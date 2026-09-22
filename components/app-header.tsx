@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button";
 import { ROLE_LABEL } from "@/lib/domain";
 import type { Viewer } from "@/lib/permissions";
 
-export function AppHeader({ viewer, showTasks, badge }: { viewer: Viewer; showTasks: boolean; badge: number }) {
+export function AppHeader({ viewer, showTasks, showTaskReport, badge }: { viewer: Viewer; showTasks: boolean; showTaskReport: boolean; badge: number }) {
   const links = [
     { href: "/home", label: "Home" },
     { href: "/roster", label: "Roster" },
     ...(viewer.role !== "MANAGEMENT" ? [{ href: "/requests", label: "My requests" }] : []),
+    ...(showTaskReport ? [{ href: "/task-report", label: "Task report" }] : []),
     ...(showTasks ? [{ href: "/tasks", label: "Tasks" }] : []),
   ];
   return (

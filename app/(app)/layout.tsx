@@ -2,7 +2,7 @@ import { AppHeader } from "@/components/app-header";
 import { MobileTabs } from "@/components/mobile-tabs";
 import { requireViewer } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { canEditShift, canManageTasks } from "@/lib/permissions";
+import { canEditShift, canManageTasks, canViewTaskReport } from "@/lib/permissions";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const viewer = await requireViewer();
@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <AppHeader viewer={viewer} showTasks={canManageTasks(viewer)} badge={badge} />
+      <AppHeader viewer={viewer} showTasks={canManageTasks(viewer)} showTaskReport={canViewTaskReport(viewer)} badge={badge} />
       <div className="flex min-h-0 flex-1 flex-col pb-16 lg:pb-0">{children}</div>
       <MobileTabs showRequests={viewer.role !== "MANAGEMENT"} />
     </div>

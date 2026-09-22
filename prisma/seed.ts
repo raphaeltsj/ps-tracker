@@ -111,7 +111,7 @@ async function main() {
     // Approved leave: short blocks spread across the range.
     const fullTypes = ["AL", "AL", "AL", "OL", "MC", "FCL", "CSE", "MWO", "1 OIL", "TRG"];
     for (let i = 0; i < 38; i++) {
-      const who = pick(staff);
+      const who = pick(staff.slice(1));
       const start = pick(range);
       const len = 1 + Math.floor(rand() * 3);
       await createLeave(who.id, pick(fullTypes), dateRange(start, addDays(start, len - 1)), "APPROVED", {
@@ -121,7 +121,7 @@ async function main() {
     }
     // Half-day leave.
     for (let i = 0; i < 10; i++) {
-      await createLeave(pick(staff).id, pick(["0.5 AL", "0.5 OIL"]), [pick(range)], "APPROVED", {
+      await createLeave(pick(staff.slice(1)).id, pick(["0.5 AL", "0.5 OIL"]), [pick(range)], "APPROVED", {
         half: rand() < 0.5 ? "FIRST" : "SECOND",
       });
     }
@@ -161,13 +161,26 @@ async function main() {
         (d) => `${d.leave.staffId}|${d.date}`,
       ),
     );
+    // Days a person is not on their normal cycle duty: V days themselves and the post-V Off PM block.
+    const vDays = overrides.filter((o) => o.duty === "V");
+    const postV = new Set(
+      vDays.flatMap((o) => {
+        const toPm = 6 - cyclePosition(s.cycleAnchor, o.date); // next PM Day 1
+        return [toPm, toPm + 1].map((n) => `${o.staffId}|${addDays(o.date, n)}`);
+      }),
+    );
     const assignments: { taskId: string; staffId: string; date: string }[] = [];
     for (const date of range) {
       if (shiftDutyOn(s.cycleAnchor, date) === "OFF") continue;
       for (const m of staff.slice(0, 10)) {
-        if (rand() < 0.35 || fullLeave.has(`${m.id}|${date}`)) continue;
+        const key = `${m.id}|${date}`;
+        if (rand() < 0.35 || fullLeave.has(key) || postV.has(key)) continue;
         assignments.push({ taskId: pick(tasks).id, staffId: m.id, date });
       }
+    }
+    // People on V duty can hold a Task too.
+    for (const v of vDays) {
+      if (rand() < 0.7 && !fullLeave.has(`${v.staffId}|${v.date}`)) assignments.push({ taskId: pick(tasks).id, staffId: v.staffId, date: v.date });
     }
     await db.taskAssignment.createMany({ data: assignments });
 
@@ -190,6 +203,9 @@ async function main() {
   console.log("Seeded shifts A, B, C with demo staff, leave, duties and Tasks.");
 }
 
+// Only one type of leave per person per day: skip any active leave that would overlap.
+const activeLeaveDays = new Map<string, Set<string>>();
+
 async function createLeave(
   staffId: string,
   typeCode: string,
@@ -197,6 +213,12 @@ async function createLeave(
   status: string,
   extra: { half?: string; notes?: string | null; remarks?: string | null; rejectReason?: string; givenById?: string | null } = {},
 ) {
+  if (status === "APPROVED" || status === "PENDING") {
+    const taken = activeLeaveDays.get(staffId) ?? new Set<string>();
+    if (dates.some((d) => taken.has(d))) return;
+    dates.forEach((d) => taken.add(d));
+    activeLeaveDays.set(staffId, taken);
+  }
   const decided = status === "APPROVED" || status === "REJECTED";
   await db.leave.create({
     data: {

@@ -13,6 +13,11 @@ export type CellAbsence = {
   derived: boolean;
 };
 
+/** True for actual leave (approved or pending). A BD marker on an Off day is not leave. */
+export function isLeaveEntry(a: CellAbsence): boolean {
+  return !(a.derived && a.counts === 0);
+}
+
 export type RosterCell = {
   duty: Duty;
   dutySource: EffectiveDuty["source"];

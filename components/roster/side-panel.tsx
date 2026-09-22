@@ -13,7 +13,7 @@ import { cyclePositionLabel } from "@/lib/cycle";
 import { formatDate, formatDateList, formatDateShort } from "@/lib/dates";
 import { ASSIGNABLE_DUTIES, DUTY_LABEL, HALF_DAY_TIMES, type Duty, type Half } from "@/lib/domain";
 import { canDecideLeave } from "@/lib/permissions";
-import type { LeaveSummary, LeaveTypeOption } from "@/lib/roster-types";
+import { isLeaveEntry, type LeaveSummary, type LeaveTypeOption } from "@/lib/roster-types";
 import { formatFigure } from "@/lib/strength";
 import { cn } from "@/lib/utils";
 
@@ -161,6 +161,8 @@ function RequestForm({ roster, viewer, selection, leaveTypes, onClear, onRemoveD
   const own = roster.cells[viewer.id];
   const needSlot = type?.halfDay ? 0.5 : 1;
   const tight = dates.filter((d) => roster.days[d].strength.slots < needSlot);
+  // Only one type of leave per day.
+  const taken = dates.filter((d) => own?.[d]?.absences.some(isLeaveEntry));
   // Management never requests leave; BD / BD-IL are derived from the birthday for now.
   const requestable = leaveTypes.filter((t) => t.code !== "BD" && t.code !== "BD-IL");
 
@@ -207,6 +209,11 @@ function RequestForm({ roster, viewer, selection, leaveTypes, onClear, onRemoveD
         <span className="text-xs font-medium">Additional notes for your supervisor</span>
         <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={500} placeholder="Optional" />
       </label>
+      {taken.length > 0 && (
+        <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">
+          You already have leave on {formatDateList(taken)}. Only one type of leave is allowed per day, so remove those dates.
+        </p>
+      )}
       {tight.length > 0 && (
         <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
           No slot left on {formatDateList(tight)}. You can still submit; your supervisor decides.
@@ -214,7 +221,7 @@ function RequestForm({ roster, viewer, selection, leaveTypes, onClear, onRemoveD
       )}
       <Button
         className="w-full"
-        disabled={pending || dates.length === 0 || !type || (type.halfDay && !half)}
+        disabled={pending || dates.length === 0 || taken.length > 0 || !type || (type.halfDay && !half)}
         onClick={() =>
           run(
             () => requestLeave({ typeCode, dates, half, notes }),
@@ -387,6 +394,8 @@ function EditTools(props: PanelProps) {
   }, [cells]);
   const names = Object.keys(byStaff).map((id) => roster.staff.find((s) => s.id === id)?.name ?? "?");
   const onFullLeave = cells.filter((c) => roster.cells[c.staffId]?.[c.date]?.absences.some((a) => a.status === "APPROVED" && a.counts >= 1)).length;
+  // Only one type of leave per day: cells that already hold leave cannot be given more.
+  const withLeave = cells.filter((c) => roster.cells[c.staffId]?.[c.date]?.absences.some(isLeaveEntry));
   const type = leaveTypes.find((t) => t.code === typeCode);
 
   return (
@@ -449,7 +458,7 @@ function EditTools(props: PanelProps) {
 
       {tab === "task" && (
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">Optional. One Task per person per day; several people can share a Task. Not available on full-day leave.</p>
+          <p className="text-xs text-muted-foreground">Optional. One Task per person per day, including people on V duty. Several people can share a Task. Not available on full-day leave.</p>
           <select value={taskId} onChange={(e) => setTaskId(e.target.value)} className="h-9 w-full rounded-md border bg-background px-2 text-sm" aria-label="Task">
             <option value="">Choose a Task</option>
             {tasks.map((t) => (
@@ -483,9 +492,19 @@ function EditTools(props: PanelProps) {
           <LeaveTypeSelect id="give-type" types={leaveTypes} value={typeCode} onChange={(v) => { setTypeCode(v); setHalf(null); }} />
           {type?.halfDay && <HalfPicker value={half} onChange={setHalf} duty={cells[0] ? roster.cells[cells[0].staffId][cells[0].date].duty : null} />}
           <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} placeholder="Remarks (optional)" />
+          {withLeave.length > 0 && (
+            <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">
+              {withLeave.length} selected cell{withLeave.length > 1 ? "s" : ""} already {withLeave.length > 1 ? "have" : "has"} leave (
+              {withLeave
+                .slice(0, 3)
+                .map((c) => `${roster.staff.find((s) => s.id === c.staffId)?.name} ${formatDateShort(c.date)}`)
+                .join(", ")}
+              {withLeave.length > 3 ? ", ..." : ""}). Only one type of leave per day: edit or cancel that leave instead.
+            </p>
+          )}
           <Button
             className="w-full"
-            disabled={pending || !type || (type.halfDay && !half) || cells.length === 0}
+            disabled={pending || !type || (type.halfDay && !half) || cells.length === 0 || withLeave.length > 0}
             onClick={() =>
               run(() => giveLeave({ staffDates: byStaff, typeCode, half, remarks }), () => {
                 onClear();

@@ -16,6 +16,7 @@ import {
   type Viewer,
 } from "@/lib/permissions";
 import { buildRoster } from "@/lib/roster-data";
+import { findLeaveConflict } from "@/lib/leave-rules";
 import { datesWithoutSlot } from "@/lib/slots";
 import { formatFigure } from "@/lib/strength";
 
@@ -56,13 +57,12 @@ async function clearTasksForFullDayLeave(staffId: string, dates: string[], halfD
   await db.taskAssignment.deleteMany({ where: { staffId, date: { in: dates } } });
 }
 
-async function overlappingLeave(staffId: string, dates: string[], excludeId?: string) {
-  return db.leaveDay.findFirst({
-    where: {
-      date: { in: dates },
-      leave: { staffId, status: { in: ["PENDING", "APPROVED"] }, id: excludeId ? { not: excludeId } : undefined },
-    },
-  });
+/** One type of leave per person per day: returns an error message if any date already has leave. */
+async function leaveClashMessage(staffId: string, who: string, dates: string[], excludeId?: string): Promise<string | null> {
+  const clash = await findLeaveConflict(staffId, dates, excludeId);
+  if (!clash) return null;
+  const state = clash.status === "PENDING" ? "a pending request for" : "";
+  return `${who} already ${who === "You" ? "have" : "has"} ${state} ${clash.code} on ${formatDate(clash.date)}. Only one type of leave is allowed per day.`.replace(/\s+/g, " ");
 }
 
 // ---------- Session ----------
@@ -97,8 +97,8 @@ export async function requestLeave(input: { typeCode: string; dates: string[]; h
     const locked = await db.lockedDate.findFirst({ where: { shiftId: viewer.shiftId!, date: { in: dates } } });
     if (locked) return fail(`${formatDate(locked.date)} is a locked date: ${locked.remarks}`);
   }
-  const clash = await overlappingLeave(viewer.id, dates);
-  if (clash) return fail(`You already have leave on ${formatDate(clash.date)}.`);
+  const clash = await leaveClashMessage(viewer.id, "You", dates);
+  if (clash) return fail(clash);
 
   await db.leave.create({
     data: {
@@ -185,8 +185,8 @@ export async function giveLeave(input: {
     const staff = await db.staff.findUnique({ where: { id: staffId } });
     if (!staff || !canEditShift(viewer, staff.shiftId)) return fail("You can only give leave in your own shift.");
     if (staff.role === "MANAGEMENT") return fail("Management does not take leave.");
-    const clash = await overlappingLeave(staffId, dates);
-    if (clash) return fail(`${staff.name} already has leave on ${formatDate(clash.date)}.`);
+    const clash = await leaveClashMessage(staffId, staffId === viewer.id ? "You" : staff.name, dates);
+    if (clash) return fail(clash);
     plan.push({ staffId, dates });
   }
 
@@ -231,8 +231,8 @@ export async function editLeave(input: {
   if (input.dates) {
     const next = cleanDates(input.dates);
     if (!next) return fail("Invalid dates.");
-    const clash = await overlappingLeave(leave.staffId, next, leave.id);
-    if (clash) return fail(`${leave.staff.name} already has leave on ${formatDate(clash.date)}.`);
+    const clash = await leaveClashMessage(leave.staffId, leave.staff.name, next, leave.id);
+    if (clash) return fail(clash);
     dates = next;
   }
 

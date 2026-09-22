@@ -15,14 +15,26 @@ function birthdayIn(birthday: string, year: number): string {
   return `${year}-${m}-${day}`;
 }
 
-export function birthdayEvents(birthday: string, year: number, dutyOn: (date: string) => Duty): BirthdayEvent[] {
+/**
+ * Only one type of leave per person per day, so BD and BD-IL only land on a working day with no
+ * other leave. `hasLeave` reports approved or pending leave on a date.
+ * TODO(open item): a working-day birthday that already has other leave is treated like an Off-day
+ * birthday (BD marker, BD-IL on the next free working day).
+ */
+export function birthdayEvents(
+  birthday: string,
+  year: number,
+  dutyOn: (date: string) => Duty,
+  hasLeave: (date: string) => boolean = () => false,
+): BirthdayEvent[] {
   const date = birthdayIn(birthday, year);
-  if (isWorkingDuty(dutyOn(date))) return [{ date, code: "BD", counts: true }];
+  const free = (d: string) => isWorkingDuty(dutyOn(d)) && !hasLeave(d);
+  if (free(date)) return [{ date, code: "BD", counts: true }];
 
   const events: BirthdayEvent[] = [{ date, code: "BD", counts: false }];
-  for (let i = 1; i <= 14; i++) {
+  for (let i = 1; i <= 21; i++) {
     const next = addDays(date, i);
-    if (isWorkingDuty(dutyOn(next))) {
+    if (free(next)) {
       events.push({ date: next, code: "BD-IL", counts: true });
       break;
     }

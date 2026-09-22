@@ -65,6 +65,15 @@ test("birthday on an Off day: BD marker, BD-IL on the next working day", () => {
   assert.deepEqual(birthdayEvents("1990-01-03", 2026, dutyOn), [{ date: "2026-01-03", code: "BD", counts: true }]);
 });
 
+test("one leave type per day: BD-IL skips working days that already have leave", () => {
+  const dutyOn = (d: string) => effectiveDuty(ANCHORS.A, d, new Map()).duty;
+  // Birthday 5 Jan is Off; 7 Jan (PM) already has leave, so BD-IL moves to 8 Jan.
+  assert.deepEqual(birthdayEvents("1990-01-05", 2026, dutyOn, (d) => d === "2026-01-07"), [
+    { date: "2026-01-05", code: "BD", counts: false },
+    { date: "2026-01-08", code: "BD-IL", counts: true },
+  ]);
+});
+
 test("date helpers", () => {
   assert.equal(addDays("2026-02-28", 1), "2026-03-01");
   assert.equal(formatDateList(["2026-10-03", "2026-10-04", "2026-10-05", "2026-10-09"]), "3-5 Oct, 9 Oct");

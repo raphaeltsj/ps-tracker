@@ -16,6 +16,58 @@ const DUTY_STYLE: Record<Duty, string> = {
 
 const DUTY_SHORT: Record<Duty, string> = { ...DUTY_LABEL, OFF_POSTV: "Off*" };
 
+/**
+ * Roster view cell colours. AM, PM and Off are shown by colour only (no text); V and V(SB) keep
+ * their text chip. The legend and cell tooltips / screen-reader labels carry the names.
+ */
+export const DUTY_CELL: Record<Duty, string> = {
+  AM: "bg-amber-200/80 dark:bg-amber-500/30",
+  PM: "bg-indigo-200/80 dark:bg-indigo-500/35",
+  V: "bg-violet-300/70 dark:bg-violet-600/40",
+  VSB: "bg-violet-100 dark:bg-violet-500/15",
+  OFF: "bg-neutral-100 dark:bg-neutral-800/70",
+  OFF_POSTV: "bg-neutral-100 shadow-[inset_0_0_0_2px_var(--color-violet-400)] dark:bg-neutral-800/70 dark:shadow-[inset_0_0_0_2px_var(--color-violet-500)]",
+};
+
+/** Duties that keep a text label on the roster. */
+export const LABELLED_DUTIES: Duty[] = ["V", "VSB"];
+
+export function dutyTitle(duty: Duty): string {
+  return DUTY_TIMES[duty] ? `${DUTY_LABEL[duty]} ${DUTY_TIMES[duty]}` : DUTY_LABEL[duty];
+}
+
+/** Colour legend for the Roster view (spec 14.2). */
+export function DutyLegend({ className }: { className?: string }) {
+  const items: [Duty, string][] = [
+    ["AM", `AM ${DUTY_TIMES.AM}`],
+    ["PM", `PM ${DUTY_TIMES.PM}`],
+    ["OFF", "Off / Rest"],
+    ["OFF_POSTV", "Off (post-V)"],
+    ["V", `V ${DUTY_TIMES.V}`],
+    ["VSB", "V(SB) standby"],
+  ];
+  return (
+    <ul className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground", className)} aria-label="Duty colour legend">
+      {items.map(([duty, label]) => (
+        <li key={duty} className="flex items-center gap-1.5">
+          <span className={cn("grid h-3.5 w-5 place-items-center rounded-sm border border-foreground/10 text-[8px] font-bold text-foreground", DUTY_CELL[duty])} aria-hidden>
+            {duty === "V" ? "V" : duty === "VSB" ? "SB" : ""}
+          </span>
+          {label}
+        </li>
+      ))}
+      <li className="flex items-center gap-1.5">
+        <span className="h-3.5 w-5 rounded-sm border bg-hatch" aria-hidden />
+        Locked date
+      </li>
+      <li className="flex items-center gap-1.5">
+        <span className="size-2 rounded-full bg-fuchsia-500" aria-hidden />
+        Special event
+      </li>
+    </ul>
+  );
+}
+
 export function DutyChip({ duty, className, long }: { duty: Duty; className?: string; long?: boolean }) {
   const title = DUTY_TIMES[duty] ? `${DUTY_LABEL[duty]} ${DUTY_TIMES[duty]}` : DUTY_LABEL[duty];
   return (

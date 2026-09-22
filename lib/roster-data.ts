@@ -59,9 +59,9 @@ export async function getMyLeaves(staffId: string): Promise<LeaveSummary[]> {
 export async function buildRoster(shiftId: string, from: string, to: string, viewer: Viewer | null): Promise<RosterData> {
   const shift = await db.shift.findUniqueOrThrow({ where: { id: shiftId } });
   const dates = dateRange(from, to);
-  // Overrides a little either side: post-V looks back up to 3 days, BD-IL looks ahead up to 14.
+  // Load a little either side: post-V looks back up to 3 days, BD-IL looks ahead up to 21.
   const loadFrom = addDays(from, -21);
-  const loadTo = addDays(to, 14);
+  const loadTo = addDays(to, 21);
 
   const staff = await db.staff.findMany({
     where: { shiftId, active: true, role: { not: "MANAGEMENT" } },
@@ -75,7 +75,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
       where: {
         staffId: { in: staffIds },
         status: { in: ["APPROVED", "PENDING"] },
-        days: { some: { date: { gte: from, lte: to } } },
+        days: { some: { date: { gte: loadFrom, lte: loadTo } } },
       },
       include: leaveInclude,
     }),
@@ -105,6 +105,8 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
   for (const person of staff) {
     const personOverrides = overridesByStaff.get(person.id) ?? new Map<string, AssignableDuty>();
     const dutyOn = (date: string) => effectiveDuty(shift.cycleAnchor, date, personOverrides);
+    // All approved/pending leave days (visible or not), so BD / BD-IL land the same for every viewer.
+    const leaveDates = new Set(leaves.filter((l) => l.staffId === person.id).flatMap((l) => l.days.map((d) => d.date)));
     const row: Record<string, RosterCell> = {};
     for (const date of dates) {
       const { duty, source } = dutyOn(date);
@@ -130,7 +132,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
     if (person.birthday) {
       const years = new Set([Number(from.slice(0, 4)) - 1, Number(from.slice(0, 4)), Number(to.slice(0, 4))]);
       for (const year of years) {
-        for (const ev of birthdayEvents(person.birthday, year, (d) => dutyOn(d).duty)) {
+        for (const ev of birthdayEvents(person.birthday, year, (d) => dutyOn(d).duty, (d) => leaveDates.has(d))) {
           if (!dateSet.has(ev.date)) continue;
           row[ev.date].absences.push({
             leaveId: null,
@@ -145,7 +147,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
     }
 
     for (const date of dates) {
-      // One person is at most 1 absence per day, even with overlapping records.
+      // One leave type per person per day; cap at 1 in case older data overlaps.
       const counted = Math.min(1, row[date].absences.reduce((sum, a) => sum + a.counts, 0));
       notIn.set(date, notIn.get(date)! + counted);
     }

@@ -40,3 +40,8 @@ export function canManageStaff(viewer: Viewer): boolean {
 export function canAddCustomLeaveType(viewer: Viewer): boolean {
   return viewer.role === "SUPERVISOR" || viewer.role === "MANAGEMENT";
 }
+
+/** Task report (count of Tasks done per person). Supervisors default to their own shift. */
+export function canViewTaskReport(viewer: Viewer): boolean {
+  return viewer.role === "SUPERVISOR" || viewer.role === "MANAGEMENT";
+}

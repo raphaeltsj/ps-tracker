@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, Lock } from "lucide-react";
-import { DutyChip, EventBadge, LeaveChip, LockBadge, TaskTag } from "@/components/roster/chips";
+import { DUTY_CELL, DutyChip, DutyLegend, dutyTitle, EventBadge, LABELLED_DUTIES, LeaveChip, LockBadge, TaskTag } from "@/components/roster/chips";
 import { StrengthSummary } from "@/components/roster/strength-summary";
 import { cellKey, type Selection, type WorkspaceProps } from "@/components/roster/roster-workspace";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,9 @@ export function MobileRoster({
           <div>
             <div className="font-semibold">{formatDate(day)}</div>
             <div className="text-xs text-muted-foreground">
-              {roster.shiftName}: {info.shiftDuty === "OFF" ? "Rest day" : `${info.shiftDuty} duty`}
+              <span className={cn("mr-1.5 inline-block h-2 w-6 rounded-full align-middle", DUTY_CELL[info.shiftDuty])} aria-hidden />
+              {roster.shiftName}
+              <span className="sr-only">: {info.shiftDuty === "OFF" ? "Rest day" : `${info.shiftDuty} duty`}</span>
             </div>
           </div>
           {mode === "staff" && canRequest && (canRequestLocked || !info.locked) && (
@@ -99,6 +101,7 @@ export function MobileRoster({
           </div>
         )}
         <StrengthSummary day={info} compact={compact} />
+        <DutyLegend />
       </div>
 
       <ul className="divide-y">
@@ -127,7 +130,10 @@ export function MobileRoster({
                   <LeaveChip absence={a} />
                 </button>
               ))}
-              <DutyChip duty={cell.duty} className="min-w-12" />
+              {/* AM, PM and Off by colour only; V and V(SB) keep their label. */}
+              <span className={cn("grid h-6 w-12 place-items-center rounded-md", DUTY_CELL[cell.duty])} title={dutyTitle(cell.duty)}>
+                {LABELLED_DUTIES.includes(cell.duty) ? <DutyChip duty={cell.duty} /> : <span className="sr-only">{dutyTitle(cell.duty)}</span>}
+              </span>
             </li>
           );
         })}

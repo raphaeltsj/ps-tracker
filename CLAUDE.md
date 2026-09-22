@@ -2,11 +2,16 @@
 
 PS Tracker is a duty roster web app (desktop-first, with a full mobile view) for a shift-based team of about 60-90 people, split into three fixed shifts (A, B, C) of 20-30 people each.
 
-The full spec is `docs/system-context.md`. It is the source of truth: update it whenever a rule changes. Items in [square brackets] there are undecided. Do not invent answers for them; flag them instead.
+The full spec is `docs/system-context.md`. It is the source of truth: update it whenever a rule changes. Part A is the product rules; Part B (section 17) is the build framework (stack, structure, conventions), previously `docs/framework.md`. Items in [square brackets] there are undecided. Do not invent answers for them; flag them instead.
 
 ## Stack and commands
 
-[TBD: the team fills this in once decided: framework, package manager, how to run, test, and lint.]
+Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, npm. Details in `docs/system-context.md` section 17.
+
+- Setup: `npm install`, then `npm run setup` (creates and seeds `prisma/dev.db`)
+- Run: `npm run dev` (http://localhost:3000, pick a demo user)
+- Test: `npm test`; lint: `npm run lint`; types: `npm run typecheck`
+- Reseed demo data: `npm run db:seed`
 
 ## Domain rules (summary)
 
@@ -31,13 +36,14 @@ The full spec is `docs/system-context.md`. It is the source of truth: update it 
 **Leave.**
 - Types: AL, 0.5 AL, OL, MWO, OML (full name TBD), MC, HL, FCL, CSE, BD, BD-IL, 0.5 OIL, 1 OIL. Half-day types ask first or second half, show actual hours, and look half-filled.
 - Custom leave types: name max 6 characters including spaces, with a live counter and chip preview. They count toward Not in Strength.
-- Birthday: BD shows on the birthday even on an Off day; then the leave is BD-IL on the next closest working day. BD on an Off day is a marker only.
+- One type of leave per person per day (pending, approved, given, half-day, BD / BD-IL all count). Block the request or grant and show the clashing date.
+- Birthday: BD shows on the birthday even on an Off day; then the leave is BD-IL on the next closest working day without other leave. BD on an Off day is a marker only.
 - Staff requests: leave type, dates (range or specific), notes; may be on Off days; may be submitted with no slots left. Statuses: Pending, Approved, Rejected, Withdrawn. Staff can withdraw pending only.
 - Supervisor review: inbox sorted earliest submitted first (name, type, dates, time submitted only; no priority badges). Reject needs a reason and is always available. Approve is disabled with "No slot available on [date]" unless an extra slot exists on every requested date (half-day needs at least 0.5).
 - Only supervisors and Management cancel approved leave. Leave they give is already approved and may be set on locked dates and Off days.
 - Locked dates: staff cannot request them (disabled in the picker); selecting one shows a "Locked date" badge and the remarks in the right-hand side panel. Already-approved leave is unaffected. Festive balloting is out of scope.
 
-**Tasks.** Named "Task 1", "Task 2", etc., name only (no description), max 6 characters including spaces. Only Management adds, renames, and deletes them; deleting removes all assignments, so warn first. Assignment is optional. Several people can share a Task. One Task per person per day (a new one replaces the old). No Task on full-day leave (remove any existing; half-day keeps it). Tasks are informational only and never affect duty, leave, strength, MFL, or slots. Show as a separate small tag beside the duty.
+**Tasks.** Named "Task 1", "Task 2", etc., name only (no description), max 6 characters including spaces. Only Management adds, renames, and deletes them; deleting removes all assignments, so warn first. Assignment is optional, and people on V duty can be given a Task. Several people can share a Task. One Task per person per day (a new one replaces the old). No Task on full-day leave (remove any existing; half-day keeps it). Tasks are informational only and never affect duty, leave, strength, MFL, or slots. Show as a separate small tag beside the duty. Supervisors and Management have a Task report (tasks done per person) filtered by year, month, or date range, which must stay readable with many Tasks.
 
 **Roles.**
 - Regular Staff: view all shifts, Calendar/Roster switch, see strength, request and withdraw own leave. No edit controls.
@@ -49,7 +55,7 @@ The full spec is `docs/system-context.md`. It is the source of truth: update it 
 - Strength rows are sticky directly below the date header, with a "Compact" toggle that shows only Available Slot(s).
 - The request form sits on the same page as the calendar/roster (right panel on desktop, bottom sheet on mobile).
 - Mobile uses bottom tabs (Home, Roster, Requests, Profile). Include a notification bell placeholder.
-- Light and dark mode, calm and readable, colours always paired with text or icons. Suggested: AM amber, PM indigo, V deep navy/purple, V(SB) lighter outline of V, Off grey, Leave teal, Special Event magenta, locked dates hatched with a lock icon.
+- Light and dark mode, calm and readable, colours paired with text, icons, or a legend. On the Roster view, AM / PM / Off are colour-coded cells with no text (legend above the grid, tooltips and screen-reader labels); V and V(SB) keep their labels. Suggested: AM amber, PM indigo, V deep navy/purple, V(SB) lighter outline of V, Off grey, Leave teal, Special Event magenta, locked dates hatched with a lock icon.
 - Sample data: placeholder staff names that are each a single 5-character word (Alpha, Bravo, Delta...). No realistic personal names.
 
 **Out of scope.** Payroll, timesheets and attendance, HR records, festive balloting.

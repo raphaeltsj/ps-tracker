@@ -2,13 +2,12 @@
 
 A duty roster web app for a shift-based team: three fixed shifts on a 6-day AM / PM / Off cycle, with V (night) duty and standby, minimum-headcount tracking, leave requests and approvals, locked dates, duty swaps, and optional Tasks.
 
-- Full spec: [`docs/system-context.md`](docs/system-context.md) (source of truth)
-- Build framework (stack, structure, conventions): [`docs/framework.md`](docs/framework.md)
+- Full spec: [`docs/system-context.md`](docs/system-context.md) (source of truth). Part A is the product rules; Part B (section 17) is the build framework: stack, structure, and conventions.
 - Shared Claude Code context: [`CLAUDE.md`](CLAUDE.md)
 
 ## Status
 
-Core loop built (framework build priority): Roster and Calendar views with the same-page leave request, supervisor Edit view, give / edit / cancel leave, assign duties and Tasks, approve or reject from the leave detail panel, and Task management. Still to come: leave inbox page, all-shift overview, lock-date and special-event editors, duty swaps, staff records, and custom leave type editor.
+Core loop built (build priority, spec section 17.5): Roster and Calendar views with the same-page leave request, supervisor Edit view, give / edit / cancel leave, assign duties and Tasks (including on V duty), approve or reject from the leave detail panel, Task management, and the Task report. One type of leave per person per day is enforced. Still to come: leave inbox page, all-shift overview, lock-date and special-event editors, duty swaps, staff records, and custom leave type editor.
 
 ## Stack
 
@@ -41,6 +40,8 @@ Pick a demo user on the login screen (Management, or a Supervisor / Regular Staf
 - `lib/cycle.ts`: duty cycle, cycle position, V duty and "Off (post-V)" (derived, never stored)
 - `lib/strength.ts`: Total / Not in / Working / MFL / Available Slot(s)
 - `lib/permissions.ts`: role and shift checks, used by the UI and enforced in every Server Action
+- `lib/leave-rules.ts`: one type of leave per person per day
+- `lib/task-report.ts`: Task report counts (page: `/task-report`)
 - `lib/roster-data.ts`: loads a shift's month and computes cells and strength rows
 - `components/roster/`: roster grid, calendar, mobile agenda, side panel
 - `prisma/seed.ts`: demo shifts, staff, leave, V blocks, Tasks, locks and events

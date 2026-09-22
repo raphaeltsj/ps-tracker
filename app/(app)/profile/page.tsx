@@ -6,6 +6,8 @@ import { cyclePositionLabel } from "@/lib/cycle";
 import { formatDate, todayLocal } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { ROLE_LABEL } from "@/lib/domain";
+import { canManageTasks, canViewTaskReport } from "@/lib/permissions";
+import Link from "next/link";
 
 export const metadata = { title: "Profile | PS Tracker" };
 
@@ -35,6 +37,18 @@ export default async function ProfilePage() {
           </>
         )}
       </dl>
+      {canViewTaskReport(viewer) && (
+        <Link href="/task-report" className="flex items-center justify-between rounded-xl border p-4 text-sm hover:bg-accent/40">
+          <span>Task report</span>
+          <span className="text-muted-foreground">Tasks done by year, month or range</span>
+        </Link>
+      )}
+      {canManageTasks(viewer) && (
+        <Link href="/tasks" className="flex items-center justify-between rounded-xl border p-4 text-sm hover:bg-accent/40">
+          <span>Manage Tasks</span>
+          <span className="text-muted-foreground">Add, rename, delete</span>
+        </Link>
+      )}
       <div className="flex items-center justify-between rounded-xl border p-4 text-sm">
         <span>Light / dark mode</span>
         <ThemeToggle />
