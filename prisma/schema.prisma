@@ -1,0 +1,153 @@
+// PS Tracker data model. Domain rules live in docs/system-context.md.
+// Strength figures, cycle position and base duties are derived in /lib, never stored.
+// Dates are stored as "YYYY-MM-DD" strings: rosters are whole days, so there is no timezone to get wrong.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Shift {
+  id          String         @id // "A" | "B" | "C"
+  name        String
+  // Day index (days since 1970-01-01) on which this shift starts PM Day 1. See lib/cycle.ts.
+  cycleAnchor Int
+  staff       Staff[]
+  lockedDates LockedDate[]
+  events      SpecialEvent[]
+  vHeadcounts VHeadcount[]
+}
+
+model Staff {
+  id        String  @id @default(cuid())
+  name      String
+  // "STAFF" | "SUPERVISOR" | "MANAGEMENT". Management has no shift and never takes leave.
+  role      String
+  shiftId   String?
+  shift     Shift?  @relation(fields: [shiftId], references: [id])
+  // "YYYY-MM-DD". Drives BD / BD-IL.
+  birthday  String?
+  active    Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  dutyOverrides   DutyOverride[]
+  leaves          Leave[]           @relation("LeaveStaff")
+  leavesGiven     Leave[]           @relation("LeaveGivenBy")
+  leavesDecided   Leave[]           @relation("LeaveDecidedBy")
+  taskAssignments TaskAssignment[]
+  sessions        Session[]
+}
+
+model Session {
+  token     String   @id
+  staffId   String
+  staff     Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+// A duty set by a supervisor that replaces the person's cycle duty for one day.
+// V, V(SB) and every other duty are stored the same way (one duty picker).
+model DutyOverride {
+  id      String @id @default(cuid())
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  date    String
+  duty    String // "AM" | "PM" | "V" | "VSB" | "OFF"
+
+  @@unique([staffId, date])
+}
+
+model LeaveType {
+  code      String  @id // short code shown on the chip, max 6 characters
+  name      String
+  halfDay   Boolean @default(false)
+  custom    Boolean @default(false)
+  sortOrder Int     @default(0)
+  leaves    Leave[]
+}
+
+model Leave {
+  id           String     @id @default(cuid())
+  staffId      String
+  staff        Staff      @relation("LeaveStaff", fields: [staffId], references: [id], onDelete: Cascade)
+  typeCode     String
+  type         LeaveType  @relation(fields: [typeCode], references: [code])
+  half         String? // "FIRST" | "SECOND" for half-day types
+  // "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN" | "CANCELLED"
+  status       String
+  notes        String? // staff notes on a request
+  remarks      String? // supervisor remarks
+  rejectReason String?
+  givenById    String? // set when a supervisor/management gave the leave directly
+  givenBy      Staff?     @relation("LeaveGivenBy", fields: [givenById], references: [id])
+  decidedById  String?
+  decidedBy    Staff?     @relation("LeaveDecidedBy", fields: [decidedById], references: [id])
+  submittedAt  DateTime   @default(now())
+  decidedAt    DateTime?
+  days         LeaveDay[]
+}
+
+model LeaveDay {
+  id      String @id @default(cuid())
+  leaveId String
+  leave   Leave  @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+  date    String
+
+  @@unique([leaveId, date])
+  @@index([date])
+}
+
+model Task {
+  id          String           @id @default(cuid())
+  name        String // max 6 characters
+  createdAt   DateTime         @default(now())
+  assignments TaskAssignment[]
+}
+
+model TaskAssignment {
+  id      String @id @default(cuid())
+  taskId  String
+  task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  date    String
+
+  // One Task per person per day.
+  @@unique([staffId, date])
+}
+
+model LockedDate {
+  id      String @id @default(cuid())
+  shiftId String
+  shift   Shift  @relation(fields: [shiftId], references: [id])
+  date    String
+  remarks String
+
+  @@unique([shiftId, date])
+}
+
+model SpecialEvent {
+  id         String @id @default(cuid())
+  shiftId    String
+  shift      Shift  @relation(fields: [shiftId], references: [id])
+  date       String
+  reportTime String // e.g. "0600"
+  note       String?
+
+  @@unique([shiftId, date])
+}
+
+// V headcount (and so V MFL) raised above 1 for a specific date.
+model VHeadcount {
+  id      String @id @default(cuid())
+  shiftId String
+  shift   Shift  @relation(fields: [shiftId], references: [id])
+  date    String
+  count   Int
+
+  @@unique([shiftId, date])
+}

@@ -19,3 +19,22 @@ Thumbs.db
 
 # Editors
 .idea/
+
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+.vercel
+
+# Local SQLite database
+/prisma/*.db
+/prisma/*.db-journal
+
+/lib/generated/prisma
+
+# Generated Prisma client
+/lib/generated/
+
+# Machine-specific preview config
+.claude/launch.json
