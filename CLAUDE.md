@@ -1,0 +1,64 @@
+# PS Tracker: shared Claude Code context
+
+PS Tracker is a duty roster web app (desktop-first, with a full mobile view) for a shift-based team of about 60-90 people, split into three fixed shifts (A, B, C) of 20-30 people each.
+
+The full spec is `docs/system-context.md`. It is the source of truth: update it whenever a rule changes. Items in [square brackets] there are undecided. Do not invent answers for them; flag them instead.
+
+## Stack and commands
+
+[TBD: the team fills this in once decided: framework, package manager, how to run, test, and lint.]
+
+## Domain rules (summary)
+
+**Cycle.** Every shift runs 2 days PM, 2 days AM, 2 days Off, repeating (6-day cycle). Shifts are offset so handover runs A to B to C to A. Each person should see their cycle position (for example "PM Day 1 of 2, next: AM").
+
+**Duties and times.** AM 0745-1445, PM 1445-2130, V (night) 2130-0745 (crosses midnight). Duty types are AM, PM, V, V(SB), Off, all assigned from one duty picker.
+
+**V duty.** A temporary overlay, not a separate team. Normally 1 person covers V; a supervisor can raise the number for specific dates. The person works 2 days of V on what would have been their 2 Off days after AM; their next 2-day PM block becomes 2 Off (label it "Off (post-V)"); then AM, AM, Off, Off and back to normal. Each of the 2 V days has a standby on V(SB), a different person each day, from the same shift. V(SB) never affects Total Strength, Not in Strength, Working Strength, MFL, or leave slots.
+
+**Special events.** A whole shift reports at a different time. Show "Special Event: report at [time]" on the day header, day view, mobile day card, and affected cells. They do not change MFL or leave slots. Public holidays change nothing.
+
+**MFL (minimum headcount).** Weekday: AM 13, PM 12, V 1. Weekend (Sat, Sun): AM 14, PM 11, V 1. On a shift's Off days it is a "Rest day" and MFL is blank.
+
+**Strength figures (per duty, per day).**
+- Total Strength = headcount of the shift.
+- Not in Strength = sum of **approved** absences (half-day counts 0.5; pending never counts).
+- Working Strength = Total - Not in Strength.
+- Available Slot(s) = Total - Not in Strength - MFL (on Rest days MFL is blank, so Total - Not in Strength).
+- Values like 21.5 must display cleanly. Colour-code slots: healthy, low (1-2), zero ("No slots"), below MFL (warning).
+- Worked example: weekday PM, total 26, 4 full leave + 1 x 0.5 OIL gives Not in 4.5, Working 21.5, Slots 9.5.
+
+**Leave.**
+- Types: AL, 0.5 AL, OL, MWO, OML (full name TBD), MC, HL, FCL, CSE, BD, BD-IL, 0.5 OIL, 1 OIL. Half-day types ask first or second half, show actual hours, and look half-filled.
+- Custom leave types: name max 6 characters including spaces, with a live counter and chip preview. They count toward Not in Strength.
+- Birthday: BD shows on the birthday even on an Off day; then the leave is BD-IL on the next closest working day. BD on an Off day is a marker only.
+- Staff requests: leave type, dates (range or specific), notes; may be on Off days; may be submitted with no slots left. Statuses: Pending, Approved, Rejected, Withdrawn. Staff can withdraw pending only.
+- Supervisor review: inbox sorted earliest submitted first (name, type, dates, time submitted only; no priority badges). Reject needs a reason and is always available. Approve is disabled with "No slot available on [date]" unless an extra slot exists on every requested date (half-day needs at least 0.5).
+- Only supervisors and Management cancel approved leave. Leave they give is already approved and may be set on locked dates and Off days.
+- Locked dates: staff cannot request them (disabled in the picker); selecting one shows a "Locked date" badge and the remarks in the right-hand side panel. Already-approved leave is unaffected. Festive balloting is out of scope.
+
+**Tasks.** Named "Task 1", "Task 2", etc., name only (no description), max 6 characters including spaces. Only Management adds, renames, and deletes them; deleting removes all assignments, so warn first. Assignment is optional. Several people can share a Task. One Task per person per day (a new one replaces the old). No Task on full-day leave (remove any existing; half-day keeps it). Tasks are informational only and never affect duty, leave, strength, MFL, or slots. Show as a separate small tag beside the duty.
+
+**Roles.**
+- Regular Staff: view all shifts, Calendar/Roster switch, see strength, request and withdraw own leave. No edit controls.
+- Supervisor: staff view plus Edit view for their own shift only (other shifts read-only). Assign duties and Tasks, swap duties, give/edit/cancel leave (including their own, no approval needed), approve/reject requests, lock dates, set special-event times and V headcount, add custom leave types. In Staff view they can request leave and approve their own request.
+- Management: everything a supervisor can do across all shifts, plus lock all shifts at once, manage Tasks, and manage staff records. Management never requests or takes leave.
+
+**UI.**
+- Calendar/Roster switch (all roles) is separate from the Edit/Staff switch (supervisors and Management).
+- Strength rows are sticky directly below the date header, with a "Compact" toggle that shows only Available Slot(s).
+- The request form sits on the same page as the calendar/roster (right panel on desktop, bottom sheet on mobile).
+- Mobile uses bottom tabs (Home, Roster, Requests, Profile). Include a notification bell placeholder.
+- Light and dark mode, calm and readable, colours always paired with text or icons. Suggested: AM amber, PM indigo, V deep navy/purple, V(SB) lighter outline of V, Off grey, Leave teal, Special Event magenta, locked dates hatched with a lock icon.
+- Sample data: placeholder staff names that are each a single 5-character word (Alpha, Bravo, Delta...). No realistic personal names.
+
+**Out of scope.** Payroll, timesheets and attendance, HR records, festive balloting.
+
+## Working agreements
+
+- `main` holds working code only. Everyone works on their own branch and merges through a pull request.
+- Experiments go on throwaway branches like `try/approach-a` and can be deleted.
+- Ask the team before editing shared files (config, schema, package files, this file).
+- When a decision is made, update this file and `docs/system-context.md`, then push.
+- Personal Claude preferences go in `CLAUDE.local.md`, which is gitignored.
+- Never commit secrets. Use a `.env` file that stays out of git.
