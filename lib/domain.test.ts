@@ -1,0 +1,80 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { birthdayEvents } from "./birthday";
+import { cyclePositionLabel, effectiveDuty, shiftDutyOn } from "./cycle";
+import { addDays, dateRange, dayIndex, formatDateList } from "./dates";
+import type { AssignableDuty } from "./domain";
+import { computeStrength, formatFigure, mflFor } from "./strength";
+
+const DAY1 = dayIndex("2026-01-01");
+const ANCHORS = { A: DAY1, B: DAY1 - 4, C: DAY1 - 2 };
+
+test("the three shifts follow the spec's 6-day table (section 3.2)", () => {
+  const days = dateRange("2026-01-01", "2026-01-06");
+  assert.deepEqual(days.map((d) => shiftDutyOn(ANCHORS.A, d)), ["PM", "PM", "AM", "AM", "OFF", "OFF"]);
+  assert.deepEqual(days.map((d) => shiftDutyOn(ANCHORS.B, d)), ["OFF", "OFF", "PM", "PM", "AM", "AM"]);
+  assert.deepEqual(days.map((d) => shiftDutyOn(ANCHORS.C, d)), ["AM", "AM", "OFF", "OFF", "PM", "PM"]);
+});
+
+test("cycle position label", () => {
+  assert.equal(cyclePositionLabel(ANCHORS.A, "2026-01-01"), "PM Day 1 of 2, next: AM");
+  assert.equal(cyclePositionLabel(ANCHORS.A, "2026-01-04"), "AM Day 2 of 2, next: Off");
+  assert.equal(cyclePositionLabel(ANCHORS.A, "2026-01-06"), "Off Day 2 of 2, next: PM");
+});
+
+test("V duty turns the following PM block into Off (post-V), section 5", () => {
+  const overrides = new Map<string, AssignableDuty>([
+    ["2026-01-05", "V"],
+    ["2026-01-06", "V"],
+  ]);
+  const duties = dateRange("2026-01-01", "2026-01-12").map((d) => effectiveDuty(ANCHORS.A, d, overrides).duty);
+  assert.deepEqual(duties, ["PM", "PM", "AM", "AM", "V", "V", "OFF_POSTV", "OFF_POSTV", "AM", "AM", "OFF", "OFF"]);
+});
+
+test("worked example: weekday PM, total 26, 4 full + 1 half-day leave", () => {
+  const date = "2026-09-22"; // Tuesday
+  const s = computeStrength(26, 4.5, mflFor("PM", date));
+  assert.equal(s.notIn, 4.5);
+  assert.equal(formatFigure(s.working), "21.5");
+  assert.equal(formatFigure(s.slots), "9.5");
+  assert.equal(s.status, "healthy");
+});
+
+test("Rest day: MFL blank, slots = total - not in", () => {
+  const s = computeStrength(26, 3, mflFor("OFF", "2026-09-22"));
+  assert.equal(s.mfl, null);
+  assert.equal(s.working, 23);
+  assert.equal(s.slots, 23);
+});
+
+test("weekend MFL and slot status bands", () => {
+  assert.equal(mflFor("AM", "2026-09-26"), 14); // Saturday
+  assert.equal(mflFor("PM", "2026-09-27"), 11); // Sunday
+  assert.equal(computeStrength(14, 0, 12).status, "low");
+  assert.equal(computeStrength(12, 0, 12).status, "zero");
+  assert.equal(computeStrength(12, 1, 12).status, "below");
+});
+
+test("birthday on an Off day: BD marker, BD-IL on the next working day", () => {
+  const dutyOn = (d: string) => effectiveDuty(ANCHORS.A, d, new Map()).duty;
+  const events = birthdayEvents("1990-01-05", 2026, dutyOn);
+  assert.deepEqual(events, [
+    { date: "2026-01-05", code: "BD", counts: false },
+    { date: "2026-01-07", code: "BD-IL", counts: true },
+  ]);
+  assert.deepEqual(birthdayEvents("1990-01-03", 2026, dutyOn), [{ date: "2026-01-03", code: "BD", counts: true }]);
+});
+
+test("one leave type per day: BD-IL skips working days that already have leave", () => {
+  const dutyOn = (d: string) => effectiveDuty(ANCHORS.A, d, new Map()).duty;
+  // Birthday 5 Jan is Off; 7 Jan (PM) already has leave, so BD-IL moves to 8 Jan.
+  assert.deepEqual(birthdayEvents("1990-01-05", 2026, dutyOn, (d) => d === "2026-01-07"), [
+    { date: "2026-01-05", code: "BD", counts: false },
+    { date: "2026-01-08", code: "BD-IL", counts: true },
+  ]);
+});
+
+test("date helpers", () => {
+  assert.equal(addDays("2026-02-28", 1), "2026-03-01");
+  assert.equal(formatDateList(["2026-10-03", "2026-10-04", "2026-10-05", "2026-10-09"]), "3-5 Oct, 9 Oct");
+});
