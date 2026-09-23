@@ -20,6 +20,10 @@ export function mflFor(duty: ShiftDuty, date: string): number | null {
   return MFL[isWeekend(date) ? "weekend" : "weekday"][duty];
 }
 
+/** V always needs exactly 1 person (spec 7). */
+export const V_MFL = MFL.weekday.V;
+
+/** Red at no slots or below MFL, yellow at 1-2 left, green above that (spec 8). */
 export function slotStatus(slots: number): SlotStatus {
   if (slots < 0) return "below";
   if (slots === 0) return "zero";

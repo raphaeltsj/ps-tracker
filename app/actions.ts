@@ -4,9 +4,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { endSession, requireViewer, startSession } from "@/lib/auth";
-import { formatDate, isValidDate } from "@/lib/dates";
+import { addDays, formatDate, isValidDate } from "@/lib/dates";
 import { db } from "@/lib/db";
-import { ASSIGNABLE_DUTIES, NAME_MAX, type Half } from "@/lib/domain";
+import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_OIL_HALF, NAME_MAX, type Half } from "@/lib/domain";
 import {
   canDecideLeave,
   canEditShift,
@@ -221,6 +221,7 @@ export async function editLeave(input: {
   const viewer = await requireViewer();
   const leave = await db.leave.findUnique({ where: { id: input.leaveId }, include: { staff: true, days: true } });
   if (!leave || !canEditShift(viewer, leave.staff.shiftId)) return fail("You cannot edit this leave.");
+  if (leave.autoFor) return fail(`This ${DOS_OIL_CODE} comes with the ${DOS_LABEL} duty and cannot be changed. Remove the duty instead.`);
   if (leave.status !== "APPROVED" && leave.status !== "PENDING") return fail("This leave can no longer be edited.");
   const type = await leaveTypeOrNull(input.typeCode);
   if (!type) return fail("Pick a leave type.");
@@ -257,6 +258,7 @@ export async function cancelLeave(leaveId: string): Promise<ActionResult> {
   const viewer = await requireViewer();
   const leave = await db.leave.findUnique({ where: { id: leaveId }, include: { staff: true } });
   if (!leave || !canEditShift(viewer, leave.staff.shiftId)) return fail("Only supervisors and Management can cancel approved leave.");
+  if (leave.autoFor) return fail(`This ${DOS_OIL_CODE} comes with the ${DOS_LABEL} duty and cannot be cancelled. Remove the duty instead.`);
   if (leave.status !== "APPROVED") return fail("Only approved leave can be cancelled.");
   await db.leave.update({ where: { id: leaveId }, data: { status: "CANCELLED", decidedById: viewer.id, decidedAt: new Date() } });
   return done("Leave cancelled. The slot is free again.");
@@ -277,13 +279,19 @@ async function checkCells(viewer: Viewer, cells: CellRef[]): Promise<string | nu
   return null;
 }
 
-/** duty "CYCLE" removes the override so the person follows the normal cycle again. */
+/**
+ * Assigns V, V(SB) or Off(V). AM and PM are never set by hand: they come from the cycle.
+ * duty "CYCLE" removes the override, so cancelling a V duty also restores the PM block that the
+ * app had turned into Off(V).
+ */
 export async function assignDuty(input: { cells: CellRef[]; duty: string }): Promise<ActionResult> {
   const viewer = await requireViewer();
   const error = await checkCells(viewer, input.cells);
   if (error) return fail(error);
   const isCycle = input.duty === "CYCLE";
-  if (!isCycle && !(ASSIGNABLE_DUTIES as readonly string[]).includes(input.duty)) return fail("Pick a duty.");
+  if (!isCycle && !(ASSIGNABLE_DUTIES as readonly string[]).includes(input.duty)) {
+    return fail("Pick V, V(SB) or Off(V). AM and PM follow the shift cycle.");
+  }
 
   await db.$transaction(
     input.cells.map(({ staffId, date }) =>
@@ -297,6 +305,128 @@ export async function assignDuty(input: { cells: CellRef[]; duty: string }): Pro
     ),
   );
   return done(isCycle ? "Reset to the normal cycle." : "Duty assigned.");
+}
+
+/**
+ * DOS / DOS2IC / FDO (spec 5.2): a 24-hour duty reporting at 0800 on one AM day, on top of the
+ * person's shift duty. It always earns a 0.5 OIL (first half) the next day, which is created here
+ * and cannot be cancelled on its own. `kind` null removes the duty and that OIL.
+ */
+export async function assignExtraDuty(input: { cells: CellRef[]; kind: string | null }): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  const error = await checkCells(viewer, input.cells);
+  if (error) return fail(error);
+
+  if (input.kind === null) {
+    const removed = await db.extraDuty.findMany({ where: { OR: input.cells.map(({ staffId, date }) => ({ staffId, date })) } });
+    if (removed.length === 0) return fail(`No ${DOS_LABEL} duty on the selected cells.`);
+    await db.leave.deleteMany({ where: { autoFor: { in: removed.map((r) => r.id) } } });
+    await db.extraDuty.deleteMany({ where: { id: { in: removed.map((r) => r.id) } } });
+    return done(`${DOS_LABEL} duty removed, with its ${DOS_OIL_CODE}.`);
+  }
+  if (!(DOS_KINDS as readonly string[]).includes(input.kind)) return fail(`Pick ${DOS_KINDS.join(", ")}.`);
+
+  // It must fall on an AM day, and the next day must be free for the 0.5 OIL.
+  const staff = await db.staff.findMany({ where: { id: { in: input.cells.map((c) => c.staffId) } } });
+  const byId = new Map(staff.map((s) => [s.id, s]));
+  for (const { staffId, date } of input.cells) {
+    const person = byId.get(staffId)!;
+    const roster = await buildRoster(person.shiftId!, date, date, viewer);
+    const duty = roster.cells[staffId]?.[date]?.duty;
+    if (duty !== "AM") return fail(`${person.name} is not on AM duty on ${formatDate(date)}. A ${DOS_LABEL} duty must fall on an AM day.`);
+    const next = addDays(date, 1);
+    const clash = await findLeaveConflict(staffId, [next]);
+    if (clash) {
+      return fail(`${person.name} already has ${clash.code} on ${formatDate(next)}, so the ${DOS_OIL_CODE} that comes with this duty cannot be added.`);
+    }
+  }
+
+  for (const { staffId, date } of input.cells) {
+    const existing = await db.extraDuty.findUnique({ where: { staffId_date: { staffId, date } } });
+    if (existing) await db.leave.deleteMany({ where: { autoFor: existing.id } });
+    const duty = await db.extraDuty.upsert({
+      where: { staffId_date: { staffId, date } },
+      create: { staffId, date, kind: input.kind },
+      update: { kind: input.kind },
+    });
+    await db.leave.create({
+      data: {
+        staffId,
+        typeCode: DOS_OIL_CODE,
+        half: DOS_OIL_HALF,
+        status: "APPROVED",
+        remarks: `Automatic after ${input.kind} duty on ${formatDate(date)}.`,
+        givenById: viewer.id,
+        decidedById: viewer.id,
+        decidedAt: new Date(),
+        autoFor: duty.id,
+        days: { create: [{ date: addDays(date, 1) }] },
+      },
+    });
+  }
+  return done(`${input.kind} assigned, with ${DOS_OIL_CODE} the next day.`);
+}
+
+// ---------- Locked dates and special events ----------
+
+async function editableShifts(viewer: Viewer, shiftId: string, allShifts: boolean): Promise<string[] | null> {
+  const ids = allShifts ? (await db.shift.findMany({ select: { id: true } })).map((s) => s.id) : [shiftId];
+  if (ids.some((id) => !canEditShift(viewer, id))) return null;
+  return ids;
+}
+
+/** Locks dates for events. Staff cannot request leave on them; supervisors still can give leave. */
+export async function lockDates(input: { shiftId: string; dates: string[]; remarks: string; allShifts?: boolean }): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  const dates = cleanDates(input.dates);
+  if (!dates) return fail("Pick at least one valid date.");
+  const remarks = cleanText(input.remarks);
+  if (!remarks) return fail("Add remarks explaining why the dates are locked.");
+  const shifts = await editableShifts(viewer, input.shiftId, input.allShifts === true);
+  if (!shifts) return fail("You can only lock dates for your own shift.");
+
+  for (const shiftId of shifts) {
+    for (const date of dates) {
+      await db.lockedDate.upsert({
+        where: { shiftId_date: { shiftId, date } },
+        create: { shiftId, date, remarks },
+        update: { remarks },
+      });
+    }
+  }
+  return done(shifts.length > 1 ? `Locked on all ${shifts.length} shifts.` : "Date locked.");
+}
+
+export async function unlockDate(input: { shiftId: string; date: string; allShifts?: boolean }): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  if (!isValidDate(input.date)) return fail("Invalid date.");
+  const shifts = await editableShifts(viewer, input.shiftId, input.allShifts === true);
+  if (!shifts) return fail("You can only unlock dates for your own shift.");
+  await db.lockedDate.deleteMany({ where: { shiftId: { in: shifts }, date: input.date } });
+  return done("Date unlocked. Leave already approved is unaffected.");
+}
+
+/** A whole shift reports at a different time. Does not change MFL or slots. */
+export async function setSpecialEvent(input: { shiftId: string; date: string; reportTime: string; note?: string }): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  if (!isValidDate(input.date)) return fail("Invalid date.");
+  if (!canEditShift(viewer, input.shiftId)) return fail("You can only set events for your own shift.");
+  const reportTime = typeof input.reportTime === "string" ? input.reportTime.replace(":", "").trim() : "";
+  if (!/^([01]\d|2[0-3])[0-5]\d$/.test(reportTime)) return fail("Enter a report time like 0600.");
+
+  await db.specialEvent.upsert({
+    where: { shiftId_date: { shiftId: input.shiftId, date: input.date } },
+    create: { shiftId: input.shiftId, date: input.date, reportTime, note: cleanText(input.note) },
+    update: { reportTime, note: cleanText(input.note) },
+  });
+  return done(`Special event set: report at ${reportTime}.`);
+}
+
+export async function clearSpecialEvent(input: { shiftId: string; date: string }): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  if (!canEditShift(viewer, input.shiftId)) return fail("You can only change events for your own shift.");
+  await db.specialEvent.deleteMany({ where: { shiftId: input.shiftId, date: input.date } });
+  return done("Special event removed.");
 }
 
 /** taskId null removes the Task. People on full-day leave are skipped. */

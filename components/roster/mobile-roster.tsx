@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, Lock } from "lucide-react";
-import { DUTY_CELL, DutyChip, DutyLegend, dutyTitle, EventBadge, LABELLED_DUTIES, LeaveChip, LockBadge, TaskTag } from "@/components/roster/chips";
+import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, EventBadge, LABELLED_DUTIES, LeaveChip, LockBadge, TaskTag } from "@/components/roster/chips";
 import { StrengthSummary } from "@/components/roster/strength-summary";
 import { cellKey, type Selection, type WorkspaceProps } from "@/components/roster/roster-workspace";
 import { Button } from "@/components/ui/button";
@@ -20,12 +20,14 @@ export function MobileRoster({
   canRequest,
   canRequestLocked,
   onDate,
+  onFocusDate,
   onCell,
   onLeave,
 }: WorkspaceProps & {
   selection: Selection;
   compact: boolean;
   onDate: (date: string, shiftKey: boolean) => void;
+  onFocusDate: (date: string) => void;
   onCell: (staffId: string, date: string, shiftKey: boolean) => void;
   onLeave: (leaveId: string | null, date: string) => void;
 }) {
@@ -48,7 +50,10 @@ export function MobileRoster({
             return (
               <button
                 key={d}
-                onClick={() => setDay(d)}
+                onClick={() => {
+                  setDay(d);
+                  onFocusDate(d);
+                }}
                 className={cn(
                   "flex flex-col items-center rounded-lg py-1 text-xs",
                   d === day ? "bg-primary text-primary-foreground" : "hover:bg-accent",
@@ -118,6 +123,7 @@ export function MobileRoster({
                 {p.name}
                 {p.role === "SUPERVISOR" && <span className="ml-1 text-[10px] text-muted-foreground">Sup</span>}
               </span>
+              {cell.dos && <DosTag kind={cell.dos} />}
               {cell.task && <TaskTag name={cell.task.name} />}
               {cell.absences.map((a, i) => (
                 <button

@@ -1,6 +1,6 @@
 import { CalendarClock, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DUTY_LABEL, DUTY_TIMES, STATUS_LABEL, type Duty, type LeaveStatus } from "@/lib/domain";
+import { DOS_LABEL, DOS_REPORT_TIME, DUTY_LABEL, DUTY_TIMES, STATUS_LABEL, type DosKind, type Duty, type LeaveStatus } from "@/lib/domain";
 import type { CellAbsence } from "@/lib/roster-types";
 import { formatFigure, slotLabel, type Strength } from "@/lib/strength";
 
@@ -11,10 +11,10 @@ const DUTY_STYLE: Record<Duty, string> = {
   V: "bg-violet-900 text-violet-50 border-violet-900 dark:bg-violet-500/40 dark:text-violet-50 dark:border-violet-400/60",
   VSB: "bg-transparent text-violet-800 border-violet-500 border-dashed dark:text-violet-200 dark:border-violet-400",
   OFF: "bg-neutral-100 text-neutral-500 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:border-neutral-700",
-  OFF_POSTV: "bg-neutral-100 text-violet-700 border-violet-300 border-dashed dark:bg-neutral-800 dark:text-violet-300 dark:border-violet-500/50",
+  OFF_V: "bg-neutral-100 text-violet-700 border-violet-400 border-dashed dark:bg-neutral-800 dark:text-violet-300 dark:border-violet-500/60",
 };
 
-const DUTY_SHORT: Record<Duty, string> = { ...DUTY_LABEL, OFF_POSTV: "Off*" };
+const DUTY_SHORT: Record<Duty, string> = { ...DUTY_LABEL };
 
 /**
  * Roster view cell colours. AM, PM and Off are shown by colour only (no text); V and V(SB) keep
@@ -26,7 +26,7 @@ export const DUTY_CELL: Record<Duty, string> = {
   V: "bg-violet-300/70 dark:bg-violet-600/40",
   VSB: "bg-violet-100 dark:bg-violet-500/15",
   OFF: "bg-neutral-100 dark:bg-neutral-800/70",
-  OFF_POSTV: "bg-neutral-100 shadow-[inset_0_0_0_2px_var(--color-violet-400)] dark:bg-neutral-800/70 dark:shadow-[inset_0_0_0_2px_var(--color-violet-500)]",
+  OFF_V: "bg-neutral-100 shadow-[inset_0_0_0_2px_var(--color-violet-400)] dark:bg-neutral-800/70 dark:shadow-[inset_0_0_0_2px_var(--color-violet-500)]",
 };
 
 /** Duties that keep a text label on the roster. */
@@ -42,7 +42,7 @@ export function DutyLegend({ className }: { className?: string }) {
     ["AM", `AM ${DUTY_TIMES.AM}`],
     ["PM", `PM ${DUTY_TIMES.PM}`],
     ["OFF", "Off / Rest"],
-    ["OFF_POSTV", "Off (post-V)"],
+    ["OFF_V", "Off(V)"],
     ["V", `V ${DUTY_TIMES.V}`],
     ["VSB", "V(SB) standby"],
   ];
@@ -56,6 +56,12 @@ export function DutyLegend({ className }: { className?: string }) {
           {label}
         </li>
       ))}
+      <li className="flex items-center gap-1.5">
+        <span className="grid h-3.5 w-5 place-items-center rounded-sm border border-rose-500 bg-rose-500/15 text-[7px] font-bold text-rose-800 dark:text-rose-200" aria-hidden>
+          DOS
+        </span>
+        {DOS_LABEL} 24h, report {DOS_REPORT_TIME}
+      </li>
       <li className="flex items-center gap-1.5">
         <span className="h-3.5 w-5 rounded-sm border bg-hatch" aria-hidden />
         Locked date
@@ -114,6 +120,21 @@ export function LeaveChip({ absence, className }: { absence: Pick<CellAbsence, "
   );
 }
 
+/** DOS / DOS2IC / FDO: a 24-hour duty on top of the shift duty (spec 5.2). */
+export function DosTag({ kind, className }: { kind: DosKind; className?: string }) {
+  return (
+    <span
+      title={`${kind}: 24-hour duty, report at ${DOS_REPORT_TIME}. The shift duty and any Task still apply.`}
+      className={cn(
+        "inline-flex h-4 items-center rounded-sm border border-rose-500 bg-rose-500/15 px-1 text-[10px] font-bold leading-none text-rose-800 whitespace-nowrap dark:text-rose-200",
+        className,
+      )}
+    >
+      {kind}
+    </span>
+  );
+}
+
 export function TaskTag({ name, className }: { name: string; className?: string }) {
   return (
     <span
@@ -144,18 +165,19 @@ export function EventBadge({ time, className }: { time: string; className?: stri
   );
 }
 
+// Green above 2 slots, yellow at 1-2, red at none or below MFL (spec 8).
 export const SLOT_STYLE: Record<Strength["status"], string> = {
   healthy: "text-emerald-700 dark:text-emerald-300",
-  low: "text-amber-700 dark:text-amber-300 font-semibold",
-  zero: "text-orange-700 dark:text-orange-300 font-semibold",
+  low: "text-amber-800 dark:text-amber-300 font-semibold",
+  zero: "text-red-700 dark:text-red-300 font-bold",
   below: "text-red-700 dark:text-red-300 font-bold",
 };
 
 export const SLOT_BG: Record<Strength["status"], string> = {
   healthy: "bg-emerald-50 dark:bg-emerald-500/10",
-  low: "bg-amber-50 dark:bg-amber-500/10",
-  zero: "bg-orange-100 dark:bg-orange-500/15",
-  below: "bg-red-100 dark:bg-red-500/20",
+  low: "bg-amber-100 dark:bg-amber-500/15",
+  zero: "bg-red-100 dark:bg-red-500/20",
+  below: "bg-red-200 dark:bg-red-500/30",
 };
 
 export function SlotBadge({ strength, className }: { strength: Strength; className?: string }) {

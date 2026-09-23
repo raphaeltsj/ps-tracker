@@ -32,7 +32,10 @@ export type EffectiveDuty = {
 
 /**
  * A person's duty on a date: a supervisor override wins; otherwise the shift cycle, except that a PM
- * block directly after V duty (worked on the preceding Off days) becomes "Off (post-V)".
+ * block directly after a 2-day V (worked on the preceding Off days) becomes "Off(V)".
+ * An Off set by a supervisor is also an Off(V): it is the rest day awarded for V duty, for example
+ * to a V(SB) who was activated. Cancelling the V duty restores the PM block by itself, because
+ * nothing about it is stored.
  */
 export function effectiveDuty(
   anchor: number,
@@ -40,14 +43,14 @@ export function effectiveDuty(
   overrides: ReadonlyMap<string, AssignableDuty>,
 ): EffectiveDuty {
   const override = overrides.get(date);
-  if (override) return { duty: override, source: "override" };
+  if (override) return { duty: override === "OFF" ? "OFF_V" : override, source: "override" };
 
   const pos = cyclePosition(anchor, date);
   const base = CYCLE[pos];
   if (base === "PM") {
     const blockStart = addDays(date, -pos);
     if (overrides.get(addDays(blockStart, -1)) === "V" || overrides.get(addDays(blockStart, -2)) === "V") {
-      return { duty: "OFF_POSTV", source: "postV" };
+      return { duty: "OFF_V", source: "postV" };
     }
   }
   return { duty: base, source: "cycle" };

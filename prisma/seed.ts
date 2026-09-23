@@ -5,7 +5,7 @@ import { PrismaClient } from "../lib/generated/prisma/client";
 import { DATABASE_URL } from "../lib/db-url";
 import { cyclePosition, shiftDutyOn } from "../lib/cycle";
 import { addDays, dateRange, dayIndex, monthDates, shiftMonth, todayLocal } from "../lib/dates";
-import { COMMON_LEAVE_TYPES } from "../lib/domain";
+import { COMMON_LEAVE_TYPES, DOS_KINDS, DOS_OIL_CODE, DOS_OIL_HALF } from "../lib/domain";
 
 const db = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: DATABASE_URL }) });
 
@@ -45,9 +45,9 @@ async function main() {
   await db.leave.deleteMany();
   await db.leaveType.deleteMany();
   await db.dutyOverride.deleteMany();
+  await db.extraDuty.deleteMany();
   await db.lockedDate.deleteMany();
   await db.specialEvent.deleteMany();
-  await db.vHeadcount.deleteMany();
   await db.staff.deleteMany();
   await db.shift.deleteMany();
 
@@ -103,10 +103,34 @@ async function main() {
       overrides.push({ staffId: sb1.id, date, duty: "VSB" }, { staffId: sb2.id, date: next, duty: "VSB" });
       vTurn += 3;
     }
+    // An activated V(SB) gets an Off(V) on a day the supervisor picks (an assigned Off is an Off(V)).
+    const sbActivated = overrides.find((o) => o.duty === "VSB" && o.date > todayLocal());
+    if (sbActivated) {
+      const offDate = range.find((d) => d > addDays(sbActivated.date, 2) && shiftDutyOn(s.cycleAnchor, d) !== "OFF");
+      if (offDate) overrides.push({ staffId: sbActivated.staffId, date: offDate, duty: "OFF" });
+    }
     await db.dutyOverride.createMany({ data: overrides });
 
     const sup = members[0];
     const staff = members.slice(1);
+
+    // DOS / DOS2IC / FDO: one-day 24-hour duties on AM days, each with its automatic 0.5 OIL.
+    const amDays = monthDays.filter((d) => shiftDutyOn(s.cycleAnchor, d) === "AM");
+    const onV = new Set(overrides.map((o) => o.staffId + "|" + o.date));
+    let dosTurn = 0;
+    for (const date of amDays.slice(0, 6)) {
+      const who = members[(dosTurn * 5 + 4) % s.size];
+      if (onV.has(who.id + "|" + date) || onV.has(who.id + "|" + addDays(date, 1))) continue;
+      const kind = DOS_KINDS[dosTurn % DOS_KINDS.length];
+      const duty = await db.extraDuty.create({ data: { staffId: who.id, date, kind } });
+      await createLeave(who.id, DOS_OIL_CODE, [addDays(date, 1)], "APPROVED", {
+        half: DOS_OIL_HALF,
+        remarks: "Automatic after " + kind + " duty on " + date + ".",
+        givenById: sup.id,
+        autoFor: duty.id,
+      });
+      dosTurn++;
+    }
 
     // Approved leave: short blocks spread across the range.
     const fullTypes = ["AL", "AL", "AL", "OL", "MC", "FCL", "CSE", "MWO", "1 OIL", "TRG"];
@@ -188,8 +212,7 @@ async function main() {
     const working = monthDays.filter((d) => shiftDutyOn(s.cycleAnchor, d) !== "OFF");
     await db.lockedDate.create({ data: { shiftId: s.id, date: working[Math.min(8, working.length - 1)], remarks: "Important meeting: all hands on deck." } });
     await db.specialEvent.create({ data: { shiftId: s.id, date: working[Math.min(12, working.length - 1)], reportTime: "0600", note: "Early reporting for a ceremony." } });
-    const rest = monthDays.filter((d) => shiftDutyOn(s.cycleAnchor, d) === "OFF");
-    await db.vHeadcount.create({ data: { shiftId: s.id, date: rest[Math.min(4, rest.length - 1)], count: 2 } });
+    // V MFL is always 1, so there is no per-date V headcount to seed.
   }
 
   // Festive lock on every shift.
@@ -211,7 +234,7 @@ async function createLeave(
   typeCode: string,
   dates: string[],
   status: string,
-  extra: { half?: string; notes?: string | null; remarks?: string | null; rejectReason?: string; givenById?: string | null } = {},
+  extra: { half?: string; notes?: string | null; remarks?: string | null; rejectReason?: string; givenById?: string | null; autoFor?: string } = {},
 ) {
   if (status === "APPROVED" || status === "PENDING") {
     const taken = activeLeaveDays.get(staffId) ?? new Set<string>();
@@ -230,6 +253,7 @@ async function createLeave(
       remarks: extra.remarks ?? null,
       rejectReason: extra.rejectReason ?? null,
       givenById: extra.givenById ?? null,
+      autoFor: extra.autoFor ?? null,
       decidedAt: decided ? new Date() : null,
       submittedAt: new Date(Date.now() - Math.floor(rand() * 10 * 86_400_000)),
       days: { create: [...new Set(dates)].map((date) => ({ date })) },

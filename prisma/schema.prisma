@@ -19,7 +19,6 @@ model Shift {
   staff       Staff[]
   lockedDates LockedDate[]
   events      SpecialEvent[]
-  vHeadcounts VHeadcount[]
 }
 
 model Staff {
@@ -35,6 +34,7 @@ model Staff {
   createdAt DateTime @default(now())
 
   dutyOverrides   DutyOverride[]
+  extraDuties     ExtraDuty[]
   leaves          Leave[]           @relation("LeaveStaff")
   leavesGiven     Leave[]           @relation("LeaveGivenBy")
   leavesDecided   Leave[]           @relation("LeaveDecidedBy")
@@ -50,13 +50,25 @@ model Session {
 }
 
 // A duty set by a supervisor that replaces the person's cycle duty for one day.
-// V, V(SB) and every other duty are stored the same way (one duty picker).
+// V, V(SB) and Off(V) are stored the same way (one duty picker). AM and PM come from the cycle
+// only: supervisors do not set them (spec 5.1).
 model DutyOverride {
   id      String @id @default(cuid())
   staffId String
   staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
   date    String
-  duty    String // "AM" | "PM" | "V" | "VSB" | "OFF"
+  duty    String // "V" | "VSB" | "OFF"
+
+  @@unique([staffId, date])
+}
+
+// DOS / DOS2IC / FDO: a 24-hour duty on top of the person's AM duty for one day (spec 5.2).
+model ExtraDuty {
+  id      String @id @default(cuid())
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  date    String
+  kind    String // "DOS" | "DOS2IC" | "FDO"
 
   @@unique([staffId, date])
 }
@@ -88,6 +100,8 @@ model Leave {
   decidedBy    Staff?     @relation("LeaveDecidedBy", fields: [decidedById], references: [id])
   submittedAt  DateTime   @default(now())
   decidedAt    DateTime?
+  // Created by the system and not negotiable: the 0.5 OIL after a DOS/FDO duty.
+  autoFor      String? // ExtraDuty id
   days         LeaveDay[]
 }
 
@@ -141,13 +155,4 @@ model SpecialEvent {
   @@unique([shiftId, date])
 }
 
-// V headcount (and so V MFL) raised above 1 for a specific date.
-model VHeadcount {
-  id      String @id @default(cuid())
-  shiftId String
-  shift   Shift  @relation(fields: [shiftId], references: [id])
-  date    String
-  count   Int
 
-  @@unique([shiftId, date])
-}

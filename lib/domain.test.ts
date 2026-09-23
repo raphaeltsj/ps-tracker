@@ -3,8 +3,8 @@ import { test } from "node:test";
 import { birthdayEvents } from "./birthday";
 import { cyclePositionLabel, effectiveDuty, shiftDutyOn } from "./cycle";
 import { addDays, dateRange, dayIndex, formatDateList } from "./dates";
-import type { AssignableDuty } from "./domain";
-import { computeStrength, formatFigure, mflFor } from "./strength";
+import { ASSIGNABLE_DUTIES, type AssignableDuty } from "./domain";
+import { computeStrength, formatFigure, mflFor, V_MFL } from "./strength";
 
 const DAY1 = dayIndex("2026-01-01");
 const ANCHORS = { A: DAY1, B: DAY1 - 4, C: DAY1 - 2 };
@@ -22,13 +22,35 @@ test("cycle position label", () => {
   assert.equal(cyclePositionLabel(ANCHORS.A, "2026-01-06"), "Off Day 2 of 2, next: PM");
 });
 
-test("V duty turns the following PM block into Off (post-V), section 5", () => {
+test("V duty turns the following PM block into Off(V), section 5", () => {
   const overrides = new Map<string, AssignableDuty>([
     ["2026-01-05", "V"],
     ["2026-01-06", "V"],
   ]);
   const duties = dateRange("2026-01-01", "2026-01-12").map((d) => effectiveDuty(ANCHORS.A, d, overrides).duty);
-  assert.deepEqual(duties, ["PM", "PM", "AM", "AM", "V", "V", "OFF_POSTV", "OFF_POSTV", "AM", "AM", "OFF", "OFF"]);
+  assert.deepEqual(duties, ["PM", "PM", "AM", "AM", "V", "V", "OFF_V", "OFF_V", "AM", "AM", "OFF", "OFF"]);
+  // Cancelling the V duty puts the PM block back: nothing about it is stored.
+  assert.equal(effectiveDuty(ANCHORS.A, "2026-01-07", new Map()).duty, "PM");
+});
+
+test("an Off assigned by a supervisor is an Off(V); AM and PM cannot be assigned", () => {
+  const overrides = new Map<string, AssignableDuty>([["2026-01-01", "OFF"]]);
+  assert.equal(effectiveDuty(ANCHORS.A, "2026-01-01", overrides).duty, "OFF_V");
+  assert.deepEqual([...ASSIGNABLE_DUTIES], ["V", "VSB", "OFF"]);
+});
+
+test("V always needs exactly 1 person", () => {
+  assert.equal(V_MFL, 1);
+  assert.equal(mflFor("AM", "2026-09-22"), 13);
+});
+
+test("slot colours: red at none or below MFL, yellow at 1-2, green above", () => {
+  assert.equal(computeStrength(13, 0, 13).status, "zero"); // red
+  assert.equal(computeStrength(13, 1, 13).status, "below"); // red
+  assert.equal(computeStrength(14, 0, 13).status, "low"); // 1 left, yellow
+  assert.equal(computeStrength(15, 0, 13).status, "low"); // 2 left, yellow
+  assert.equal(computeStrength(15, 0.5, 13).status, "low"); // 1.5 left, yellow
+  assert.equal(computeStrength(16, 0, 13).status, "healthy"); // 3 left, green
 });
 
 test("worked example: weekday PM, total 26, 4 full + 1 half-day leave", () => {

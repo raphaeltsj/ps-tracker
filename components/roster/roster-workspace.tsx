@@ -98,24 +98,21 @@ export function RosterWorkspace(props: WorkspaceProps) {
     [canRequestLocked, roster.days],
   );
 
+  /** Date header: show the date details (and, for editors, its lock and event settings). */
+  const focusDateOnly = useCallback((date: string) => {
+    setFocusDate(date);
+    setFocusLeaveId(null);
+    setSheetOpen(true);
+  }, []);
+
   /** Staff view: pick dates for a request (click toggles, shift-click selects a range). */
   const clickDate = useCallback(
     (date: string, shiftKey: boolean) => {
       setFocusDate(date);
       setFocusLeaveId(null);
-      if (mode === "edit") {
-        if (!canEdit) return;
-        // Edit view: clicking a date header toggles that date for everyone in the shift.
-        setCells((prev) => {
-          const next = new Set(prev);
-          const keys = roster.staff.map((s) => cellKey(s.id, date));
-          const allOn = keys.every((k) => next.has(k));
-          keys.forEach((k) => (allOn ? next.delete(k) : next.add(k)));
-          return next;
-        });
-        return;
-      }
-      if (!canRequest || !selectable(date)) return;
+      setSheetOpen(true);
+      // Editors see the date details (lock, event) instead of selecting every person on that day.
+      if (mode === "edit" || !canRequest || !selectable(date)) return;
       setSheetOpen(true);
       setDates((prev) => {
         const next = new Set(prev);
@@ -128,7 +125,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
       });
       setAnchor({ staffId: null, date });
     },
-    [anchor, canEdit, canRequest, mode, roster.days, roster.staff, selectable],
+    [anchor, canRequest, mode, roster.days, selectable],
   );
 
   /** Edit view: select cells (click toggles, shift-click selects a range in the row). */
@@ -274,9 +271,9 @@ export function RosterWorkspace(props: WorkspaceProps) {
           {view === "calendar" ? (
             <CalendarView {...props} selection={selection} compact={compact} onDate={clickDate} />
           ) : isDesktop ? (
-            <RosterGrid {...props} selection={selection} compact={compact} onDate={clickDate} onCell={clickCell} onLeave={clickLeave} />
+            <RosterGrid {...props} selection={selection} compact={compact} onDate={focusDateOnly} onCell={clickCell} onLeave={clickLeave} />
           ) : (
-            <MobileRoster {...props} selection={selection} compact={compact} onDate={clickDate} onCell={clickCell} onLeave={clickLeave} />
+            <MobileRoster {...props} selection={selection} compact={compact} onDate={clickDate} onFocusDate={focusDateOnly} onCell={clickCell} onLeave={clickLeave} />
           )}
         </div>
       </section>
