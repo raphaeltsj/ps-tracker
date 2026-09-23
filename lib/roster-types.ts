@@ -34,7 +34,7 @@ export type RosterDay = {
   /** V cover on the shift's Rest days. MFL for V is always 1. */
   v: { onDuty: number; mfl: number } | null;
   locked: string | null; // remarks
-  event: { reportTime: string; note: string | null } | null;
+  event: { note: string | null } | null;
 };
 
 export type StaffRow = { id: string; name: string; role: Role; birthday: string | null };

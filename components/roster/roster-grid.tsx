@@ -65,7 +65,7 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, on
                       <span className={cn("h-2 w-6 rounded-full", DUTY_CELL[day.shiftDuty])} title={SHIFT_DUTY_LABEL[day.shiftDuty]} />
                       <span className="sr-only">{SHIFT_DUTY_LABEL[day.shiftDuty]}</span>
                       {day.locked && <Lock className="size-3 text-foreground" aria-label="Locked date" />}
-                      {day.event && <CalendarClock className="size-3 text-fuchsia-600 dark:text-fuchsia-400" aria-label={`Special Event: report at ${day.event.reportTime}`} />}
+                      {day.event && <CalendarClock className="size-3 text-fuchsia-600 dark:text-fuchsia-400" aria-label="Special event" />}
                     </div>
                   </th>
                 );
@@ -166,7 +166,7 @@ const GridCell = memo(function GridCell({
         {/* AM, PM and Off are colour-coded (legend above); only V and V(SB) keep a text label. */}
         {LABELLED_DUTIES.includes(cell.duty) ? <DutyChip duty={cell.duty} /> : <span className="sr-only">{dutyTitle(cell.duty)}</span>}
         {day.event && working && (
-          <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-fuchsia-500" title={`Special Event: report at ${day.event.reportTime}`} />
+          <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-fuchsia-500" title={day.event.note ? `Special Event: ${day.event.note}` : "Special Event"} />
         )}
         {cell.absences.map((a, i) => (
           <button

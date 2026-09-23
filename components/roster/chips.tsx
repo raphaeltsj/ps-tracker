@@ -157,10 +157,10 @@ export function LockBadge({ className }: { className?: string }) {
   );
 }
 
-export function EventBadge({ time, className }: { time: string; className?: string }) {
+export function EventBadge({ note, className }: { note?: string | null; className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-1 rounded bg-fuchsia-100 px-1.5 py-0.5 text-[11px] font-semibold text-fuchsia-900 dark:bg-fuchsia-500/20 dark:text-fuchsia-200", className)}>
-      <CalendarClock className="size-3" aria-hidden /> Special Event: report at {time}
+      <CalendarClock className="size-3" aria-hidden /> Special Event{note ? `: ${note}` : ""}
     </span>
   );
 }

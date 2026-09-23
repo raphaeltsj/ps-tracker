@@ -1,6 +1,6 @@
 # PS Tracker: System Context Document
 
-*Duty roster management for a shift-based team | Version 1.7 | Draft for editing*
+*Duty roster management for a shift-based team | Version 1.8 | Draft for editing*
 
 ## 1. Purpose of this document
 
@@ -12,6 +12,8 @@ It has two parts:
 - **Part B: Build framework** (section 17): the tech stack, project structure, and build conventions. Read both before implementing any feature.
 
 > **How to edit:** items in [square brackets] are still undecided. Section 16 lists assumptions and open questions. Update this document whenever a rule changes so it stays the single source of truth.
+
+**Changes in 1.8:** cycle days read "1st AM", "2nd OFF" (3.2); a DOS/FDO duty earns its 0.5 OIL only on a 1st AM (5.2); no duty can be assigned on a day a person is on leave (5.1); special events have no report time (6); OML is Ordinary Medical leave (12.1); supervisors can cancel a pending request, and the automatic 0.5 OIL can change half but not type, date or existence (12.4).
 
 **Changes in 1.7:** supervisors no longer set AM or PM, and an assigned Off is an "Off(V)" (5.1); new DOS / DOS2IC / FDO 24-hour duty with its automatic 0.5 OIL (5.2); V MFL is always 1 (7); Available Slot(s) colours are red / yellow / green (8); clicking a date opens its details, where supervisors lock it or set a special event (11.1, 11.2, 12.5); the Task report copes with many Tasks (9.2).
 
@@ -26,7 +28,7 @@ PS Tracker is a web application (desktop-first, with a full mobile view) that ma
 - Show who is working which duty (AM, PM, V) or is off on any day, for every shift.
 - Let regular staff view every shift roster (calendar view or roster view) and request leave with notes, and let supervisors approve or reject requests or give leave directly.
 - Track staffing levels against a minimum requirement (MFL) so supervisors can see how many people can still take leave.
-- Handle exceptions: V (night) duty with standby people, special-event reporting times, locked leave dates, duty swaps handled by supervisors, and custom leave types.
+- Handle exceptions: V (night) duty with standby people, special-event notes, locked leave dates, duty swaps handled by supervisors, and custom leave types.
 - Let management maintain the list of Tasks and let supervisors optionally assign them to their shift.
 
 The team has about 60-90 people, divided into three shifts of 20-30 people each. The app is called **PS Tracker** (working name; no branding decided yet).
@@ -49,7 +51,7 @@ The shifts are offset so that handover runs **A to B to C to A**: B takes over f
 | **Shift B** | OFF   | OFF   | PM    | PM    | AM    | AM    |
 | **Shift C** | AM    | AM    | OFF   | OFF   | PM    | PM    |
 
-Each staff member should be able to see their position in the cycle (for example "PM Day 1 of 2, next: AM").
+Each staff member should be able to see their position in the cycle. Days in a block are named **"1st"** and **"2nd"**: 1st PM, 2nd PM, 1st AM, 2nd AM, 1st OFF, 2nd OFF. The full label reads for example "1st PM, next: AM". Use the same naming everywhere a date's cycle day is shown.
 
 ## 4. Duty timings
 
@@ -85,6 +87,7 @@ The duty picker offers **V, V(SB), and Off(V)**, plus "reset to cycle". A superv
 - **AM and PM are never assigned by hand.** They come from the shift cycle. Supervisors change the cycle only through V duty and its Off(V) days.
 - **Off(V)** is an Off awarded because of V duty. It covers both the 2 days the app creates after a V block, and an Off a supervisor gives by hand, for example to a V(SB) who was activated and did the V duty. The app does not track activation: the supervisor simply picks the Off day.
 - **Reset to cycle** removes whatever was assigned, so the person follows the normal rotation again.
+- **No duty on a day the person is on leave.** If the date already holds leave (approved or pending, including BD / BD-IL), the app refuses the duty and names the clash. Cancel or move the leave first.
 
 V duty runs for **2 days**, and each of those days has a **standby person** on **V(SB)**. Standby people come from **within the same shift** as the person on V duty.
 
@@ -101,16 +104,17 @@ A second kind of duty sits **on top of** the shift duty. It has three names, **D
 - **24 hours, reporting at 0800.** The person still works their shift timing as well.
 - **One day only**, and it **must fall on an AM day** for that person. The app refuses any other day.
 - The person **keeps their Task**, if they have one: a DOS/FDO duty does not remove it.
-- **The next day they get a 0.5 OIL for the first half of the duty, automatically.** It is non-negotiable: it cannot be edited or cancelled on its own, and it disappears only when the DOS/FDO duty is removed. If the next day already has leave, the duty cannot be assigned (one type of leave per day, section 12.3).
+- **A 1st AM duty earns a 0.5 OIL the next day, automatically**, for the first half of that 2nd AM. A **2nd AM duty earns nothing**, because the next day is already an Off day.
+- That 0.5 OIL is not negotiable: it cannot be cancelled, and its type and date cannot change. A supervisor may change **which half** it covers. It disappears only when the DOS/FDO duty is removed. If the next day already has leave, the duty cannot be assigned (one type of leave per day, section 12.3).
 - On the roster the duty shows as a small tag (DOS, DOS2IC, or FDO) beside the duty colour, like a Task tag.
 - DOS/FDO duties do not change Total Strength, MFL or slots on the day itself; the 0.5 OIL the next day counts as 0.5 like any half-day leave.
 
 ## 6. Special events
 
-On some dates an entire shift must report at a different time, earlier, later, longer, or shorter than the default timings. This is called a **special event**.
+On some dates an entire shift has something on that the roster should flag. This is called a **special event**. It carries a **note saying what the event is, and no reporting time**: duty timings stay as they are.
 
-- The UI must show a clear indicator such as "Special Event: report at [time]" on the day header, the day view, the mobile day card, and the affected staff cells.
-- Special events **do not change MFL or leave slots** for that day. They only change the reporting time.
+- The UI must show a clear "Special Event" indicator, with the note, on the day header, the day view, the mobile day card, and the affected staff cells.
+- Special events **do not change MFL or leave slots** for that day. They are a note for the whole shift.
 - Supervisors can set a special-event time for their own shift.
 
 **Public holidays** do not affect MFL or duty. The team works as usual, so they need no special handling in the roster.
@@ -229,7 +233,7 @@ There are three user roles. **Everyone can view the roster of every shift.** The
 | **Assign Tasks (optional)**               | No                | Own shift only          | All shifts                 |
 | **Swap duties between staff**             | No                | Own shift only          | All shifts                 |
 | **Manage staff records**                  | No                | No                      | Yes                        |
-| **Set special-event times**               | No                | Own shift only          | All shifts                 |
+| **Set special events**               | No                | Own shift only          | All shifts                 |
 | **Add custom leave type**                 | No                | Yes                     | Yes                        |
 | **Add / rename / delete Tasks**           | No                | No                      | Yes                        |
 | **View Task report**                      | No                | Yes (all shifts)        | Yes (all shifts)           |
@@ -267,7 +271,7 @@ Supervisors are also part of the shift roster, so they get the **regular staff v
 - **Edit leave** (type, dates, and remarks) and **cancel approved leave**. Only supervisors and Management can cancel approved leave. They can also set leave on staff Off days.
 - **Approve or reject pending** leave requests from staff (a reason is required when rejecting). A request **cannot be approved** unless an extra slot is available on every requested date (see section 12.3).
 - **Lock dates for events** and add **remarks** explaining why. Locked dates block staff leave requests, but **supervisors can still give leave on locked dates**.
-- Set special-event report times and add custom leave types. **Clicking a date** in the roster opens that date's settings: lock or unlock it with remarks, and set, change or remove its special event.
+- Set special events (a note for the whole shift) and add custom leave types. **Clicking a date** in the roster opens that date's settings: lock or unlock it with remarks, and set, change or remove its special event.
 - **In Staff view**, a supervisor can **submit leave requests** like regular staff, and can **approve their own request**.
 - **In Edit view**, a supervisor can **cancel approved leave** and **give leave** to staff, **including themselves**. Leave a supervisor gives themselves is already approved and needs no approval.
 
@@ -305,7 +309,7 @@ Common leave types and their full names:
 | **0.5 AL**  | Half-day local leave      | Requester chooses the first half or second half of the duty timing; the UI shows the actual hours. Counts as 0.5.            |
 | **OL**      | Overseas leave            |                                                                                                                              |
 | **MWO**     | Mental wellness off       |                                                                                                                              |
-| **OML**     | \[full name to be added\] |                                                                                                                              |
+| **OML**     | Ordinary Medical leave    | Medical leave without a medical certificate.                                                                                 |                                                                                                                              |
 | **MC**      | Medical leave             |                                                                                                                              |
 | **HL**      | Hospitalised leave        |                                                                                                                              |
 | **FCL**     | Family care leave         |                                                                                                                              |
@@ -353,7 +357,8 @@ Supervisors can add a new leave type. The name is limited to **6 characters maxi
 - It can be given on **locked dates**.
 - The one-type-per-day rule (section 12.3) applies: leave cannot be given on a day where the person already has leave. Editing leave onto new dates is checked the same way.
 - A supervisor can give leave to **themselves** in Edit view (already approved, no approval needed), and can also **approve their own request** submitted from Staff view. Management does not request or take leave.
-- Supervisors can **edit** leave (type, dates, and remarks) and **cancel** it. Edits and cancellations update the strength figures immediately.
+- Supervisors can **edit** leave (type, dates, and remarks) and **cancel** it, whether it is approved or still pending. Edits and cancellations update the strength figures immediately.
+- The automatic 0.5 OIL that comes with a DOS/FDO duty (section 5.2) is the exception: only its half can change, and it is removed by removing the duty.
 - Leave can be set on staff **Off days** too.
 
 ### 12.5 Locked dates
@@ -486,7 +491,6 @@ For now, use placeholder staff names that are each a **single 5-character word**
 
 ### Open items
 
-- Full name of the OML leave code.
 - BD / BD-IL: whether they are given automatically or requested, whether they need an available slot, and whether the BD-IL day can be moved.
 - Duty swaps: whether swaps can be across different shifts (and how strength is counted), and whether staff can request a swap in the app.
 - Staff records: which details are kept (for example name, shift, role, birthday).
@@ -499,7 +503,7 @@ For now, use placeholder staff names that are each a **single 5-character word**
 - BD on a working-day birthday that already has other leave: currently treated like an Off-day birthday (BD marker, BD-IL on the next free working day). To confirm.
 - Colour-only duties on the Roster view: confirm the legend and tooltips are enough for colour-blind users, or add a pattern for AM vs PM.
 - Task report: whether supervisors should see other shifts' Task counts (currently yes, like the roster), and whether an export (for example CSV) is needed.
-- DOS/FDO on the second AM day of a block: the automatic 0.5 OIL then falls on a Rest day. To confirm whether that is intended, or whether the duty should be limited to the first AM day.
+- Whether half-day leave should also block a duty on that day, or only full-day leave (the app currently blocks any leave).
 - Whether AM or PM should ever be editable by hand (for example to fix a mistake), now that the picker only offers V, V(SB) and Off(V).
 - Whether a DOS/FDO duty should count anywhere in the strength figures.
 - [Add further open items here.]
@@ -587,13 +591,13 @@ This is the prompt prepared for generating the first UI mockups. It condenses th
 
 Design polished **hero screens** for a responsive web app (desktop and mobile) called **PS Tracker**, a duty roster management system for a shift-based team. There are three roles: Regular Staff, Supervisor, and Management.
 
-**Shifts and cycle:** Staff belong to three fixed shifts, Shift A, Shift B, and Shift C, of 20-30 people each. All shifts follow the same 6-day cycle of 2 PM, 2 AM, 2 Off, offset so that handover runs A to B to C to A. On any given day one shift is on PM, one is on AM, and one is resting. Make the rotation easy to read and show each person's cycle position (for example "PM Day 1 of 2").
+**Shifts and cycle:** Staff belong to three fixed shifts, Shift A, Shift B, and Shift C, of 20-30 people each. All shifts follow the same 6-day cycle of 2 PM, 2 AM, 2 Off, offset so that handover runs A to B to C to A. On any given day one shift is on PM, one is on AM, and one is resting. Make the rotation easy to read and show each person's cycle position (for example "1st PM, next: AM").
 
 **Duties and timings:** The daily duties are AM (0745-1445), PM (1445-2130), V (the night shift, 2130-0745, crossing midnight), V(SB) (standby for V), and Off. A supervisor assigns V, V(SB) and Off(V) from one duty picker, and can reset a day to the cycle; AM and PM always come from the cycle. A separate DOS/FDO duty (named DOS, DOS2IC or FDO) sits on top of an AM day: 24 hours reporting at 0800, the Task is kept, and a 0.5 OIL (first half) follows automatically the next day.
 
 **V duty and standby:** Normally 1 person covers V; specific dates can require more. The person works 2 days of V on what would be their 2 Off days after AM, then their next 2-day PM block becomes 2 Off, then they continue normally. Example: PM PM AM AM V V OFF OFF AM AM OFF OFF PM PM. Label the converted Off days "Off (post-V)". For the 2-day V block, one person from the same shift is on V(SB) for the first V day and a different person from the same shift is on V(SB) for the second V day. V(SB) does not affect strength, MFL, or leave slots.
 
-**Special events:** Some dates have the entire shift reporting at a different time. Show a clear "Special Event: report at [time]" indicator on the day header, day view, mobile day card, and affected cells. Special events do not change MFL or leave slots. Public holidays do not affect MFL or duty.
+**Special events:** Some dates carry a note for the whole shift. Show a clear "Special Event" indicator with its note on the day header, day view, mobile day card, and affected cells. There is no reporting time, and special events do not change MFL or leave slots. Public holidays do not affect MFL or duty.
 
 **Minimum headcount (MFL):** Weekday: AM 13, PM 12, V 1. Weekend: AM 14, PM 11, V 1. V MFL is always 1.
 
@@ -601,11 +605,11 @@ Design polished **hero screens** for a responsive web app (desktop and mobile) c
 
 **Regular Staff view:** Staff can see the roster of all shifts to plan their schedules. Provide two views, a **Calendar view** and a **Roster view**, with a clearly visible **switch button** to toggle. The **request leave form sits on the same page** as these views (in a right-hand panel on desktop, a bottom sheet on mobile) so staff can see the dates they want, whether each date is AM, PM, or Off, and what has already been planned while booking. Staff pick a **date range or specific dates** directly on the calendar or roster, choose a leave type, and add **additional notes** for the supervisor. When a staff member selects a date that has remarks, show the leave details (type, dates, status) and the remark in the side panel. They can see whether each request is Pending, Approved, or Rejected in the same panel. Staff can request leave on any day, including their Off days, and can still submit when no slots are left (the supervisor decides). They can **withdraw** a pending request but cannot cancel approved leave. Some dates are **locked** for events, and staff cannot apply for leave on locked dates (show a lock icon and disable them in the date picker). When someone selects a locked date, show that it is a **locked date** and show the **remarks** explaining why in the side panel on the right (for example a festive period or an important meeting). Show BD on the roster and calendar on a staff member's birthday. Include a placeholder card "Leave taken this month" for a later release. Staff have no edit controls.
 
-**Supervisor view:** Supervisors are part of the roster, so they also get the regular staff view, plus an **Edit view**. Provide a prominent **switch button** between **Edit view** and **Staff view** (distinct from the Calendar/Roster switch). In **Staff view** a supervisor can submit leave requests like regular staff and can approve their own request. In **Edit view** they manage only their own shift (other shifts are read-only) and can: assign duties (AM, PM, V, V(SB), Off) from one duty picker; **swap duties** between staff (they handle all shift swaps); assign Tasks (optional, one Task per person per day, not for people on full-day leave); **give leave** to staff, **including themselves**, by selecting specific dates or a date range, a leave type, and remarks (leave they give is already approved, so it has no approval step); **edit leave** and its remarks, and **cancel approved leave** (only supervisors and Management can cancel approved leave); set leave on Off days; approve or **reject pending** staff leave requests (reason required on reject; Approve is disabled unless an extra slot is available on every requested date, and Reject is always available); **lock dates** for events and add remarks explaining why (for example a festive period or an important meeting); set special-event times and per-date V headcount; and add custom leave types. Supervisors can give leave on locked dates.
+**Supervisor view:** Supervisors are part of the roster, so they also get the regular staff view, plus an **Edit view**. Provide a prominent **switch button** between **Edit view** and **Staff view** (distinct from the Calendar/Roster switch). In **Staff view** a supervisor can submit leave requests like regular staff and can approve their own request. In **Edit view** they manage only their own shift (other shifts are read-only) and can: assign duties (AM, PM, V, V(SB), Off) from one duty picker; **swap duties** between staff (they handle all shift swaps); assign Tasks (optional, one Task per person per day, not for people on full-day leave); **give leave** to staff, **including themselves**, by selecting specific dates or a date range, a leave type, and remarks (leave they give is already approved, so it has no approval step); **edit leave** and its remarks, and **cancel approved leave** (only supervisors and Management can cancel approved leave); set leave on Off days; approve or **reject pending** staff leave requests (reason required on reject; Approve is disabled unless an extra slot is available on every requested date, and Reject is always available); **lock dates** for events and add remarks explaining why (for example a festive period or an important meeting); set special events; and add custom leave types. Supervisors can give leave on locked dates.
 
 **Management view:** Management can do everything a Supervisor can do across all shifts, but does **not** request or take leave of any sort (no request form, no "my requests"). Their role is the bigger picture of roster and duty management, so give them a strong all-shift overview. Management can also **rename, add, and delete Tasks**, lock dates for all shifts at once, and **manage staff records** (add staff, edit details such as birthday, move people between shifts). Deleting a Task deletes all of its existing assignments, so show a clear warning before deleting. Tasks need no description, only a name.
 
-**Common leave types:** AL (local leave), 0.5 AL (half-day local leave), OL (overseas leave), MWO (mental wellness off), OML, MC (medical leave), HL (hospitalised leave), FCL (family care leave), CSE (course leave), BD (birthday leave), BD-IL (birthday off in lieu), 0.5 OIL (half-day off in lieu), and 1 OIL (off in lieu). For 0.5 AL and 0.5 OIL the requester picks first half or second half of the duty, showing actual hours. **Birthdays:** BD is shown on the roster and calendar on the staff member's birthday, even when it falls on an Off day. In that case the leave becomes BD-IL, placed on the next closest working day they have. Supervisors can add a custom leave type with a name of maximum 6 characters, spaces included, with a live counter (for example "4/6"), validation, and a chip preview. Custom types count toward Not in Strength like the common types. Each type is a short-code chip; half-day types are half-filled.
+**Common leave types:** AL (local leave), 0.5 AL (half-day local leave), OL (overseas leave), MWO (mental wellness off), OML (ordinary medical leave, that is MC without a medical certificate), MC (medical leave), HL (hospitalised leave), FCL (family care leave), CSE (course leave), BD (birthday leave), BD-IL (birthday off in lieu), 0.5 OIL (half-day off in lieu), and 1 OIL (off in lieu). For 0.5 AL and 0.5 OIL the requester picks first half or second half of the duty, showing actual hours. **Birthdays:** BD is shown on the roster and calendar on the staff member's birthday, even when it falls on an Off day. In that case the leave becomes BD-IL, placed on the next closest working day they have. Supervisors can add a custom leave type with a name of maximum 6 characters, spaces included, with a live counter (for example "4/6"), validation, and a chip preview. Custom types count toward Not in Strength like the common types. Each type is a short-code chip; half-day types are half-filled.
 
 **Leave inbox (supervisor):** a simple list sorted by earliest submitted first. Each row shows only staff name, leave type, dates requested, and time submitted, plus Approve and Reject. Approve is disabled with a message like "No slot available on [date]" when a requested date has no available slot. Staff notes appear when a request is opened, together with the resulting Available Slot(s) for those dates. No priority badges.
 

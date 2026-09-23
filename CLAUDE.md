@@ -15,15 +15,15 @@ Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, n
 
 ## Domain rules (summary)
 
-**Cycle.** Every shift runs 2 days PM, 2 days AM, 2 days Off, repeating (6-day cycle). Shifts are offset so handover runs A to B to C to A. Each person should see their cycle position (for example "PM Day 1 of 2, next: AM").
+**Cycle.** Every shift runs 2 days PM, 2 days AM, 2 days Off, repeating (6-day cycle). Shifts are offset so handover runs A to B to C to A. Days in a block are named "1st" and "2nd": 1st PM, 2nd PM, 1st AM, 2nd AM, 1st OFF, 2nd OFF. Each person should see their cycle position (for example "1st PM, next: AM"), named the same way everywhere.
 
 **Duties and times.** AM 0745-1445, PM 1445-2130, V (night) 2130-0745 (crosses midnight). The duty picker offers V, V(SB), Off(V) and "reset to cycle" only: AM and PM come from the cycle and are never set by hand. An assigned Off is an "Off(V)", the Off awarded for V duty (including for an activated V(SB), whose Off day the supervisor picks).
 
-**DOS/FDO duties.** DOS, DOS2IC and FDO are three names for the same 24-hour duty, reporting at 0800 on top of the shift duty. One day only, on an AM day, the Task is kept, and the next day gets an automatic 0.5 OIL (first half) that cannot be edited or cancelled on its own. Removing the duty removes that OIL.
+**DOS/FDO duties.** DOS, DOS2IC and FDO are three names for the same 24-hour duty, reporting at 0800 on top of the shift duty. One day only, on an AM day, and the Task is kept. On a 1st AM it earns an automatic 0.5 OIL (first half) the next day; on a 2nd AM it earns none, because the next day is already Off. That OIL cannot be cancelled and its type and date cannot change, though a supervisor may change which half it covers. Removing the duty removes it. No duty can be assigned on a day the person is on leave.
 
 **V duty.** A temporary overlay, not a separate team. Exactly 1 person covers V each night. The person works 2 days of V on what would have been their 2 Off days after AM; their next 2-day PM block becomes 2 Off (label it "Off(V)"); then AM, AM, Off, Off and back to normal. Nothing about that is stored, so cancelling the V duty restores the PM block. Each of the 2 V days has a standby on V(SB), a different person each day, from the same shift. V(SB) never affects Total Strength, Not in Strength, Working Strength, MFL, or leave slots.
 
-**Special events.** A whole shift reports at a different time. Show "Special Event: report at [time]" on the day header, day view, mobile day card, and affected cells. They do not change MFL or leave slots. Public holidays change nothing.
+**Special events.** A note on a date for the whole shift, with no reporting time. Show "Special Event" and the note on the day header, day view, mobile day card, and affected cells. They do not change MFL or leave slots. Public holidays change nothing.
 
 **MFL (minimum headcount).** Weekday: AM 13, PM 12, V 1. Weekend (Sat, Sun): AM 14, PM 11, V 1. V MFL is always 1. On a shift's Off days it is a "Rest day" and MFL is blank.
 
@@ -36,13 +36,13 @@ Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, n
 - Worked example: weekday PM, total 26, 4 full leave + 1 x 0.5 OIL gives Not in 4.5, Working 21.5, Slots 9.5.
 
 **Leave.**
-- Types: AL, 0.5 AL, OL, MWO, OML (full name TBD), MC, HL, FCL, CSE, BD, BD-IL, 0.5 OIL, 1 OIL. Half-day types ask first or second half, show actual hours, and look half-filled.
+- Types: AL, 0.5 AL, OL, MWO, OML (ordinary medical leave: MC without a medical certificate), MC, HL, FCL, CSE, BD, BD-IL, 0.5 OIL, 1 OIL. Half-day types ask first or second half, show actual hours, and look half-filled.
 - Custom leave types: name max 6 characters including spaces, with a live counter and chip preview. They count toward Not in Strength.
 - One type of leave per person per day (pending, approved, given, half-day, BD / BD-IL all count). Block the request or grant and show the clashing date.
 - Birthday: BD shows on the birthday even on an Off day; then the leave is BD-IL on the next closest working day without other leave. BD on an Off day is a marker only.
 - Staff requests: leave type, dates (range or specific), notes; may be on Off days; may be submitted with no slots left. Statuses: Pending, Approved, Rejected, Withdrawn. Staff can withdraw pending only.
 - Supervisor review: inbox sorted earliest submitted first (name, type, dates, time submitted only; no priority badges). Reject needs a reason and is always available. Approve is disabled with "No slot available on [date]" unless an extra slot exists on every requested date (half-day needs at least 0.5).
-- Only supervisors and Management cancel approved leave. Leave they give is already approved and may be set on locked dates and Off days.
+- Only supervisors and Management cancel leave, whether approved or pending. Leave they give is already approved and may be set on locked dates and Off days.
 - Locked dates: staff cannot request them (disabled in the picker); selecting one shows a "Locked date" badge and the remarks in the right-hand side panel. Supervisors lock, unlock and set special events from that panel, which opens when a date is clicked. Already-approved leave is unaffected. Festive balloting is out of scope.
 
 **Tasks.** Named "Task 1", "Task 2", etc., name only (no description), max 6 characters including spaces. Only Management adds, renames, and deletes them; deleting removes all assignments, so warn first. Assignment is optional, and people on V duty or a DOS/FDO duty can be given a Task. Several people can share a Task. One Task per person per day (a new one replaces the old). No Task on full-day leave (remove any existing; half-day keeps it). Tasks are informational only and never affect duty, leave, strength, MFL, or slots. Show as a separate small tag beside the duty. Supervisors and Management have a Task report (tasks done per person) filtered by year, month, or date range, which must stay readable with many Tasks.

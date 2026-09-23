@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { birthdayEvents } from "./birthday";
-import { cyclePositionLabel, effectiveDuty, shiftDutyOn } from "./cycle";
+import { cycleDayLabel, cyclePositionLabel, dosEarnsOil, effectiveDuty, shiftDutyOn } from "./cycle";
 import { addDays, dateRange, dayIndex, formatDateList } from "./dates";
 import { ASSIGNABLE_DUTIES, type AssignableDuty } from "./domain";
 import { computeStrength, formatFigure, mflFor, V_MFL } from "./strength";
@@ -16,10 +16,17 @@ test("the three shifts follow the spec's 6-day table (section 3.2)", () => {
   assert.deepEqual(days.map((d) => shiftDutyOn(ANCHORS.C, d)), ["AM", "AM", "OFF", "OFF", "PM", "PM"]);
 });
 
-test("cycle position label", () => {
-  assert.equal(cyclePositionLabel(ANCHORS.A, "2026-01-01"), "PM Day 1 of 2, next: AM");
-  assert.equal(cyclePositionLabel(ANCHORS.A, "2026-01-04"), "AM Day 2 of 2, next: Off");
-  assert.equal(cyclePositionLabel(ANCHORS.A, "2026-01-06"), "Off Day 2 of 2, next: PM");
+test("cycle day labels read 1st / 2nd", () => {
+  assert.equal(cycleDayLabel(ANCHORS.A, "2026-01-01"), "1st PM");
+  assert.equal(cycleDayLabel(ANCHORS.A, "2026-01-04"), "2nd AM");
+  assert.equal(cycleDayLabel(ANCHORS.A, "2026-01-06"), "2nd OFF");
+  assert.equal(cyclePositionLabel(ANCHORS.A, "2026-01-01"), "1st PM, next: AM");
+  assert.equal(cyclePositionLabel(ANCHORS.A, "2026-01-04"), "2nd AM, next: OFF");
+});
+
+test("a DOS/FDO duty earns the next-day 0.5 OIL only on a 1st AM", () => {
+  assert.equal(dosEarnsOil(ANCHORS.A, "2026-01-03"), true); // 1st AM, next day is the 2nd AM
+  assert.equal(dosEarnsOil(ANCHORS.A, "2026-01-04"), false); // 2nd AM, next day is Off anyway
 });
 
 test("V duty turns the following PM block into Off(V), section 5", () => {

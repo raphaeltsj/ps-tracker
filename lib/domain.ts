@@ -82,8 +82,8 @@ export const COMMON_LEAVE_TYPES: { code: string; name: string; halfDay?: boolean
   { code: "0.5 AL", name: "Half-day local leave", halfDay: true },
   { code: "OL", name: "Overseas leave" },
   { code: "MWO", name: "Mental wellness off" },
-  // TODO(open item): full name of OML.
-  { code: "OML", name: "OML (full name to be added)" },
+  // MC without a medical certificate.
+  { code: "OML", name: "Ordinary Medical leave" },
   { code: "MC", name: "Medical leave" },
   { code: "HL", name: "Hospitalised leave" },
   { code: "FCL", name: "Family care leave" },

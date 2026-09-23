@@ -14,14 +14,24 @@ export function shiftDutyOn(anchor: number, date: string): ShiftDuty {
   return CYCLE[cyclePosition(anchor, date)];
 }
 
-const BLOCK_NAME: Record<ShiftDuty, string> = { PM: "PM", AM: "AM", OFF: "Off" };
+const BLOCK_NAME: Record<ShiftDuty, string> = { PM: "PM", AM: "AM", OFF: "OFF" };
 
-/** e.g. "PM Day 1 of 2, next: AM" */
+/** Which day of the 2-day block a date is: "1st AM", "2nd OFF", and so on. */
+export function cycleDayLabel(anchor: number, date: string): string {
+  const pos = cyclePosition(anchor, date);
+  return `${pos % 2 === 0 ? "1st" : "2nd"} ${BLOCK_NAME[CYCLE[pos]]}`;
+}
+
+/** e.g. "1st PM, next: AM" */
 export function cyclePositionLabel(anchor: number, date: string): string {
   const pos = cyclePosition(anchor, date);
-  const block = CYCLE[pos];
   const next = CYCLE[(pos - (pos % 2) + 2) % 6];
-  return `${BLOCK_NAME[block]} Day ${(pos % 2) + 1} of 2, next: ${BLOCK_NAME[next]}`;
+  return `${cycleDayLabel(anchor, date)}, next: ${BLOCK_NAME[next]}`;
+}
+
+/** A DOS/FDO duty only earns the next-day 0.5 OIL when it falls on the 1st AM (spec 5.2). */
+export function dosEarnsOil(anchor: number, date: string): boolean {
+  return cyclePosition(anchor, date) === 2;
 }
 
 export type EffectiveDuty = {

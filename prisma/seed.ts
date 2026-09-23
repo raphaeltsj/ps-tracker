@@ -3,7 +3,7 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../lib/generated/prisma/client";
 import { DATABASE_URL } from "../lib/db-url";
-import { cyclePosition, shiftDutyOn } from "../lib/cycle";
+import { cyclePosition, dosEarnsOil, shiftDutyOn } from "../lib/cycle";
 import { addDays, dateRange, dayIndex, monthDates, shiftMonth, todayLocal } from "../lib/dates";
 import { COMMON_LEAVE_TYPES, DOS_KINDS, DOS_OIL_CODE, DOS_OIL_HALF } from "../lib/domain";
 
@@ -54,7 +54,6 @@ async function main() {
   await db.leaveType.createMany({
     data: COMMON_LEAVE_TYPES.map((t, i) => ({ code: t.code, name: t.name, halfDay: t.halfDay ?? false, sortOrder: i })),
   });
-  await db.leaveType.create({ data: { code: "TRG", name: "Training", custom: true, sortOrder: 100 } });
 
   const tasks = [];
   for (let i = 1; i <= 5; i++) tasks.push(await db.task.create({ data: { name: `Task ${i}` } }));
@@ -123,17 +122,20 @@ async function main() {
       if (onV.has(who.id + "|" + date) || onV.has(who.id + "|" + addDays(date, 1))) continue;
       const kind = DOS_KINDS[dosTurn % DOS_KINDS.length];
       const duty = await db.extraDuty.create({ data: { staffId: who.id, date, kind } });
-      await createLeave(who.id, DOS_OIL_CODE, [addDays(date, 1)], "APPROVED", {
-        half: DOS_OIL_HALF,
-        remarks: "Automatic after " + kind + " duty on " + date + ".",
-        givenById: sup.id,
-        autoFor: duty.id,
-      });
+      // Only a 1st AM duty earns the next-day 0.5 OIL: after a 2nd AM the person is already Off.
+      if (dosEarnsOil(s.cycleAnchor, date)) {
+        await createLeave(who.id, DOS_OIL_CODE, [addDays(date, 1)], "APPROVED", {
+          half: DOS_OIL_HALF,
+          remarks: "Automatic after " + kind + " duty on " + date + ".",
+          givenById: sup.id,
+          autoFor: duty.id,
+        });
+      }
       dosTurn++;
     }
 
     // Approved leave: short blocks spread across the range.
-    const fullTypes = ["AL", "AL", "AL", "OL", "MC", "FCL", "CSE", "MWO", "1 OIL", "TRG"];
+    const fullTypes = ["AL", "AL", "AL", "OL", "MC", "FCL", "CSE", "MWO", "OML", "1 OIL"];
     for (let i = 0; i < 38; i++) {
       const who = pick(staff.slice(1));
       const start = pick(range);
@@ -211,7 +213,7 @@ async function main() {
     // Locked date, special event and a raised V headcount this month.
     const working = monthDays.filter((d) => shiftDutyOn(s.cycleAnchor, d) !== "OFF");
     await db.lockedDate.create({ data: { shiftId: s.id, date: working[Math.min(8, working.length - 1)], remarks: "Important meeting: all hands on deck." } });
-    await db.specialEvent.create({ data: { shiftId: s.id, date: working[Math.min(12, working.length - 1)], reportTime: "0600", note: "Early reporting for a ceremony." } });
+    await db.specialEvent.create({ data: { shiftId: s.id, date: working[Math.min(12, working.length - 1)], note: "Ceremony: the whole shift attends." } });
     // V MFL is always 1, so there is no per-date V headcount to seed.
   }
 

@@ -9,7 +9,7 @@ import { StrengthSummary } from "@/components/roster/strength-summary";
 import { ResultMessage, useAction } from "@/components/roster/use-action";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { cyclePositionLabel } from "@/lib/cycle";
+import { cycleDayLabel, cyclePositionLabel } from "@/lib/cycle";
 import { formatDate, formatDateList, formatDateShort } from "@/lib/dates";
 import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_REPORT_TIME, DUTY_LABEL, HALF_DAY_TIMES, type Duty, type Half } from "@/lib/domain";
 import { canDecideLeave } from "@/lib/permissions";
@@ -72,12 +72,12 @@ function DateDetails({ roster, viewer, date, onFocusLeave, canEdit, mode }: Pane
     <Section title={formatDate(date)}>
       {mode === "edit" && canEdit && <DateSettings shiftId={roster.shiftId} date={date} day={day} isManagement={viewer.role === "MANAGEMENT"} />}
       <p className="text-muted-foreground">
-        {roster.shiftName}: {day.shiftDuty === "OFF" ? "Rest day (MFL blank)" : `${day.shiftDuty} duty`}
+        {roster.shiftName}: {cycleDayLabel(roster.anchor, date)}
+        {day.shiftDuty === "OFF" ? " (Rest day, MFL blank)" : " duty"}
       </p>
       {day.event && (
         <div className="space-y-1">
-          <EventBadge time={day.event.reportTime} />
-          {day.event.note && <p className="text-xs text-muted-foreground">{day.event.note}</p>}
+          <EventBadge note={day.event.note} />
         </div>
       )}
       {day.locked && (
@@ -116,7 +116,6 @@ function DateSettings({ shiftId, date, day, isManagement }: { shiftId: string; d
   const { pending, result, run } = useAction();
   const [remarks, setRemarks] = useState(day.locked ?? "");
   const [allShifts, setAllShifts] = useState(false);
-  const [time, setTime] = useState(day.event ? `${day.event.reportTime.slice(0, 2)}:${day.event.reportTime.slice(2)}` : "");
   const [note, setNote] = useState(day.event?.note ?? "");
   const [open, setOpen] = useState<"lock" | "event" | null>(null);
 
@@ -155,14 +154,10 @@ function DateSettings({ shiftId, date, day, isManagement }: { shiftId: string; d
 
       {open === "event" && (
         <div className="space-y-2">
-          <label className="block space-y-1">
-            <span className="text-xs font-medium">Report time</span>
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="h-9 w-full rounded-md border bg-background px-2 text-sm" />
-          </label>
-          <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Note (optional)" />
-          <p className="text-[11px] text-muted-foreground">Special events change the reporting time only: MFL and slots stay the same.</p>
+          <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="What is the event?" />
+          <p className="text-[11px] text-muted-foreground">Special events are a marker for the whole shift: MFL and slots stay the same.</p>
           <div className="flex gap-2">
-            <Button size="sm" disabled={pending || !time} onClick={() => run(() => setSpecialEvent({ shiftId, date, reportTime: time, note }))}>
+            <Button size="sm" disabled={pending || !note.trim()} onClick={() => run(() => setSpecialEvent({ shiftId, date, note }))}>
               {day.event ? "Save event" : "Set event"}
             </Button>
             {day.event && (
@@ -322,7 +317,9 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
   const [reason, setReason] = useState("");
   const [confirmCancel, setConfirmCancel] = useState(false);
 
-  const editable = mode === "edit" && canEdit && !leave.auto && (leave.status === "APPROVED" || leave.status === "PENDING");
+  const active = leave.status === "APPROVED" || leave.status === "PENDING";
+  const editable = mode === "edit" && canEdit && active;
+  const cancellable = editable && !leave.auto;
   const decidable = leave.status === "PENDING" && canDecideLeave(viewer, leave.staffId, leave.shiftId) && (mode === "edit" || leave.staffId === viewer.id);
   const type = leaveTypes.find((t) => t.code === typeCode);
   // Selected cells that all belong to this person can replace the leave dates.
@@ -352,7 +349,8 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
       {leave.status === "PENDING" && <p className="text-xs text-muted-foreground">Submitted {new Date(leave.submittedAt).toLocaleString()}</p>}
       {leave.auto && (
         <p className="rounded-md bg-muted p-2 text-xs">
-          This {DOS_OIL_CODE} comes with the {DOS_LABEL} duty and cannot be edited or cancelled. Remove that duty instead.
+          This {DOS_OIL_CODE} comes with the {DOS_LABEL} duty. You can change which half it covers, but not its type or date, and it cannot be cancelled. Remove the duty
+          instead.
         </p>
       )}
 
@@ -386,21 +384,23 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
       {editable && !editing && !confirmCancel && (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-            Edit leave
+            {leave.auto ? "Change half" : "Edit leave"}
           </Button>
-          {leave.status === "APPROVED" && (
+          {cancellable && (
             <Button size="sm" variant="outline" className="text-red-700 dark:text-red-300" onClick={() => setConfirmCancel(true)}>
-              Cancel leave
+              {leave.status === "PENDING" ? "Cancel request" : "Cancel leave"}
             </Button>
           )}
         </div>
       )}
       {confirmCancel && (
         <div className="space-y-2 rounded-md border border-red-300 p-2 dark:border-red-500/40">
-          <p className="text-xs">Cancel this approved leave? The slot is freed straight away.</p>
+          <p className="text-xs">
+            {leave.status === "PENDING" ? "Cancel this pending request?" : "Cancel this approved leave? The slot is freed straight away."}
+          </p>
           <div className="flex gap-2">
             <Button size="sm" variant="destructive" disabled={pending} onClick={() => run(() => cancelLeave(leave.id), () => onFocusLeave(null))}>
-              Yes, cancel leave
+              {leave.status === "PENDING" ? "Yes, cancel request" : "Yes, cancel leave"}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setConfirmCancel(false)}>
               Keep it
@@ -410,10 +410,12 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
       )}
       {editing && (
         <div className="space-y-2 rounded-md border p-2">
-          <LeaveTypeSelect id="edit-type" types={leaveTypes} value={typeCode} onChange={(v) => { setTypeCode(v); setHalf(null); }} />
+          {!leave.auto && <LeaveTypeSelect id="edit-type" types={leaveTypes} value={typeCode} onChange={(v) => { setTypeCode(v); setHalf(null); }} />}
           {type?.halfDay && <HalfPicker value={half} onChange={setHalf} duty={null} />}
           <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} placeholder="Remarks" />
-          {onlyThisPerson ? (
+          {leave.auto ? (
+            <p className="text-xs text-muted-foreground">Only the half can change: this {DOS_OIL_CODE} stays on {formatDateList(leave.days)}.</p>
+          ) : onlyThisPerson ? (
             <p className="text-xs text-muted-foreground">Dates will change to your selection: {formatDateList(selectedDates)}.</p>
           ) : (
             <p className="text-xs text-muted-foreground">To change dates, select this person&apos;s new dates on the roster first.</p>
@@ -424,7 +426,7 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
               disabled={pending || !type || (type.halfDay && !half)}
               onClick={() =>
                 run(
-                  () => editLeave({ leaveId: leave.id, typeCode, half, remarks, dates: onlyThisPerson ? selectedDates : undefined }),
+                  () => editLeave({ leaveId: leave.id, typeCode, half, remarks, dates: !leave.auto && onlyThisPerson ? selectedDates : undefined }),
                   () => {
                     setEditing(false);
                     onClear();

@@ -167,7 +167,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
   }
 
   const lockByDate = new Map(locks.map((l) => [l.date, l.remarks]));
-  const eventByDate = new Map(events.map((e) => [e.date, { reportTime: e.reportTime, note: e.note }]));
+  const eventByDate = new Map(events.map((e) => [e.date, { note: e.note }]));
 
   const days: Record<string, RosterDay> = {};
   for (const date of dates) {

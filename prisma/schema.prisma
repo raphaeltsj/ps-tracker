@@ -145,12 +145,11 @@ model LockedDate {
 }
 
 model SpecialEvent {
-  id         String @id @default(cuid())
-  shiftId    String
-  shift      Shift  @relation(fields: [shiftId], references: [id])
-  date       String
-  reportTime String // e.g. "0600"
-  note       String?
+  id      String  @id @default(cuid())
+  shiftId String
+  shift   Shift   @relation(fields: [shiftId], references: [id])
+  date    String
+  note    String?
 
   @@unique([shiftId, date])
 }
