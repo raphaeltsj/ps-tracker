@@ -9,12 +9,19 @@ export const ROLE_LABEL: Record<Role, string> = {
   MANAGEMENT: "Management",
 };
 
-/** Duties a supervisor can assign from the one duty picker. */
-export const ASSIGNABLE_DUTIES = ["AM", "PM", "V", "VSB", "OFF"] as const;
+/**
+ * Duties a supervisor can assign from the one duty picker. AM and PM are not here: they come from
+ * the shift cycle and are never set by hand (spec 5.1). An assigned OFF is an Off awarded because
+ * of V duty, shown as "Off(V)".
+ */
+export const ASSIGNABLE_DUTIES = ["V", "VSB", "OFF"] as const;
 export type AssignableDuty = (typeof ASSIGNABLE_DUTIES)[number];
 
-/** Effective duty on a day. OFF_POSTV is derived: the PM block replaced by Off after V duty. */
-export type Duty = AssignableDuty | "OFF_POSTV";
+/**
+ * Effective duty on a day. AM, PM and OFF come from the cycle; OFF_V is an Off awarded for V duty,
+ * either given by a supervisor or derived from the PM block after a 2-day V.
+ */
+export type Duty = "AM" | "PM" | "V" | "VSB" | "OFF" | "OFF_V";
 
 /** What a whole shift works on a day in the normal cycle. OFF = Rest day. */
 export type ShiftDuty = "AM" | "PM" | "OFF";
@@ -25,8 +32,18 @@ export const DUTY_LABEL: Record<Duty, string> = {
   V: "V",
   VSB: "V(SB)",
   OFF: "Off",
-  OFF_POSTV: "Off (post-V)",
+  OFF_V: "Off(V)",
 };
+
+/** DOS / DOS2IC / FDO: the same 24-hour duty under three names (spec 5.2). */
+export const DOS_KINDS = ["DOS", "DOS2IC", "FDO"] as const;
+export type DosKind = (typeof DOS_KINDS)[number];
+
+export const DOS_REPORT_TIME = "0800";
+export const DOS_LABEL = "DOS/FDO";
+/** The half-day OIL a DOS/FDO duty always earns the next day. */
+export const DOS_OIL_CODE = "0.5 OIL";
+export const DOS_OIL_HALF = "FIRST";
 
 export const DUTY_TIMES: Partial<Record<Duty, string>> = {
   AM: "0745-1445",
@@ -65,8 +82,8 @@ export const COMMON_LEAVE_TYPES: { code: string; name: string; halfDay?: boolean
   { code: "0.5 AL", name: "Half-day local leave", halfDay: true },
   { code: "OL", name: "Overseas leave" },
   { code: "MWO", name: "Mental wellness off" },
-  // TODO(open item): full name of OML.
-  { code: "OML", name: "OML (full name to be added)" },
+  // MC without a medical certificate.
+  { code: "OML", name: "Ordinary Medical leave" },
   { code: "MC", name: "Medical leave" },
   { code: "HL", name: "Hospitalised leave" },
   { code: "FCL", name: "Family care leave" },

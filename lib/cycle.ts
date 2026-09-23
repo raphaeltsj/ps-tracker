@@ -14,14 +14,24 @@ export function shiftDutyOn(anchor: number, date: string): ShiftDuty {
   return CYCLE[cyclePosition(anchor, date)];
 }
 
-const BLOCK_NAME: Record<ShiftDuty, string> = { PM: "PM", AM: "AM", OFF: "Off" };
+const BLOCK_NAME: Record<ShiftDuty, string> = { PM: "PM", AM: "AM", OFF: "OFF" };
 
-/** e.g. "PM Day 1 of 2, next: AM" */
+/** Which day of the 2-day block a date is: "1st AM", "2nd OFF", and so on. */
+export function cycleDayLabel(anchor: number, date: string): string {
+  const pos = cyclePosition(anchor, date);
+  return `${pos % 2 === 0 ? "1st" : "2nd"} ${BLOCK_NAME[CYCLE[pos]]}`;
+}
+
+/** e.g. "1st PM, next: AM" */
 export function cyclePositionLabel(anchor: number, date: string): string {
   const pos = cyclePosition(anchor, date);
-  const block = CYCLE[pos];
   const next = CYCLE[(pos - (pos % 2) + 2) % 6];
-  return `${BLOCK_NAME[block]} Day ${(pos % 2) + 1} of 2, next: ${BLOCK_NAME[next]}`;
+  return `${cycleDayLabel(anchor, date)}, next: ${BLOCK_NAME[next]}`;
+}
+
+/** A DOS/FDO duty only earns the next-day 0.5 OIL when it falls on the 1st AM (spec 5.2). */
+export function dosEarnsOil(anchor: number, date: string): boolean {
+  return cyclePosition(anchor, date) === 2;
 }
 
 export type EffectiveDuty = {
@@ -32,7 +42,10 @@ export type EffectiveDuty = {
 
 /**
  * A person's duty on a date: a supervisor override wins; otherwise the shift cycle, except that a PM
- * block directly after V duty (worked on the preceding Off days) becomes "Off (post-V)".
+ * block directly after a 2-day V (worked on the preceding Off days) becomes "Off(V)".
+ * An Off set by a supervisor is also an Off(V): it is the rest day awarded for V duty, for example
+ * to a V(SB) who was activated. Cancelling the V duty restores the PM block by itself, because
+ * nothing about it is stored.
  */
 export function effectiveDuty(
   anchor: number,
@@ -40,14 +53,14 @@ export function effectiveDuty(
   overrides: ReadonlyMap<string, AssignableDuty>,
 ): EffectiveDuty {
   const override = overrides.get(date);
-  if (override) return { duty: override, source: "override" };
+  if (override) return { duty: override === "OFF" ? "OFF_V" : override, source: "override" };
 
   const pos = cyclePosition(anchor, date);
   const base = CYCLE[pos];
   if (base === "PM") {
     const blockStart = addDays(date, -pos);
     if (overrides.get(addDays(blockStart, -1)) === "V" || overrides.get(addDays(blockStart, -2)) === "V") {
-      return { duty: "OFF_POSTV", source: "postV" };
+      return { duty: "OFF_V", source: "postV" };
     }
   }
   return { duty: base, source: "cycle" };

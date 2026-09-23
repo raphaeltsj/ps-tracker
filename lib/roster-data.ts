@@ -3,11 +3,11 @@ import { birthdayEvents } from "@/lib/birthday";
 import { effectiveDuty, shiftDutyOn } from "@/lib/cycle";
 import { addDays, dateRange } from "@/lib/dates";
 import { db } from "@/lib/db";
-import type { AssignableDuty, Half, LeaveStatus, Role } from "@/lib/domain";
+import type { AssignableDuty, DosKind, Half, LeaveStatus, Role } from "@/lib/domain";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { canEditShift, type Viewer } from "@/lib/permissions";
 import type { CellAbsence, LeaveSummary, RosterCell, RosterData, RosterDay } from "@/lib/roster-types";
-import { computeStrength, mflFor } from "@/lib/strength";
+import { computeStrength, mflFor, V_MFL } from "@/lib/strength";
 
 const leaveInclude = {
   type: true,
@@ -35,6 +35,7 @@ export function toLeaveSummary(leave: LeaveWithRelations): LeaveSummary {
     givenByName: leave.givenBy?.name ?? null,
     submittedAt: leave.submittedAt.toISOString(),
     days: leave.days.map((d) => d.date),
+    auto: leave.autoFor !== null,
   };
 }
 
@@ -69,7 +70,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
   });
   const staffIds = staff.map((s) => s.id);
 
-  const [overrides, leaves, tasks, locks, events, vCounts] = await Promise.all([
+  const [overrides, leaves, tasks, locks, events, extraDuties] = await Promise.all([
     db.dutyOverride.findMany({ where: { staffId: { in: staffIds }, date: { gte: loadFrom, lte: loadTo } } }),
     db.leave.findMany({
       where: {
@@ -85,7 +86,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
     }),
     db.lockedDate.findMany({ where: { shiftId, date: { gte: from, lte: to } } }),
     db.specialEvent.findMany({ where: { shiftId, date: { gte: from, lte: to } } }),
-    db.vHeadcount.findMany({ where: { shiftId, date: { gte: from, lte: to } } }),
+    db.extraDuty.findMany({ where: { staffId: { in: staffIds }, date: { gte: from, lte: to } } }),
   ]);
 
   const editor = viewer ? canEditShift(viewer, shiftId) : false;
@@ -110,7 +111,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
     const row: Record<string, RosterCell> = {};
     for (const date of dates) {
       const { duty, source } = dutyOn(date);
-      row[date] = { duty, dutySource: source, task: null, absences: [] };
+      row[date] = { duty, dutySource: source, dos: null, task: null, absences: [] };
       if (duty === "V") vOnDuty.set(date, vOnDuty.get(date)! + 1);
     }
 
@@ -160,9 +161,13 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
     if (cell && !cell.absences.some((a) => a.counts >= 1)) cell.task = { id: t.task.id, name: t.task.name };
   }
 
+  for (const e of extraDuties) {
+    const cell = cells[e.staffId]?.[e.date];
+    if (cell) cell.dos = e.kind as DosKind;
+  }
+
   const lockByDate = new Map(locks.map((l) => [l.date, l.remarks]));
-  const eventByDate = new Map(events.map((e) => [e.date, { reportTime: e.reportTime, note: e.note }]));
-  const vByDate = new Map(vCounts.map((v) => [v.date, v.count]));
+  const eventByDate = new Map(events.map((e) => [e.date, { note: e.note }]));
 
   const days: Record<string, RosterDay> = {};
   for (const date of dates) {
@@ -173,7 +178,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
       // TODO(open item): Total Strength is the whole shift headcount per spec, including people
       // temporarily on V or post-V Off.
       strength: computeStrength(staff.length, notIn.get(date)!, mflFor(shiftDuty, date)),
-      v: shiftDuty === "OFF" ? { onDuty: vOnDuty.get(date)!, mfl: vByDate.get(date) ?? 1 } : null,
+      v: shiftDuty === "OFF" ? { onDuty: vOnDuty.get(date)!, mfl: V_MFL } : null,
       locked: lockByDate.get(date) ?? null,
       event: eventByDate.get(date) ?? null,
     };

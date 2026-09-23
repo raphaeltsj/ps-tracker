@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, Lock } from "lucide-react";
-import { DUTY_CELL, DutyChip, DutyLegend, dutyTitle, EventBadge, LABELLED_DUTIES, LeaveChip, LockBadge, TaskTag } from "@/components/roster/chips";
+import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, EventBadge, LABELLED_DUTIES, LeaveChip, LockBadge, TaskTag } from "@/components/roster/chips";
 import { StrengthSummary } from "@/components/roster/strength-summary";
 import { cellKey, type Selection, type WorkspaceProps } from "@/components/roster/roster-workspace";
 import { Button } from "@/components/ui/button";
+import { cycleDayLabel } from "@/lib/cycle";
 import { formatDate, weekdayShort } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
@@ -20,12 +21,14 @@ export function MobileRoster({
   canRequest,
   canRequestLocked,
   onDate,
+  onFocusDate,
   onCell,
   onLeave,
 }: WorkspaceProps & {
   selection: Selection;
   compact: boolean;
   onDate: (date: string, shiftKey: boolean) => void;
+  onFocusDate: (date: string) => void;
   onCell: (staffId: string, date: string, shiftKey: boolean) => void;
   onLeave: (leaveId: string | null, date: string) => void;
 }) {
@@ -48,7 +51,10 @@ export function MobileRoster({
             return (
               <button
                 key={d}
-                onClick={() => setDay(d)}
+                onClick={() => {
+                  setDay(d);
+                  onFocusDate(d);
+                }}
                 className={cn(
                   "flex flex-col items-center rounded-lg py-1 text-xs",
                   d === day ? "bg-primary text-primary-foreground" : "hover:bg-accent",
@@ -83,8 +89,8 @@ export function MobileRoster({
             <div className="font-semibold">{formatDate(day)}</div>
             <div className="text-xs text-muted-foreground">
               <span className={cn("mr-1.5 inline-block h-2 w-6 rounded-full align-middle", DUTY_CELL[info.shiftDuty])} aria-hidden />
-              {roster.shiftName}
-              <span className="sr-only">: {info.shiftDuty === "OFF" ? "Rest day" : `${info.shiftDuty} duty`}</span>
+              {roster.shiftName}: {cycleDayLabel(roster.anchor, day)}
+              {info.shiftDuty === "OFF" ? " (Rest day)" : ""}
             </div>
           </div>
           {mode === "staff" && canRequest && (canRequestLocked || !info.locked) && (
@@ -93,7 +99,7 @@ export function MobileRoster({
             </Button>
           )}
         </div>
-        {info.event && <EventBadge time={info.event.reportTime} />}
+        {info.event && <EventBadge note={info.event.note} />}
         {info.locked && (
           <div className="space-y-1">
             <LockBadge />
@@ -118,6 +124,7 @@ export function MobileRoster({
                 {p.name}
                 {p.role === "SUPERVISOR" && <span className="ml-1 text-[10px] text-muted-foreground">Sup</span>}
               </span>
+              {cell.dos && <DosTag kind={cell.dos} />}
               {cell.task && <TaskTag name={cell.task.name} />}
               {cell.absences.map((a, i) => (
                 <button

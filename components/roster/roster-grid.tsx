@@ -1,7 +1,7 @@
 "use client";
 import { memo } from "react";
 import { CalendarClock, Lock } from "lucide-react";
-import { DUTY_CELL, DutyChip, DutyLegend, dutyTitle, LABELLED_DUTIES, LeaveChip, SLOT_BG, SLOT_STYLE, TaskTag } from "@/components/roster/chips";
+import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, LABELLED_DUTIES, LeaveChip, SLOT_BG, SLOT_STYLE, TaskTag } from "@/components/roster/chips";
 import { cellKey, type Selection, type WorkspaceProps } from "@/components/roster/roster-workspace";
 import { isWeekend, weekdayShort } from "@/lib/dates";
 import type { RosterCell, RosterDay } from "@/lib/roster-types";
@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 type GridProps = WorkspaceProps & {
   selection: Selection;
   compact: boolean;
-  onDate: (date: string, shiftKey: boolean) => void;
+  onDate: (date: string) => void;
   onCell: (staffId: string, date: string, shiftKey: boolean) => void;
   onLeave: (leaveId: string | null, date: string) => void;
 };
@@ -46,8 +46,8 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, on
                 return (
                   <th
                     key={date}
-                    onClick={(e) => onDate(date, e.shiftKey)}
-                    title={day.locked ? `Locked date: ${day.locked}` : day.event ? `Special Event: report at ${day.event.reportTime}` : undefined}
+                    onClick={() => onDate(date)}
+                    title={`Open the details for ${date}`}
                     className={cn(
                       "min-w-14 cursor-pointer select-none border-b border-r px-1 py-1 text-center font-normal",
                       isWeekend(date) && "bg-muted/60",
@@ -65,7 +65,7 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, on
                       <span className={cn("h-2 w-6 rounded-full", DUTY_CELL[day.shiftDuty])} title={SHIFT_DUTY_LABEL[day.shiftDuty]} />
                       <span className="sr-only">{SHIFT_DUTY_LABEL[day.shiftDuty]}</span>
                       {day.locked && <Lock className="size-3 text-foreground" aria-label="Locked date" />}
-                      {day.event && <CalendarClock className="size-3 text-fuchsia-600 dark:text-fuchsia-400" aria-label={`Special Event: report at ${day.event.reportTime}`} />}
+                      {day.event && <CalendarClock className="size-3 text-fuchsia-600 dark:text-fuchsia-400" aria-label="Special event" />}
                     </div>
                   </th>
                 );
@@ -166,7 +166,7 @@ const GridCell = memo(function GridCell({
         {/* AM, PM and Off are colour-coded (legend above); only V and V(SB) keep a text label. */}
         {LABELLED_DUTIES.includes(cell.duty) ? <DutyChip duty={cell.duty} /> : <span className="sr-only">{dutyTitle(cell.duty)}</span>}
         {day.event && working && (
-          <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-fuchsia-500" title={`Special Event: report at ${day.event.reportTime}`} />
+          <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-fuchsia-500" title={day.event.note ? `Special Event: ${day.event.note}` : "Special Event"} />
         )}
         {cell.absences.map((a, i) => (
           <button
@@ -180,6 +180,7 @@ const GridCell = memo(function GridCell({
             <LeaveChip absence={a} />
           </button>
         ))}
+        {cell.dos && <DosTag kind={cell.dos} />}
         {cell.task && <TaskTag name={cell.task.name} />}
       </div>
     </td>

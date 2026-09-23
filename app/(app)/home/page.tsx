@@ -2,7 +2,7 @@ import Link from "next/link";
 import { DutyChip, EventBadge, LeaveChip, LockBadge, TaskTag } from "@/components/roster/chips";
 import { StrengthSummary } from "@/components/roster/strength-summary";
 import { requireViewer } from "@/lib/auth";
-import { cyclePositionLabel } from "@/lib/cycle";
+import { cycleDayLabel, cyclePositionLabel } from "@/lib/cycle";
 import { addDays, formatDate, formatDateShort, todayLocal } from "@/lib/dates";
 import { DUTY_TIMES } from "@/lib/domain";
 import { buildRoster } from "@/lib/roster-data";
@@ -26,9 +26,9 @@ export default async function HomePage() {
               <Link key={r.shiftId} href={`/roster?shift=${r.shiftId}`} className="space-y-2 rounded-xl border p-4 hover:bg-accent/40">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold">{r.shiftName}</span>
-                  <span className="text-sm text-muted-foreground">{day.shiftDuty === "OFF" ? "Rest day" : `${day.shiftDuty} duty`}</span>
+                  <span className="text-sm text-muted-foreground">{cycleDayLabel(r.anchor, today)}{day.shiftDuty === "OFF" ? " (Rest day)" : " duty"}</span>
                 </div>
-                {day.event && <EventBadge time={day.event.reportTime} />}
+                {day.event && <EventBadge note={day.event.note} />}
                 {day.locked && <LockBadge />}
                 <StrengthSummary day={day} />
               </Link>
@@ -55,7 +55,7 @@ export default async function HomePage() {
           {todayCell.absences.map((a, i) => <LeaveChip key={i} absence={a} />)}
         </div>
         <p className="text-sm font-medium">{cyclePositionLabel(roster.anchor, today)}</p>
-        {todayInfo.event && <EventBadge time={todayInfo.event.reportTime} />}
+        {todayInfo.event && <EventBadge note={todayInfo.event.note} />}
         {todayInfo.locked && <LockBadge />}
       </section>
 
@@ -68,7 +68,7 @@ export default async function HomePage() {
               <DutyChip duty={me[d].duty} long />
               {me[d].task && <TaskTag name={me[d].task.name} />}
               {me[d].absences.map((a, i) => <LeaveChip key={i} absence={a} />)}
-              {roster.days[d].event && <span className="text-xs text-fuchsia-700 dark:text-fuchsia-300">Report {roster.days[d].event!.reportTime}</span>}
+              {roster.days[d].event && <span className="text-xs text-fuchsia-700 dark:text-fuchsia-300">Special event</span>}
             </li>
           ))}
         </ul>

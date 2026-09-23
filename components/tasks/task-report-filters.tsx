@@ -58,7 +58,7 @@ export function TaskReportFilters(props: Props) {
 
   const label = "text-xs font-medium text-muted-foreground";
   return (
-    <form onSubmit={apply} className="flex flex-wrap items-end gap-3 rounded-xl border p-3">
+    <form onSubmit={apply} className="relative z-40 flex flex-wrap items-end gap-3 rounded-xl border bg-background p-3">
       <div className="space-y-1">
         <span className={label}>Period</span>
         <div className="flex rounded-lg border p-0.5 text-sm" role="radiogroup" aria-label="Period">
@@ -169,7 +169,7 @@ function TaskPicker({ tasks, picked, onChange }: { tasks: { id: string; name: st
         <summary className={cn("flex h-9 cursor-pointer list-none items-center rounded-md border bg-background px-3 text-sm", picked?.length === 0 && "border-red-500 text-red-700 dark:text-red-300")}>
           {summary}
         </summary>
-        <div className="absolute z-20 mt-1 w-64 space-y-2 rounded-lg border bg-popover p-2 shadow-lg">
+        <div className="absolute z-50 mt-1 max-h-[60vh] w-64 space-y-2 overflow-y-auto rounded-lg border bg-popover p-2 shadow-xl">
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search Tasks" className="h-8" aria-label="Search Tasks" />
           <div className="flex gap-3 text-xs">
             <button type="button" className="underline underline-offset-2" onClick={() => onChange(null)}>
@@ -179,7 +179,7 @@ function TaskPicker({ tasks, picked, onChange }: { tasks: { id: string; name: st
               Clear
             </button>
           </div>
-          <ul className="max-h-60 space-y-0.5 overflow-y-auto">
+          <ul className="max-h-[40vh] space-y-0.5 overflow-y-auto">
             {shown.map((t) => (
               <li key={t.id}>
                 <label className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-accent">

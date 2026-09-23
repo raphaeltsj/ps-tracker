@@ -1,19 +1,19 @@
 "use client";
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
-import { approveLeave, assignDuty, assignTask, cancelLeave, editLeave, giveLeave, rejectLeave, requestLeave } from "@/app/actions";
-import { DutyChip, EventBadge, LeaveChip, LockBadge, StatusBadge, TaskTag } from "@/components/roster/chips";
+import { approveLeave, assignDuty, assignExtraDuty, assignTask, cancelLeave, clearSpecialEvent, editLeave, giveLeave, lockDates, rejectLeave, requestLeave, setSpecialEvent, unlockDate } from "@/app/actions";
+import { DosTag, DutyChip, EventBadge, LeaveChip, LockBadge, StatusBadge, TaskTag } from "@/components/roster/chips";
 import { MyRequests } from "@/components/roster/my-requests";
 import type { Selection, WorkspaceProps } from "@/components/roster/roster-workspace";
 import { StrengthSummary } from "@/components/roster/strength-summary";
 import { ResultMessage, useAction } from "@/components/roster/use-action";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { cyclePositionLabel } from "@/lib/cycle";
+import { cycleDayLabel, cyclePositionLabel } from "@/lib/cycle";
 import { formatDate, formatDateList, formatDateShort } from "@/lib/dates";
-import { ASSIGNABLE_DUTIES, DUTY_LABEL, HALF_DAY_TIMES, type Duty, type Half } from "@/lib/domain";
+import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_REPORT_TIME, DUTY_LABEL, HALF_DAY_TIMES, type Duty, type Half } from "@/lib/domain";
 import { canDecideLeave } from "@/lib/permissions";
-import { isLeaveEntry, type LeaveSummary, type LeaveTypeOption } from "@/lib/roster-types";
+import { isLeaveEntry, type LeaveSummary, type LeaveTypeOption, type RosterDay } from "@/lib/roster-types";
 import { formatFigure } from "@/lib/strength";
 import { cn } from "@/lib/utils";
 
@@ -64,26 +64,27 @@ export function SidePanel(props: PanelProps) {
 
 // ---------------- Date details ----------------
 
-function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date: string }) {
+function DateDetails({ roster, viewer, date, onFocusLeave, canEdit, mode }: PanelProps & { date: string }) {
   const day = roster.days[date];
   const own = roster.cells[viewer.id]?.[date];
   if (!day) return null;
   return (
     <Section title={formatDate(date)}>
+      {mode === "edit" && canEdit && <DateSettings shiftId={roster.shiftId} date={date} day={day} isManagement={viewer.role === "MANAGEMENT"} />}
       <p className="text-muted-foreground">
-        {roster.shiftName}: {day.shiftDuty === "OFF" ? "Rest day (MFL blank)" : `${day.shiftDuty} duty`}
+        {roster.shiftName}: {cycleDayLabel(roster.anchor, date)}
+        {day.shiftDuty === "OFF" ? " (Rest day, MFL blank)" : " duty"}
       </p>
       {day.event && (
         <div className="space-y-1">
-          <EventBadge time={day.event.reportTime} />
-          {day.event.note && <p className="text-xs text-muted-foreground">{day.event.note}</p>}
+          <EventBadge note={day.event.note} />
         </div>
       )}
       {day.locked && (
         <div className="space-y-1 rounded-md border bg-hatch p-2">
           <LockBadge />
           <p className="text-xs">{day.locked}</p>
-          <p className="text-[11px] text-muted-foreground">Staff cannot request leave on this date.</p>
+          <p className="text-[11px] text-muted-foreground">Staff cannot request leave on this date. Supervisors can still give leave.</p>
         </div>
       )}
       <StrengthSummary day={day} />
@@ -92,6 +93,7 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
           <div className="text-xs font-medium text-muted-foreground">You on this date</div>
           <div className="flex flex-wrap items-center gap-1.5">
             <DutyChip duty={own.duty} long />
+            {own.dos && <DosTag kind={own.dos} />}
             {own.task && <TaskTag name={own.task.name} />}
             {own.absences.map((a, i) => (
               <button key={i} onClick={() => onFocusLeave(a.leaveId)}>
@@ -106,6 +108,68 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
         </div>
       )}
     </Section>
+  );
+}
+
+/** Supervisors and Management: lock the date for events and set the special-event report time. */
+function DateSettings({ shiftId, date, day, isManagement }: { shiftId: string; date: string; day: RosterDay; isManagement: boolean }) {
+  const { pending, result, run } = useAction();
+  const [remarks, setRemarks] = useState(day.locked ?? "");
+  const [allShifts, setAllShifts] = useState(false);
+  const [note, setNote] = useState(day.event?.note ?? "");
+  const [open, setOpen] = useState<"lock" | "event" | null>(null);
+
+  return (
+    <div className="space-y-2 rounded-md border p-2">
+      <div className="flex flex-wrap gap-1.5">
+        <Button size="sm" variant={open === "lock" ? "secondary" : "outline"} onClick={() => setOpen(open === "lock" ? null : "lock")}>
+          {day.locked ? "Edit lock" : "Lock date"}
+        </Button>
+        <Button size="sm" variant={open === "event" ? "secondary" : "outline"} onClick={() => setOpen(open === "event" ? null : "event")}>
+          {day.event ? "Edit event" : "Special event"}
+        </Button>
+      </div>
+
+      {open === "lock" && (
+        <div className="space-y-2">
+          <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} placeholder="Remarks: why is this date locked?" />
+          {isManagement && (
+            <label className="flex items-center gap-2 text-xs">
+              <input type="checkbox" checked={allShifts} onChange={(e) => setAllShifts(e.target.checked)} className="size-4" />
+              Lock on all shifts
+            </label>
+          )}
+          <div className="flex gap-2">
+            <Button size="sm" disabled={pending || !remarks.trim()} onClick={() => run(() => lockDates({ shiftId, dates: [date], remarks, allShifts }))}>
+              {day.locked ? "Save lock" : "Lock date"}
+            </Button>
+            {day.locked && (
+              <Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => unlockDate({ shiftId, date, allShifts }))}>
+                Unlock
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {open === "event" && (
+        <div className="space-y-2">
+          <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="What is the event?" />
+          <p className="text-[11px] text-muted-foreground">Special events are a marker for the whole shift: MFL and slots stay the same.</p>
+          <div className="flex gap-2">
+            <Button size="sm" disabled={pending || !note.trim()} onClick={() => run(() => setSpecialEvent({ shiftId, date, note }))}>
+              {day.event ? "Save event" : "Set event"}
+            </Button>
+            {day.event && (
+              <Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => clearSpecialEvent({ shiftId, date }))}>
+                Remove event
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+      <ResultMessage result={result} />
+    </div>
   );
 }
 
@@ -253,7 +317,9 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
   const [reason, setReason] = useState("");
   const [confirmCancel, setConfirmCancel] = useState(false);
 
-  const editable = mode === "edit" && canEdit && (leave.status === "APPROVED" || leave.status === "PENDING");
+  const active = leave.status === "APPROVED" || leave.status === "PENDING";
+  const editable = mode === "edit" && canEdit && active;
+  const cancellable = editable && !leave.auto;
   const decidable = leave.status === "PENDING" && canDecideLeave(viewer, leave.staffId, leave.shiftId) && (mode === "edit" || leave.staffId === viewer.id);
   const type = leaveTypes.find((t) => t.code === typeCode);
   // Selected cells that all belong to this person can replace the leave dates.
@@ -281,6 +347,12 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
       {leave.remarks && !editing && <p className="text-xs">Remarks: {leave.remarks}</p>}
       {leave.rejectReason && <p className="text-xs text-red-700 dark:text-red-300">Reject reason: {leave.rejectReason}</p>}
       {leave.status === "PENDING" && <p className="text-xs text-muted-foreground">Submitted {new Date(leave.submittedAt).toLocaleString()}</p>}
+      {leave.auto && (
+        <p className="rounded-md bg-muted p-2 text-xs">
+          This {DOS_OIL_CODE} comes with the {DOS_LABEL} duty. You can change which half it covers, but not its type or date, and it cannot be cancelled. Remove the duty
+          instead.
+        </p>
+      )}
 
       {decidable && !rejecting && (
         <div className="space-y-1.5">
@@ -312,21 +384,23 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
       {editable && !editing && !confirmCancel && (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-            Edit leave
+            {leave.auto ? "Change half" : "Edit leave"}
           </Button>
-          {leave.status === "APPROVED" && (
+          {cancellable && (
             <Button size="sm" variant="outline" className="text-red-700 dark:text-red-300" onClick={() => setConfirmCancel(true)}>
-              Cancel leave
+              {leave.status === "PENDING" ? "Cancel request" : "Cancel leave"}
             </Button>
           )}
         </div>
       )}
       {confirmCancel && (
         <div className="space-y-2 rounded-md border border-red-300 p-2 dark:border-red-500/40">
-          <p className="text-xs">Cancel this approved leave? The slot is freed straight away.</p>
+          <p className="text-xs">
+            {leave.status === "PENDING" ? "Cancel this pending request?" : "Cancel this approved leave? The slot is freed straight away."}
+          </p>
           <div className="flex gap-2">
             <Button size="sm" variant="destructive" disabled={pending} onClick={() => run(() => cancelLeave(leave.id), () => onFocusLeave(null))}>
-              Yes, cancel leave
+              {leave.status === "PENDING" ? "Yes, cancel request" : "Yes, cancel leave"}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setConfirmCancel(false)}>
               Keep it
@@ -336,10 +410,12 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
       )}
       {editing && (
         <div className="space-y-2 rounded-md border p-2">
-          <LeaveTypeSelect id="edit-type" types={leaveTypes} value={typeCode} onChange={(v) => { setTypeCode(v); setHalf(null); }} />
+          {!leave.auto && <LeaveTypeSelect id="edit-type" types={leaveTypes} value={typeCode} onChange={(v) => { setTypeCode(v); setHalf(null); }} />}
           {type?.halfDay && <HalfPicker value={half} onChange={setHalf} duty={null} />}
           <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} placeholder="Remarks" />
-          {onlyThisPerson ? (
+          {leave.auto ? (
+            <p className="text-xs text-muted-foreground">Only the half can change: this {DOS_OIL_CODE} stays on {formatDateList(leave.days)}.</p>
+          ) : onlyThisPerson ? (
             <p className="text-xs text-muted-foreground">Dates will change to your selection: {formatDateList(selectedDates)}.</p>
           ) : (
             <p className="text-xs text-muted-foreground">To change dates, select this person&apos;s new dates on the roster first.</p>
@@ -350,7 +426,7 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
               disabled={pending || !type || (type.halfDay && !half)}
               onClick={() =>
                 run(
-                  () => editLeave({ leaveId: leave.id, typeCode, half, remarks, dates: onlyThisPerson ? selectedDates : undefined }),
+                  () => editLeave({ leaveId: leave.id, typeCode, half, remarks, dates: !leave.auto && onlyThisPerson ? selectedDates : undefined }),
                   () => {
                     setEditing(false);
                     onClear();
@@ -378,6 +454,7 @@ function EditTools(props: PanelProps) {
   const [tab, setTab] = useState<"duty" | "task" | "leave">("duty");
   const { pending, result, run } = useAction();
   const [duty, setDuty] = useState<string>("");
+  const [dos, setDos] = useState<string>("");
   const [taskId, setTaskId] = useState<string>("");
   const [typeCode, setTypeCode] = useState("");
   const [half, setHalf] = useState<Half | null>(null);
@@ -411,7 +488,7 @@ function EditTools(props: PanelProps) {
     >
       {cells.length === 0 ? (
         <p className="text-muted-foreground">
-          Click cells to select people and dates (shift-click for a range in a row, click a date header for the whole shift). Click a leave chip to edit or cancel it.
+          Click cells to select people and dates (shift-click for a range in a row). Click a leave chip to edit or cancel it, or a date header for that date&apos;s settings.
         </p>
       ) : (
         <p>
@@ -439,20 +516,60 @@ function EditTools(props: PanelProps) {
 
       {tab === "duty" && (
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">One picker for every duty. V turns the next PM block into Off (post-V) automatically.</p>
+          <p className="text-xs text-muted-foreground">
+            AM and PM come from the shift cycle and are not set by hand. Assigning a 2-day V turns the next PM block into Off(V) by itself; resetting the V duty puts that PM block back.
+          </p>
           <div className="flex flex-wrap gap-1.5">
-            {ASSIGNABLE_DUTIES.map((d) => (
-              <button key={d} onClick={() => setDuty(d)} className={cn("rounded-md border p-1", duty === d && "border-primary ring-2 ring-primary")} aria-pressed={duty === d}>
-                <DutyChip duty={d} long />
-              </button>
-            ))}
-            <button onClick={() => setDuty("CYCLE")} className={cn("rounded-md border px-2 text-xs", duty === "CYCLE" && "border-primary ring-2 ring-primary")} aria-pressed={duty === "CYCLE"}>
+            {ASSIGNABLE_DUTIES.map((d) => {
+              const shown = d === "OFF" ? "OFF_V" : d;
+              return (
+                <button key={d} onClick={() => setDuty(d)} className={cn("rounded-md border p-1", duty === d && "border-primary ring-2 ring-primary")} aria-pressed={duty === d}>
+                  <DutyChip duty={shown as Duty} long />
+                </button>
+              );
+            })}
+            <button onClick={() => setDuty("CYCLE")} className={cn("rounded-md border px-2 py-1 text-xs", duty === "CYCLE" && "border-primary ring-2 ring-primary")} aria-pressed={duty === "CYCLE"}>
               Reset to cycle
             </button>
           </div>
           <Button className="w-full" disabled={pending || !duty || cells.length === 0} onClick={() => run(() => assignDuty({ cells, duty }), onClear)}>
-            {duty && duty !== "CYCLE" ? `Assign ${DUTY_LABEL[duty as Duty]}` : duty === "CYCLE" ? "Reset to normal cycle" : "Assign duty"}
+            {duty === "CYCLE" ? "Reset to normal cycle" : duty ? `Assign ${DUTY_LABEL[(duty === "OFF" ? "OFF_V" : duty) as Duty]}` : "Pick a duty above"}
           </Button>
+
+          <div className="space-y-2 rounded-md border p-2">
+            <p className="text-xs font-medium">{DOS_LABEL} duty</p>
+            <p className="text-xs text-muted-foreground">
+              One day only, on an AM day. 24 hours, report at {DOS_REPORT_TIME}, on top of the shift duty, and a Task is still allowed. A {DOS_OIL_CODE} (first half) is added the next day
+              automatically and cannot be cancelled on its own.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {DOS_KINDS.map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setDos(k)}
+                  aria-pressed={dos === k}
+                  className={cn("rounded-md border px-2 py-1 text-xs font-semibold", dos === k && "border-primary ring-2 ring-primary")}
+                >
+                  {k}
+                </button>
+              ))}
+              <button
+                onClick={() => setDos("NONE")}
+                aria-pressed={dos === "NONE"}
+                className={cn("rounded-md border px-2 py-1 text-xs", dos === "NONE" && "border-primary ring-2 ring-primary")}
+              >
+                Remove
+              </button>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={pending || !dos || cells.length === 0}
+              onClick={() => run(() => assignExtraDuty({ cells, kind: dos === "NONE" ? null : dos }), onClear)}
+            >
+              {dos === "NONE" ? `Remove ${DOS_LABEL} duty` : dos ? `Assign ${dos}` : `Pick a ${DOS_LABEL} type above`}
+            </Button>
+          </div>
         </div>
       )}
 
