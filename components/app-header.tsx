@@ -14,19 +14,20 @@ export function AppHeader({
   showTasks,
   showTaskReport,
   showDayworkers,
+  showManageRequests,
   badge,
 }: {
   viewer: Viewer;
   showTasks: boolean;
   showTaskReport: boolean;
   showDayworkers: boolean;
+  showManageRequests: boolean;
   badge: number;
 }) {
   const links = [
-    { href: "/home", label: "Home" },
     { href: "/roster", label: "Roster" },
-    ...(viewer.role !== "MANAGEMENT" ? [{ href: "/requests", label: "My requests" }] : []),
-    { href: "/swaps", label: "Duty swaps" },
+    ...(viewer.role !== "MANAGEMENT" ? [{ href: "/requests", label: "My Requests" }] : []),
+    ...(showManageRequests ? [{ href: "/manage-requests", label: "Manage requests" }] : []),
     ...(showTaskReport ? [{ href: "/task-report", label: "Task report" }] : []),
     ...(showDayworkers ? [{ href: "/dayworkers", label: "Dayworkers" }] : []),
     ...(showTasks ? [{ href: "/tasks", label: "Tasks" }] : []),

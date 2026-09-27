@@ -7,7 +7,7 @@ A duty roster web app for a shift-based team: three fixed shifts on a 6-day AM /
 
 ## Status
 
-Core loop built (build priority, spec section 17.5): Roster and Calendar views with the same-page leave request, supervisor Edit view, give / edit / cancel leave, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and set special events, approve or reject from the leave detail panel, Task management, the Task report, dayworkers with Ops duty and a duty count, Extra shift duty, and placeholder Support and Recall rows. One type of leave per person per day is enforced. Still to come: leave inbox page, all-shift overview, lock-date and special-event editors, duty swaps, staff records, and custom leave type editor.
+Core loop built (build priority, spec section 17.5): Roster and Calendar views with the same-page leave request, supervisor Edit view, give / edit / cancel leave, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and set special events, approve or reject from the leave detail panel, Task management, the Task report, dayworkers with Ops duty and a duty count, Extra shift duty, placeholder Support and Recall rows, duty swaps (pickable directly on the roster), and the My Requests / Manage requests pages (leave inbox included). One type of leave per person per day is enforced. Still to come: all-shift overview, staff records, and custom leave type editor.
 
 ## Stack
 
@@ -47,7 +47,10 @@ Pick a demo user on the login screen (Management, or a Supervisor / Regular Staf
 - `lib/dayworkers.ts`, `lib/dayworker-report.ts`: dayworker username rules and Ops duty counts (page: `/dayworkers`)
 - `lib/report-period.ts`: the year / month / range filter shared by both reports
 - `lib/roster-data.ts`: loads a shift's month and computes cells and strength rows
+- `lib/swaps.ts`, `lib/swap-data.ts`: duty swap exchange/preview and the checks behind it (pages: `/requests`, `/manage-requests`, and the roster's Swap / Request swap tab)
+- `lib/leave-report.ts`: leave-taken tally, by type, for the My Requests page
 - `components/roster/`: roster grid, calendar, mobile agenda, side panel
+- `components/swaps/`, `components/requests/`: the swap request/record form and list; the leave-request inbox
 - `prisma/seed.ts`: demo shifts, staff, leave, V blocks, Tasks, locks and events
 
 ## Team workflow

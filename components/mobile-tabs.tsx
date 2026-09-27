@@ -1,16 +1,16 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Home, Inbox, User } from "lucide-react";
+import { CalendarDays, ClipboardCheck, Inbox, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Mobile bottom tabs: Home, Roster, Requests, Profile (spec 14.1). */
-export function MobileTabs({ showRequests }: { showRequests: boolean }) {
+/** Mobile bottom tabs: Roster, Requests, Manage (supervisors/Management), Profile (spec 14.1). */
+export function MobileTabs({ showRequests, showManageRequests }: { showRequests: boolean; showManageRequests: boolean }) {
   const pathname = usePathname();
   const tabs = [
-    { href: "/home", label: "Home", icon: Home },
     { href: "/roster", label: "Roster", icon: CalendarDays },
     ...(showRequests ? [{ href: "/requests", label: "Requests", icon: Inbox }] : []),
+    ...(showManageRequests ? [{ href: "/manage-requests", label: "Manage", icon: ClipboardCheck }] : []),
     { href: "/profile", label: "Profile", icon: User },
   ];
   return (

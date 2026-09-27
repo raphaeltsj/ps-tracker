@@ -56,6 +56,21 @@ export async function getMyLeaves(staffId: string): Promise<LeaveSummary[]> {
 }
 
 /**
+ * Pending leave for shifts an editor supervises, earliest submitted first (spec 12.3's inbox order),
+ * for the Manage requests page. Excludes `excludeStaffId` (a supervisor's own request: that is
+ * self-service on the My Requests page, not something to review here).
+ */
+export async function getPendingLeaves(shiftIds: string[], excludeStaffId?: string): Promise<LeaveSummary[]> {
+  if (shiftIds.length === 0) return [];
+  const leaves = await db.leave.findMany({
+    where: { status: "PENDING", staff: { shiftId: { in: shiftIds }, id: excludeStaffId ? { not: excludeStaffId } : undefined } },
+    include: leaveInclude,
+    orderBy: { submittedAt: "asc" },
+  });
+  return leaves.map(toLeaveSummary);
+}
+
+/**
  * Builds everything the roster, calendar and strength rows need for one shift over a date range.
  * Pending leave is only included for its owner and for people who can edit the shift.
  */
