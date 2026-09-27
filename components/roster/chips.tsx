@@ -27,11 +27,12 @@ export const DUTY_CELL: Record<Duty, string> = {
   V: "bg-violet-300/70 dark:bg-violet-600/40",
   VSB: "bg-violet-100 dark:bg-violet-500/15",
   OFF: "bg-neutral-100 dark:bg-neutral-800/70",
-  OFF_V: "bg-neutral-100 shadow-[inset_0_0_0_2px_var(--color-violet-400)] dark:bg-neutral-800/70 dark:shadow-[inset_0_0_0_2px_var(--color-violet-500)]",
+  // A light tint plus the "Off(V)" text chip (LABELLED_DUTIES below); no border overlay needed.
+  OFF_V: "bg-violet-50 dark:bg-violet-500/10",
 };
 
 /** Duties that keep a text label on the roster. */
-export const LABELLED_DUTIES: Duty[] = ["V", "VSB"];
+export const LABELLED_DUTIES: Duty[] = ["V", "VSB", "OFF_V"];
 
 export function dutyTitle(duty: Duty): string {
   return DUTY_TIMES[duty] ? `${DUTY_LABEL[duty]} ${DUTY_TIMES[duty]}` : DUTY_LABEL[duty];

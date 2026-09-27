@@ -58,9 +58,10 @@ Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, n
 - Calendar/Roster switch (all roles) is separate from the Edit/Staff switch (supervisors and Management).
 - Strength rows are sticky directly below the date header, with a "Compact" toggle that shows only Available Slot(s). The other rows (Support, Extra, Recall, Ops duty) sit at the bottom of the roster.
 - The request form sits on the same page as the calendar/roster (right panel on desktop, bottom sheet on mobile).
-- Clicking a date shows that date's details. It never selects every person on that day: staff see details only, supervisors also get lock and special-event settings.
+- Clicking a date (header, calendar cell, or mobile week strip) shows that date's details. It never selects every person on that day. For supervisors and Management it replaces the normal duty / Task / leave tools with that date's lock and special-event settings; clicking the date again, or Close, returns to the normal tools. Staff see read-only details only.
+- Selecting a person's date (a roster cell) opens the normal duty / Task / leave tools, defaulting to the **Task** tab.
 - Mobile uses bottom tabs (Home, Roster, Requests, Profile). Include a notification bell placeholder.
-- Light and dark mode, calm and readable, colours paired with text, icons, or a legend. On the Roster view, AM / PM / Off are colour-coded cells with no text (legend above the grid names each colour without timings; tooltips and screen-reader labels carry the details); V and V(SB) keep their labels. Suggested: AM amber, PM indigo, V deep navy/purple, V(SB) lighter outline of V, Off grey, Leave teal, Special Event magenta, locked dates hatched with a lock icon.
+- Light and dark mode, calm and readable, colours paired with text, icons, or a legend. On the Roster view, AM / PM / Off are colour-coded cells with no text (legend above the grid names each colour without timings; tooltips and screen-reader labels carry the details); V, V(SB) and Off(V) keep a text label. Suggested: AM amber, PM indigo, V deep navy/purple, V(SB) lighter outline of V, Off grey, Off(V) a light violet tint with the "Off(V)" label, Leave teal, Special Event magenta, locked dates hatched with a lock icon.
 - Sample data: placeholder staff names that are each a single 5-character word (Alpha, Bravo, Delta...). No realistic personal names.
 
 **Out of scope.** Payroll, timesheets and attendance, HR records, festive balloting.

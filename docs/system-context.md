@@ -1,6 +1,6 @@
 # PS Tracker: System Context Document
 
-*Duty roster management for a shift-based team | Version 1.9 | Draft for editing*
+*Duty roster management for a shift-based team | Version 1.10 | Draft for editing*
 
 ## 1. Purpose of this document
 
@@ -12,6 +12,8 @@ It has two parts:
 - **Part B: Build framework** (section 17): the tech stack, project structure, and build conventions. Read both before implementing any feature.
 
 > **How to edit:** items in [square brackets] are still undecided. Section 16 lists assumptions and open questions. Update this document whenever a rule changes so it stays the single source of truth.
+
+**Changes in 1.10:** clicking a date now replaces the normal duty / Task / leave tools with that date's lock and special-event settings, instead of showing both at once (11.2, 14); selecting a person's date opens the normal tools on the Task tab by default (11.2); Off(V) shows an "Off(V)" text chip on the roster instead of a border overlay (14.2).
 
 **Changes in 1.9:** dayworkers and Ops duty, with a duty count for supervisors and Management (5.3); Extra shift duty from other shifts (5.4); Support and Recall placeholder rows, and the rows at the bottom of the roster (5.5); the colour legend shows names only, with no timings (14.2).
 
@@ -312,7 +314,7 @@ Supervisors are also part of the shift roster, so they get the **regular staff v
 - **Edit leave** (type, dates, and remarks) and **cancel approved leave**. Only supervisors and Management can cancel approved leave. They can also set leave on staff Off days.
 - **Approve or reject pending** leave requests from staff (a reason is required when rejecting). A request **cannot be approved** unless an extra slot is available on every requested date (see section 12.3).
 - **Lock dates for events** and add **remarks** explaining why. Locked dates block staff leave requests, but **supervisors can still give leave on locked dates**.
-- Set special events (a note for the whole shift) and add custom leave types. **Clicking a date** in the roster opens that date's settings: lock or unlock it with remarks, and set, change or remove its special event.
+- Set special events (a note for the whole shift) and add custom leave types. **Clicking a date** (the header, a calendar cell, or the mobile week strip) replaces the normal duty / Task / leave tools with that date's settings: lock or unlock it with remarks, and set, change or remove its special event. Clicking the date again, or closing the panel, returns to the normal tools. Selecting a person's date instead opens those tools directly, on the **Task** tab by default.
 - **In Staff view**, a supervisor can **submit leave requests** like regular staff, and can **approve their own request**.
 - **In Edit view**, a supervisor can **cancel approved leave** and **give leave** to staff, **including themselves**. Leave a supervisor gives themselves is already approved and needs no approval.
 
@@ -445,7 +447,7 @@ Notifications will be added later and will be tailored to each user (for example
 | **V(SB) standby** | Lighter, outlined version of the V colour |
 | **Locked date**   | Neutral hatch pattern with a lock icon    |
 
-**Roster view colour coding.** On the Roster view (desktop grid and mobile day list), **AM, PM, and Off are not written as text**. Each cell is filled with its duty colour instead: AM amber, PM indigo, Off grey, and Off(V) grey with a violet outline. The date header shows the shift's duty as a small colour bar. **V and V(SB) keep their text label** on top of their colour, because they are exceptions to the cycle. DOS/FDO duties show their name as a small tag. To stay accessible without text:
+**Roster view colour coding.** On the Roster view (desktop grid and mobile day list), **AM, PM, and Off are not written as text**. Each cell is filled with its duty colour instead: AM amber, PM indigo, Off grey. The date header shows the shift's duty as a small colour bar. **V, V(SB) and Off(V) keep a text label** on top of their colour, because they are exceptions to the cycle (Off(V) is a light violet tint with the "Off(V)" chip, not a border). DOS/FDO duties show their name as a small tag. To stay accessible without text:
 
 - A **colour legend** sits above the roster grid (and on the mobile day card) naming every colour **by name only**: AM, PM, V and DOS/FDO are written as just "AM", "PM", "V" and "DOS/FDO", with no timings and no report time. Times stay in the cell tooltips.
 - Each cell has a hover tooltip and a screen-reader label with the duty name and times.
