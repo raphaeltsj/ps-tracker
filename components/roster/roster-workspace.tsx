@@ -62,11 +62,6 @@ export type Selection = {
   focusLeaveId: string | null;
 };
 
-/** Staff view only: which tool a cell click feeds. "swap" reuses the same staffId|date cell picking
- * Edit view uses for Duty/Task/Give leave, so clicking a cell picks a person for the swap instead of
- * a plain date for a leave request. */
-export type StaffTool = "leave" | "swap";
-
 export function RosterWorkspace(props: WorkspaceProps) {
   const { roster, month, view, mode, canEdit, canRequest, canRequestLocked, today } = props;
   const router = useRouter();
@@ -79,7 +74,6 @@ export function RosterWorkspace(props: WorkspaceProps) {
   const [dateSettingsOpen, setDateSettingsOpen] = useState(false);
   const [focusLeaveId, setFocusLeaveId] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<{ staffId: string | null; date: string } | null>(null);
-  const [staffTool, setStaffTool] = useState<StaffTool>("leave");
   const [compact, setCompact] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const isDesktop = useIsDesktop();
@@ -161,11 +155,19 @@ export function RosterWorkspace(props: WorkspaceProps) {
     [anchor, canRequest, mode, roster.days, selectable],
   );
 
-  /** The staffId|date toggle shared by Edit view (Duty/Task/Give leave/Swap) and Staff view's Swap tool. */
-  const toggleCell = useCallback(
+  /** Edit view: select cells (click toggles, shift-click selects a range in the row). */
+  const clickCell = useCallback(
     (staffId: string, date: string, shiftKey: boolean) => {
+      if (mode !== "edit") return clickDate(date, shiftKey);
+      setFocusDate(date);
+      setDateSettingsOpen(false);
+      setFocusLeaveId(null);
+      if (!canEdit) return;
+      setSheetOpen(true);
+      const pseudo = isPseudoRow(staffId);
       setCells((prev) => {
-        const next = new Set(prev);
+        // Ops and Extra cells are selected on their own: never mixed with staff cells or with each other.
+        const next = new Set([...prev].filter((k) => (pseudo ? k.startsWith(`${staffId}|`) : !isPseudoRow(k.split("|")[0]))));
         if (shiftKey && anchor?.staffId === staffId) {
           const [a, b] = dayIndex(anchor.date) <= dayIndex(date) ? [anchor.date, date] : [date, anchor.date];
           dateRange(a, b).forEach((d) => next.add(cellKey(staffId, d)));
@@ -178,41 +180,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
       });
       setAnchor({ staffId, date });
     },
-    [anchor],
-  );
-
-  /**
-   * Edit view: select cells (click toggles, shift-click selects a range in the row) for Duty / Task /
-   * Give leave / Swap. Staff view: the same staffId|date picking, but only while the Swap tool is
-   * active (so a staff member can click their own cell, then a partner's, to pick a swap); otherwise
-   * falls through to clickDate for a plain leave request.
-   */
-  const clickCell = useCallback(
-    (staffId: string, date: string, shiftKey: boolean) => {
-      if (mode !== "edit") {
-        if (staffTool !== "swap" || !canRequest || isPseudoRow(staffId)) return clickDate(date, shiftKey);
-        setFocusDate(date);
-        setDateSettingsOpen(false);
-        setFocusLeaveId(null);
-        setSheetOpen(true);
-        toggleCell(staffId, date, shiftKey);
-        return;
-      }
-      setFocusDate(date);
-      setDateSettingsOpen(false);
-      setFocusLeaveId(null);
-      if (!canEdit) return;
-      setSheetOpen(true);
-      const pseudo = isPseudoRow(staffId);
-      if (pseudo) {
-        // Ops and Extra cells are selected on their own: never mixed with staff cells or with each other.
-        setCells((prev) => new Set([...prev].filter((k) => k.startsWith(`${staffId}|`))));
-      } else {
-        setCells((prev) => new Set([...prev].filter((k) => !isPseudoRow(k.split("|")[0]))));
-      }
-      toggleCell(staffId, date, shiftKey);
-    },
-    [canEdit, canRequest, clickDate, mode, staffTool, toggleCell],
+    [anchor, canEdit, clickDate, mode],
   );
 
   const clickLeave = useCallback((leaveId: string | null, date: string) => {
@@ -228,14 +196,6 @@ export function RosterWorkspace(props: WorkspaceProps) {
     setAnchor(null);
   }, []);
 
-  const changeStaffTool = useCallback(
-    (tool: StaffTool) => {
-      setStaffTool(tool);
-      clearSelection();
-    },
-    [clearSelection],
-  );
-
   const selection: Selection = useMemo(
     () => ({ dates, cells, focusDate, dateSettingsOpen, focusLeaveId }),
     [dates, cells, focusDate, dateSettingsOpen, focusLeaveId],
@@ -246,8 +206,6 @@ export function RosterWorkspace(props: WorkspaceProps) {
     <SidePanel
       {...props}
       selection={selection}
-      staffTool={staffTool}
-      onStaffToolChange={changeStaffTool}
       onClear={clearSelection}
       onFocusLeave={(id) => setFocusLeaveId(id)}
       onCloseDateSettings={closeDateSettings}
@@ -348,9 +306,9 @@ export function RosterWorkspace(props: WorkspaceProps) {
           {view === "calendar" ? (
             <CalendarView {...props} selection={selection} compact={compact} onDate={clickDate} />
           ) : isDesktop ? (
-            <RosterGrid {...props} selection={selection} compact={compact} staffTool={staffTool} onDate={focusDateOnly} onCell={clickCell} onLeave={clickLeave} />
+            <RosterGrid {...props} selection={selection} compact={compact} onDate={focusDateOnly} onCell={clickCell} onLeave={clickLeave} />
           ) : (
-            <MobileRoster {...props} selection={selection} compact={compact} staffTool={staffTool} onDate={clickDate} onFocusDate={focusDateOnly} onCell={clickCell} onLeave={clickLeave} />
+            <MobileRoster {...props} selection={selection} compact={compact} onDate={clickDate} onFocusDate={focusDateOnly} onCell={clickCell} onLeave={clickLeave} />
           )}
         </div>
       </section>

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, EventBadge, ExtraChip, LABELLED_DUTIES, LeaveChip, LockBadge, OpsChip, SwapTag, swapTitle, TaskTag } from "@/components/roster/chips";
 import { StrengthSummary } from "@/components/roster/strength-summary";
-import { cellKey, type Selection, type StaffTool, type WorkspaceProps } from "@/components/roster/roster-workspace";
+import { cellKey, type Selection, type WorkspaceProps } from "@/components/roster/roster-workspace";
 import { Button } from "@/components/ui/button";
 import { cycleDayLabel } from "@/lib/cycle";
 import { formatDate, weekdayShort } from "@/lib/dates";
@@ -15,7 +15,6 @@ export function MobileRoster({
   roster,
   selection,
   compact,
-  staffTool,
   today,
   viewer,
   mode,
@@ -29,7 +28,6 @@ export function MobileRoster({
 }: WorkspaceProps & {
   selection: Selection;
   compact: boolean;
-  staffTool: StaffTool;
   onDate: (date: string, shiftKey: boolean) => void;
   onFocusDate: (date: string) => void;
   onCell: (staffId: string, date: string, shiftKey: boolean) => void;
@@ -96,7 +94,7 @@ export function MobileRoster({
               {info.shiftDuty === "OFF" ? " (Rest day)" : ""}
             </div>
           </div>
-          {mode === "staff" && canRequest && staffTool === "leave" && (canRequestLocked || !info.locked) && (
+          {mode === "staff" && canRequest && (canRequestLocked || !info.locked) && (
             <Button size="sm" variant={selectedForLeave ? "default" : "outline"} onClick={() => onDate(day, false)}>
               {selectedForLeave ? "Selected" : "Select for leave"}
             </Button>
@@ -116,13 +114,12 @@ export function MobileRoster({
       <ul className="divide-y">
         {roster.staff.map((p) => {
           const cell = roster.cells[p.id][day];
-          const canClick = (mode === "edit" && canEdit) || (mode === "staff" && staffTool === "swap" && canRequest);
-          const selected = (mode === "edit" || staffTool === "swap") && selection.cells.has(cellKey(p.id, day));
+          const selected = selection.cells.has(cellKey(p.id, day));
           return (
             <li
               key={p.id}
-              onClick={() => canClick && onCell(p.id, day, false)}
-              className={cn("flex items-center gap-2 px-4 py-2", canClick && "cursor-pointer", p.id === viewer.id && "bg-accent/60", selected && "bg-primary/15")}
+              onClick={() => mode === "edit" && canEdit && onCell(p.id, day, false)}
+              className={cn("flex items-center gap-2 px-4 py-2", p.id === viewer.id && "bg-accent/60", selected && "bg-primary/15")}
             >
               <span className="flex-1 text-sm">
                 {p.name}

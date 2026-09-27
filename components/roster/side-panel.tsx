@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeftRight, X } from "lucide-react";
+import { X } from "lucide-react";
 import {
   approveLeave,
   assignDuty,
@@ -21,12 +21,10 @@ import {
   setSpecialEvent,
   unlockDate,
 } from "@/app/actions";
-import { previewDutySwap, recordSwap, requestSwap } from "@/app/swap-actions";
 import { DosTag, DutyChip, EventBadge, ExtraChip, LeaveChip, LockBadge, OpsChip, StatusBadge, SwapTag, TaskTag } from "@/components/roster/chips";
-import type { Selection, StaffTool, WorkspaceProps } from "@/components/roster/roster-workspace";
+import type { Selection, WorkspaceProps } from "@/components/roster/roster-workspace";
 import { StrengthSummary } from "@/components/roster/strength-summary";
 import { ResultMessage, useAction } from "@/components/roster/use-action";
-import { SwapPreview } from "@/components/swaps/swap-preview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,15 +33,11 @@ import { formatDate, formatDateList, formatDateShort } from "@/lib/dates";
 import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_REPORT_TIME, DUTY_LABEL, HALF_DAY_TIMES, type Duty, type Half } from "@/lib/domain";
 import { canDecideLeave } from "@/lib/permissions";
 import { isLeaveEntry, ROW_EXTRA, ROW_OPS, type LeaveSummary, type LeaveTypeOption } from "@/lib/roster-types";
-import type { SwapCheck } from "@/lib/swap-data";
-import { SWAP_MAX_DATES } from "@/lib/swaps";
 import { formatFigure } from "@/lib/strength";
 import { cn } from "@/lib/utils";
 
 type PanelProps = WorkspaceProps & {
   selection: Selection;
-  staffTool: StaffTool;
-  onStaffToolChange: (tool: StaffTool) => void;
   onClear: () => void;
   onFocusLeave: (id: string | null) => void;
   onCloseDateSettings: () => void;
@@ -63,7 +57,7 @@ function Section({ title, children, action }: { title: string; children: React.R
 }
 
 export function SidePanel(props: PanelProps) {
-  const { mode, canEdit, canRequest, selection, roster, myLeaves, viewer, staffTool, onStaffToolChange, onCloseDateSettings } = props;
+  const { mode, canEdit, canRequest, selection, roster, myLeaves, viewer, onCloseDateSettings } = props;
   // Cells picked in the Ops duty or Extra row open their own editor instead of the staff tools.
   const rowKind = [...selection.cells].some((k) => k.startsWith(`${ROW_OPS}|`))
     ? ("ops" as const)
@@ -82,41 +76,7 @@ export function SidePanel(props: PanelProps) {
         <DateSettingsPanel roster={roster} date={selection.focusDate!} isManagement={viewer.role === "MANAGEMENT"} onClose={onCloseDateSettings} />
       )}
       {!focusLeave && !showDateSettings && mode === "edit" && canEdit && (rowKind ? <RowEditor key={rowKind} {...props} kind={rowKind} /> : <EditTools {...props} />)}
-      {mode === "staff" && canRequest && (
-        <div className="grid grid-cols-2 gap-0.5 border-b p-2" role="tablist" aria-label="Request leave or a swap">
-          <button
-            role="tab"
-            aria-selected={staffTool === "leave"}
-            onClick={() => onStaffToolChange("leave")}
-            className={cn("rounded-md py-1.5 text-sm", staffTool === "leave" ? "bg-secondary font-semibold" : "text-muted-foreground")}
-          >
-            Request leave
-          </button>
-          <button
-            role="tab"
-            aria-selected={staffTool === "swap"}
-            onClick={() => onStaffToolChange("swap")}
-            className={cn("rounded-md py-1.5 text-sm", staffTool === "swap" ? "bg-secondary font-semibold" : "text-muted-foreground")}
-          >
-            Request swap
-          </button>
-        </div>
-      )}
-      {mode === "staff" && canRequest && staffTool === "swap" && (
-        <Section
-          title="Request a swap"
-          action={
-            selection.cells.size > 0 && (
-              <Button variant="ghost" size="sm" onClick={props.onClear}>
-                Clear
-              </Button>
-            )
-          }
-        >
-          <SwapPicker {...props} kind="request" />
-        </Section>
-      )}
-      {mode === "staff" && canRequest && staffTool === "leave" && <RequestForm {...props} />}
+      {mode === "staff" && canRequest && <RequestForm {...props} />}
       {selection.focusDate && <DateDetails {...props} date={selection.focusDate} />}
     </div>
   );
@@ -476,6 +436,8 @@ function RequestForm({ roster, viewer, selection, leaveTypes, onClear, onRemoveD
   const tight = dates.filter((d) => roster.days[d].strength.slots < needSlot);
   // Only one type of leave per day.
   const taken = dates.filter((d) => own?.[d]?.absences.some(isLeaveEntry));
+  // No leave on a day already committed to V duty or a DOS/FDO duty.
+  const onDuty = dates.filter((d) => own?.[d] && (own[d].duty === "V" || own[d].dos !== null));
   // Management never requests leave; BD / BD-IL are derived from the birthday for now.
   const requestable = leaveTypes.filter((t) => t.code !== "BD" && t.code !== "BD-IL");
 
@@ -527,6 +489,11 @@ function RequestForm({ roster, viewer, selection, leaveTypes, onClear, onRemoveD
           You already have leave on {formatDateList(taken)}. Only one type of leave is allowed per day, so remove those dates.
         </p>
       )}
+      {onDuty.length > 0 && (
+        <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">
+          You have V or {DOS_LABEL} duty on {formatDateList(onDuty)}. Leave cannot be taken on a day with that duty, so remove those dates.
+        </p>
+      )}
       {tight.length > 0 && (
         <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
           No slot left on {formatDateList(tight)}. You can still submit; your supervisor decides.
@@ -534,7 +501,7 @@ function RequestForm({ roster, viewer, selection, leaveTypes, onClear, onRemoveD
       )}
       <Button
         className="w-full"
-        disabled={pending || dates.length === 0 || taken.length > 0 || !type || (type.halfDay && !half)}
+        disabled={pending || dates.length === 0 || taken.length > 0 || onDuty.length > 0 || !type || (type.halfDay && !half)}
         onClick={() =>
           run(
             () => requestLeave({ typeCode, dates, half, notes }),
@@ -701,7 +668,7 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
 function EditTools(props: PanelProps) {
   const { selection, roster, tasks, leaveTypes, onClear } = props;
   // Task is the default: it is the most common action once a person's date is selected.
-  const [tab, setTab] = useState<"duty" | "task" | "leave" | "swap">("task");
+  const [tab, setTab] = useState<"duty" | "task" | "leave">("task");
   const { pending, result, run } = useAction();
   const [duty, setDuty] = useState<string>("");
   const [dos, setDos] = useState<string>("");
@@ -723,6 +690,11 @@ function EditTools(props: PanelProps) {
   const onFullLeave = cells.filter((c) => roster.cells[c.staffId]?.[c.date]?.absences.some((a) => a.status === "APPROVED" && a.counts >= 1)).length;
   // Only one type of leave per day: cells that already hold leave cannot be given more.
   const withLeave = cells.filter((c) => roster.cells[c.staffId]?.[c.date]?.absences.some(isLeaveEntry));
+  // No leave on a day already committed to V duty or a DOS/FDO duty.
+  const withDuty = cells.filter((c) => {
+    const cell = roster.cells[c.staffId]?.[c.date];
+    return cell && (cell.duty === "V" || cell.dos !== null);
+  });
   const type = leaveTypes.find((t) => t.code === typeCode);
   // An approved duty swap holds its dates: duties and leave cannot change there (Tasks can).
   const swapped = cells.filter((c) => roster.cells[c.staffId]?.[c.date]?.swap);
@@ -768,13 +740,12 @@ function EditTools(props: PanelProps) {
         </p>
       )}
 
-      <div className="grid grid-cols-4 rounded-lg border p-0.5" role="tablist">
+      <div className="grid grid-cols-3 rounded-lg border p-0.5" role="tablist">
         {(
           [
             ["duty", "Duty"],
             ["task", "Task"],
             ["leave", "Give leave"],
-            ["swap", "Swap"],
           ] as const
         ).map(([key, label]) => (
           <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={cn("rounded-md py-1 text-sm", tab === key ? "bg-secondary font-semibold" : "text-muted-foreground")}>
@@ -895,9 +866,19 @@ function EditTools(props: PanelProps) {
               {withLeave.length > 3 ? ", ..." : ""}). Only one type of leave per day: edit or cancel that leave instead.
             </p>
           )}
+          {withDuty.length > 0 && (
+            <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">
+              {withDuty.length} selected cell{withDuty.length > 1 ? "s" : ""} already {withDuty.length > 1 ? "have" : "has"} V or {DOS_LABEL} duty (
+              {withDuty
+                .slice(0, 3)
+                .map((c) => `${roster.staff.find((s) => s.id === c.staffId)?.name} ${formatDateShort(c.date)}`)
+                .join(", ")}
+              {withDuty.length > 3 ? ", ..." : ""}). Leave cannot be given on a day with that duty: remove the duty first.
+            </p>
+          )}
           <Button
             className="w-full"
-            disabled={pending || !type || (type.halfDay && !half) || cells.length === 0 || withLeave.length > 0}
+            disabled={pending || !type || (type.halfDay && !half) || cells.length === 0 || withLeave.length > 0 || withDuty.length > 0}
             onClick={() =>
               run(() => giveLeave({ staffDates: byStaff, typeCode, half, remarks }), () => {
                 onClear();
@@ -910,126 +891,7 @@ function EditTools(props: PanelProps) {
         </div>
       )}
 
-      {tab === "swap" && <SwapPicker {...props} kind="record" />}
-
       <ResultMessage result={result} />
     </Section>
-  );
-}
-
-// ---------------- Swap: pick cells for two people, preview, then send or record ----------------
-
-/**
- * Click cells for two people (same shift as the roster being viewed) to pick a duty swap, instead of
- * the dropdown pickers on My Requests / Manage requests. "request" is for staff (the viewer must be
- * one of the two people); "record" is for supervisors and Management, already approved for this shift.
- * A swap with someone on another shift still needs the dropdown form: the roster only shows one shift
- * at a time, so a second shift's cells are not available to click here.
- */
-function SwapPicker({ roster, viewer, selection, onClear, kind }: PanelProps & { kind: "request" | "record" }) {
-  const { pending, result, run } = useAction();
-  const [notes, setNotes] = useState("");
-  const [preview, setPreview] = useState<SwapCheck | null>(null);
-  const [checking, startCheck] = useTransition();
-
-  const byPerson = useMemo(() => {
-    const map = new Map<string, string[]>();
-    for (const key of selection.cells) {
-      const [staffId, date] = key.split("|");
-      (map.get(staffId) ?? map.set(staffId, []).get(staffId)!).push(date);
-    }
-    return map;
-  }, [selection.cells]);
-  const people = [...byPerson.keys()];
-  const nameOf = (id: string) => (id === viewer.id && kind === "request" ? "You" : (roster.staff.find((s) => s.id === id)?.name ?? "?"));
-
-  const tooMany = people.length > 2;
-  const needsSelf = kind === "request" && people.length > 0 && !people.includes(viewer.id);
-  const aId = kind === "request" ? viewer.id : people[0];
-  const bId = people.find((id) => id !== aId);
-  const dates = !tooMany && aId && bId ? [...new Set([...(byPerson.get(aId) ?? []), ...(byPerson.get(bId) ?? [])])].sort() : [];
-  const tooManyDates = dates.length > SWAP_MAX_DATES;
-  const ready = Boolean(aId && bId && !tooMany && !needsSelf && !tooManyDates && dates.length > 0);
-  const key = `${aId}|${bId}|${dates.join(",")}`;
-
-  useEffect(() => {
-    if (!ready || !aId || !bId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPreview(null);
-      return;
-    }
-    let live = true;
-    startCheck(async () => {
-      const r = await previewDutySwap({ aId, bId, dates });
-      if (live) setPreview(r);
-    });
-    return () => {
-      live = false;
-    };
-    // `key` covers aId, bId and dates.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, ready]);
-
-  const submit = () => {
-    if (!aId || !bId) return;
-    run(() => (kind === "request" ? requestSwap({ partnerId: bId, dates, notes }) : recordSwap({ aId, bId, dates, notes })), () => {
-      onClear();
-      setNotes("");
-      setPreview(null);
-    });
-  };
-
-  return (
-    <div className="space-y-2">
-      <p className="text-xs text-muted-foreground">
-        {kind === "request"
-          ? "Click your own date, then your swap partner's date on the same shift (shift-click for a second date, a give-and-take). Your partner accepts first, then both shifts' supervisors approve."
-          : "Click two people's dates on this shift to record a swap between them. It counts as agreed by both and approved for this shift; a swap with another shift still needs that shift's supervisor."}
-      </p>
-
-      {people.length === 0 && (
-        <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-          {kind === "request" ? "Click your own date on the roster to start." : "Click a cell on the roster to pick the first person."}
-        </p>
-      )}
-      {people.length === 1 && !needsSelf && (
-        <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-          {dates.length} date{dates.length === 1 ? "" : "s"} for {nameOf(people[0])}. Now click {kind === "request" ? "your partner's" : "the second person's"} date to swap with.
-        </p>
-      )}
-      {needsSelf && <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">Click one of your own dates too: a swap you request must include you.</p>}
-      {tooMany && (
-        <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">
-          Cells for more than two people are selected. Click Clear and pick again for just two people.
-        </p>
-      )}
-      {!tooMany && tooManyDates && (
-        <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">
-          A swap can have at most {SWAP_MAX_DATES} dates. Click the extra selected cells again to remove them.
-        </p>
-      )}
-
-      {ready && aId && bId && (
-        <p>
-          <span className="font-medium">{nameOf(aId)}</span> ⇄ <span className="font-medium">{nameOf(bId)}</span>{" "}
-          <span className="text-muted-foreground">({formatDateList(dates)})</span>
-        </p>
-      )}
-
-      {ready && checking && !preview && <p className="text-xs text-muted-foreground">Checking...</p>}
-      {ready && preview && aId && bId && <SwapPreview preview={preview} aName={nameOf(aId)} bName={nameOf(bId)} viewerId={viewer.id} asYou={kind === "request"} />}
-
-      {ready && (
-        <label className="block space-y-1">
-          <span className="text-xs font-medium">Notes {kind === "request" ? "for your partner and supervisors" : ""}</span>
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={500} placeholder="Optional" />
-        </label>
-      )}
-      <Button className="w-full" disabled={!ready || pending || checking || !preview?.ok} onClick={submit}>
-        <ArrowLeftRight className="size-4" />
-        {pending ? "Sending..." : kind === "request" ? "Send swap request" : "Record swap"}
-      </Button>
-      <ResultMessage result={result} />
-    </div>
   );
 }

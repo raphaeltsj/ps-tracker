@@ -3,7 +3,7 @@ import { memo } from "react";
 import { CalendarClock, Lock } from "lucide-react";
 import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, LABELLED_DUTIES, LeaveChip, SLOT_BG, SLOT_STYLE, SwapTag, swapTitle, TaskTag } from "@/components/roster/chips";
 import { BottomRows } from "@/components/roster/bottom-rows";
-import { cellKey, type Selection, type StaffTool, type WorkspaceProps } from "@/components/roster/roster-workspace";
+import { cellKey, type Selection, type WorkspaceProps } from "@/components/roster/roster-workspace";
 import { isWeekend, weekdayShort } from "@/lib/dates";
 import type { RosterCell, RosterDay } from "@/lib/roster-types";
 import { formatFigure } from "@/lib/strength";
@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 type GridProps = WorkspaceProps & {
   selection: Selection;
   compact: boolean;
-  staffTool: StaffTool;
   onDate: (date: string) => void;
   onCell: (staffId: string, date: string, shiftKey: boolean) => void;
   onLeave: (leaveId: string | null, date: string) => void;
@@ -21,7 +20,7 @@ type GridProps = WorkspaceProps & {
 const SHIFT_DUTY_LABEL = { AM: "AM", PM: "PM", OFF: "Rest day" } as const;
 
 /** Desktop month grid: sticky name column, sticky date header with strength rows directly below. */
-export function RosterGrid({ roster, selection, compact, staffTool, today, viewer, mode, canEdit, onDate, onCell, onLeave }: GridProps) {
+export function RosterGrid({ roster, selection, compact, today, viewer, mode, canEdit, onDate, onCell, onLeave }: GridProps) {
   const { dates, days } = roster;
 
   const strengthRows: { label: string; value: (d: RosterDay) => React.ReactNode; cls?: (d: RosterDay) => string }[] = [
@@ -125,11 +124,7 @@ export function RosterGrid({ roster, selection, compact, staffTool, today, viewe
                     key={date}
                     cell={roster.cells[person.id][date]}
                     day={days[date]}
-                    selected={
-                      mode === "edit" || staffTool === "swap"
-                        ? selection.cells.has(cellKey(person.id, date))
-                        : person.id === viewer.id && selection.dates.has(date)
-                    }
+                    selected={mode === "edit" ? selection.cells.has(cellKey(person.id, date)) : person.id === viewer.id && selection.dates.has(date)}
                     onClick={(shiftKey) => onCell(person.id, date, shiftKey)}
                     onLeave={(leaveId) => onLeave(leaveId, date)}
                   />

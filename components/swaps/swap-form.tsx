@@ -63,6 +63,11 @@ export function SwapForm({
   const ready = Boolean(aId && bId && date1 && (!twoDates || date2));
   const key = `${aId}|${bId}|${dates.join(",")}`;
 
+  // Duty swaps are only between different shifts. In "request" mode `partners` is already limited to
+  // shifts other than the viewer's own; in "record" mode, filter once person 1 is picked.
+  const aShiftId = mode === "record" ? [...firstPeople, ...partners].find((p) => p.id === aId)?.shiftId : undefined;
+  const partnerOptions = aShiftId ? partners.filter((p) => p.shiftId !== aShiftId) : partners;
+
   useEffect(() => {
     if (!ready) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -102,19 +107,19 @@ export function SwapForm({
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
         {mode === "request"
-          ? "Pick who you want to swap with and the date. On that date you work their duty and they work yours. For a give-and-take, add a second date: they cover you on one date and you cover them on the other. Your partner accepts first, then both shifts' supervisors approve."
-          : "Record a swap for someone in your shift. It counts as agreed by both people and approved for your shift; a swap with another shift still needs that shift's supervisor."}
+          ? "Pick who you want to swap with (a different shift only) and the date. On that date you work their duty and they work yours. For a give-and-take, add a second date: they cover you on one date and you cover them on the other. Your partner accepts first, then both shifts' supervisors approve."
+          : "Record a swap between two people on different shifts. It counts as agreed by both people and approved for the shift(s) you supervise; a swap with a shift you don't supervise still needs that shift's supervisor."}
       </p>
 
       {mode === "record" && (
         <label className="block space-y-1" htmlFor="swap-a">
-          <span className="text-xs font-medium">Person 1 (your shift)</span>
+          <span className="text-xs font-medium">Person 1</span>
           <PersonSelect id="swap-a" value={aId} onChange={setAId} people={firstPeople} placeholder="Choose a person" />
         </label>
       )}
       <label className="block space-y-1" htmlFor="swap-b">
-        <span className="text-xs font-medium">{mode === "request" ? "Swap with" : "Person 2"}</span>
-        <PersonSelect id="swap-b" value={bId} onChange={setBId} people={partners} exclude={aId} placeholder="Choose a person" />
+        <span className="text-xs font-medium">{mode === "request" ? "Swap with (a different shift)" : "Person 2 (a different shift from Person 1)"}</span>
+        <PersonSelect id="swap-b" value={bId} onChange={setBId} people={partnerOptions} exclude={aId} placeholder="Choose a person" />
       </label>
 
       <div className="grid gap-2 sm:grid-cols-2">

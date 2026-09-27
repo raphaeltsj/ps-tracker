@@ -96,6 +96,24 @@ async function leaveClashMessage(staffId: string, who: string, dates: string[], 
   return `${who} already ${who === "You" ? "have" : "has"} ${state} ${clash.code} on ${formatDate(clash.date)}. Only one type of leave is allowed per day.`.replace(/\s+/g, " ");
 }
 
+/**
+ * No leave on a day the person already has V duty or a DOS/FDO duty: those are committed duties, not
+ * ordinary AM/PM days. (A duty they hold through an approved or pending swap already blocks its own
+ * dates via swapLockMessage.) Remove the duty first if leave is genuinely needed that day.
+ */
+async function dutyClashMessage(staffId: string, who: string, dates: string[]): Promise<string | null> {
+  if (dates.length === 0) return null;
+  const [v, dos] = await Promise.all([
+    db.dutyOverride.findFirst({ where: { staffId, date: { in: dates }, duty: "V" }, orderBy: { date: "asc" } }),
+    db.extraDuty.findFirst({ where: { staffId, date: { in: dates } }, orderBy: { date: "asc" } }),
+  ]);
+  const candidates = [v && { date: v.date, label: "V" }, dos && { date: dos.date, label: dos.kind }].filter((c): c is { date: string; label: string } => Boolean(c));
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => a.date.localeCompare(b.date));
+  const { date, label } = candidates[0];
+  return `${who} ${who === "You" ? "have" : "has"} ${label} duty on ${formatDate(date)}, so leave cannot be taken that day. Remove the duty first if this is needed.`;
+}
+
 // ---------- Session ----------
 
 export async function login(formData: FormData) {
@@ -130,6 +148,8 @@ export async function requestLeave(input: { typeCode: string; dates: string[]; h
   }
   const clash = await leaveClashMessage(viewer.id, "You", dates);
   if (clash) return fail(clash);
+  const onDuty = await dutyClashMessage(viewer.id, "You", dates);
+  if (onDuty) return fail(onDuty);
   const swapped = await swapLockMessage(viewer.id, "You", dates, "leave");
   if (swapped) return fail(swapped);
 
@@ -220,6 +240,8 @@ export async function giveLeave(input: {
     if (staff.role === "MANAGEMENT") return fail("Management does not take leave.");
     const clash = await leaveClashMessage(staffId, staffId === viewer.id ? "You" : staff.name, dates);
     if (clash) return fail(clash);
+    const onDuty = await dutyClashMessage(staffId, staffId === viewer.id ? "You" : staff.name, dates);
+    if (onDuty) return fail(onDuty);
     const swapped = await swapLockMessage(staffId, staffId === viewer.id ? "You" : staff.name, dates, "leave");
     if (swapped) return fail(swapped);
     plan.push({ staffId, dates });
@@ -273,6 +295,8 @@ export async function editLeave(input: {
     const clash = await leaveClashMessage(leave.staffId, leave.staff.name, next, leave.id);
     if (clash) return fail(clash);
     const added = next.filter((d) => !leave.days.some((x) => x.date === d));
+    const onDuty = await dutyClashMessage(leave.staffId, leave.staff.name, added);
+    if (onDuty) return fail(onDuty);
     const swapped = await swapLockMessage(leave.staffId, leave.staff.name, added, "leave");
     if (swapped) return fail(swapped);
     dates = next;

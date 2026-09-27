@@ -113,6 +113,7 @@ export async function checkSwap(aId: string, bId: string, rawDates: string[], ex
   for (const p of [a, b]) {
     if (!p.active || p.role === "MANAGEMENT" || !p.shiftId) return fail(`${p.name} is not on a shift roster, so cannot swap duties.`);
   }
+  if (a.shiftId === b.shiftId) return fail(`${a.name} and ${b.name} are both on Shift ${a.shiftId}. Duty swaps are only between different shifts.`);
 
   const clash = await findSwapClash([aId, bId], dates, excludeSwapId);
   if (clash) {
