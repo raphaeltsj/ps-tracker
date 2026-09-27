@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { Bell, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { logout } from "@/app/actions";
 import { DevClearRoster } from "@/components/dev-clear-roster";
 import { Logo } from "@/components/logo";
 import { NavLinks } from "@/components/nav-links";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { ROLE_LABEL } from "@/lib/domain";
+import type { NotificationSummary } from "@/lib/notifications";
 import type { Viewer } from "@/lib/permissions";
 
 export function AppHeader({
@@ -14,18 +16,26 @@ export function AppHeader({
   showTasks,
   showTaskReport,
   showDayworkers,
+  showManageRequests,
   badge,
+  bellHref,
+  notifications,
+  unreadCount,
 }: {
   viewer: Viewer;
   showTasks: boolean;
   showTaskReport: boolean;
   showDayworkers: boolean;
+  showManageRequests: boolean;
   badge: number;
+  bellHref: string;
+  notifications: NotificationSummary[];
+  unreadCount: number;
 }) {
   const links = [
-    { href: "/home", label: "Home" },
     { href: "/roster", label: "Roster" },
-    ...(viewer.role !== "MANAGEMENT" ? [{ href: "/requests", label: "My requests" }] : []),
+    ...(viewer.role !== "MANAGEMENT" ? [{ href: "/requests", label: "My Requests" }] : []),
+    ...(showManageRequests ? [{ href: "/manage-requests", label: "Manage requests" }] : []),
     ...(showTaskReport ? [{ href: "/task-report", label: "Task report" }] : []),
     ...(showDayworkers ? [{ href: "/dayworkers", label: "Dayworkers" }] : []),
     ...(showTasks ? [{ href: "/tasks", label: "Tasks" }] : []),
@@ -42,15 +52,7 @@ export function AppHeader({
         <div className="ml-auto flex items-center gap-1">
           {/* TEMPORARY developer tool: clears the whole roster. Never shown in production. */}
           {process.env.NODE_ENV !== "production" && viewer.role !== "STAFF" && <DevClearRoster />}
-          {/* Notifications are a future feature: bell with badge as a placeholder (spec 13). */}
-          <Button variant="ghost" size="icon" className="relative" aria-label={`Notifications (${badge})`} title="Notifications (coming later)">
-            <Bell className="size-4" />
-            {badge > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
-                {badge}
-              </span>
-            )}
-          </Button>
+          <NotificationBell notifications={notifications} unreadCount={unreadCount} badge={badge} bellHref={bellHref} />
           <ThemeToggle />
           <Link href="/profile" className="hidden text-right text-xs leading-tight sm:block">
             <span className="block font-medium">{viewer.name}</span>

@@ -21,16 +21,16 @@ import {
   setSpecialEvent,
   unlockDate,
 } from "@/app/actions";
-import { DosTag, DutyChip, EventBadge, ExtraChip, LeaveChip, LockBadge, OpsChip, StatusBadge, TaskTag } from "@/components/roster/chips";
-import { MyRequests } from "@/components/roster/my-requests";
+import { DosTag, DutyChip, EventBadge, ExtraChip, LeaveChip, LockBadge, OpsChip, StatusBadge, SwapTag, TaskTag } from "@/components/roster/chips";
 import type { Selection, WorkspaceProps } from "@/components/roster/roster-workspace";
 import { StrengthSummary } from "@/components/roster/strength-summary";
 import { ResultMessage, useAction } from "@/components/roster/use-action";
+import { SwapForm } from "@/components/swaps/swap-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cycleDayLabel, cyclePositionLabel } from "@/lib/cycle";
-import { formatDate, formatDateList, formatDateShort } from "@/lib/dates";
+import { formatDate, formatDateList, formatDateShort, formatDateTime } from "@/lib/dates";
 import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_REPORT_TIME, DUTY_LABEL, HALF_DAY_TIMES, type Duty, type Half } from "@/lib/domain";
 import { canDecideLeave } from "@/lib/permissions";
 import { isLeaveEntry, ROW_EXTRA, ROW_OPS, type LeaveSummary, type LeaveTypeOption } from "@/lib/roster-types";
@@ -59,6 +59,9 @@ function Section({ title, children, action }: { title: string; children: React.R
 
 export function SidePanel(props: PanelProps) {
   const { mode, canEdit, canRequest, selection, roster, myLeaves, viewer, onCloseDateSettings } = props;
+  // "Request leave" vs "Request swap" in Staff view: local to the panel, since (unlike Duty/Task/Give
+  // leave) the swap form doesn't drive cell selection on the roster.
+  const [staffTool, setStaffTool] = useState<"leave" | "swap">("leave");
   // Cells picked in the Ops duty or Extra row open their own editor instead of the staff tools.
   const rowKind = [...selection.cells].some((k) => k.startsWith(`${ROW_OPS}|`))
     ? ("ops" as const)
@@ -77,20 +80,33 @@ export function SidePanel(props: PanelProps) {
         <DateSettingsPanel roster={roster} date={selection.focusDate!} isManagement={viewer.role === "MANAGEMENT"} onClose={onCloseDateSettings} />
       )}
       {!focusLeave && !showDateSettings && mode === "edit" && canEdit && (rowKind ? <RowEditor key={rowKind} {...props} kind={rowKind} /> : <EditTools {...props} />)}
-      {mode === "staff" && canRequest && <RequestForm {...props} />}
+      {mode === "staff" && canRequest && (
+        <div className="grid grid-cols-2 gap-0.5 border-b p-2" role="tablist" aria-label="Request leave or a swap">
+          <button
+            role="tab"
+            aria-selected={staffTool === "leave"}
+            onClick={() => setStaffTool("leave")}
+            className={cn("rounded-md py-1.5 text-sm", staffTool === "leave" ? "bg-secondary font-semibold" : "text-muted-foreground")}
+          >
+            Request leave
+          </button>
+          <button
+            role="tab"
+            aria-selected={staffTool === "swap"}
+            onClick={() => setStaffTool("swap")}
+            className={cn("rounded-md py-1.5 text-sm", staffTool === "swap" ? "bg-secondary font-semibold" : "text-muted-foreground")}
+          >
+            Request swap
+          </button>
+        </div>
+      )}
+      {mode === "staff" && canRequest && staffTool === "swap" && (
+        <Section title="Request a swap">
+          <SwapForm mode="request" viewerId={viewer.id} firstPeople={[]} today={props.today} />
+        </Section>
+      )}
+      {mode === "staff" && canRequest && staffTool === "leave" && <RequestForm {...props} />}
       {selection.focusDate && <DateDetails {...props} date={selection.focusDate} />}
-      {mode === "staff" && canRequest && (
-        <Section title="My requests">
-          <MyRequests leaves={myLeaves} viewer={viewer} onSelect={(id) => props.onFocusLeave(id)} />
-        </Section>
-      )}
-      {mode === "staff" && canRequest && (
-        <Section title="Leave taken this month">
-          <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-            Coming in a later release: how many leave days you took this month and how many remain.
-          </p>
-        </Section>
-      )}
     </div>
   );
 }
@@ -102,6 +118,8 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
   const own = roster.cells[viewer.id]?.[date];
   const ops = roster.ops[date] ?? [];
   const extra = roster.extra[date] ?? [];
+  // Who in this shift swapped on this date, and who covers their own duty.
+  const swapsToday = roster.staff.map((person) => ({ person, cell: roster.cells[person.id]?.[date] })).filter((x) => x.cell?.swap);
   if (!day) return null;
   return (
     <Section title={formatDate(date)}>
@@ -122,6 +140,24 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
         </div>
       )}
       <StrengthSummary day={day} />
+      {swapsToday.length > 0 && (
+        <div className="space-y-1 rounded-md border border-emerald-600/40 p-2">
+          <div className="text-xs font-medium text-muted-foreground">Duty swaps on this date</div>
+          <ul className="space-y-1.5">
+            {swapsToday.map(({ person, cell }) => (
+              <li key={person.id} className="text-xs">
+                <span className="flex flex-wrap items-center gap-1">
+                  <span className="font-medium">{person.name}</span> works <DutyChip duty={cell.duty} />
+                  <span className="text-muted-foreground">instead of {DUTY_LABEL[cell.swap!.ownDuty]}</span>
+                </span>
+                <span className="text-muted-foreground">
+                  Covered by {cell.swap!.partnerName} (Shift {cell.swap!.partnerShiftId}), who works {person.name}&apos;s {DUTY_LABEL[cell.swap!.ownDuty]} in their place.
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {(ops.length > 0 || extra.length > 0) && (
         <div className="space-y-2 rounded-md border p-2">
           {ops.length > 0 && (
@@ -157,6 +193,7 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
           <div className="text-xs font-medium text-muted-foreground">You on this date</div>
           <div className="flex flex-wrap items-center gap-1.5">
             <DutyChip duty={own.duty} long />
+            {own.swap && <SwapTag swap={own.swap} duty={own.duty} />}
             {own.dos && <DosTag kind={own.dos} />}
             {own.task && <TaskTag name={own.task.name} />}
             {own.absences.map((a, i) => (
@@ -165,6 +202,14 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
               </button>
             ))}
           </div>
+          {own.swap && (
+            <p className="text-[11px] text-muted-foreground">
+              Duty swap with {own.swap.partnerName} (Shift {own.swap.partnerShiftId}): you work {DUTY_LABEL[own.duty]} instead of your {DUTY_LABEL[own.swap.ownDuty]}.{" "}
+              <Link href="/requests" className="underline underline-offset-2">
+                My Requests
+              </Link>
+            </p>
+          )}
           {own.absences.some((a) => a.derived) && (
             <p className="text-[11px] text-muted-foreground">BD is shown on your birthday; on an Off day it becomes BD-IL on your next working day.</p>
           )}
@@ -440,6 +485,8 @@ function RequestForm({ roster, viewer, selection, leaveTypes, onClear, onRemoveD
   const tight = dates.filter((d) => roster.days[d].strength.slots < needSlot);
   // Only one type of leave per day.
   const taken = dates.filter((d) => own?.[d]?.absences.some(isLeaveEntry));
+  // No leave on a day already committed to V duty or a DOS/FDO duty.
+  const onDuty = dates.filter((d) => own?.[d] && (own[d].duty === "V" || own[d].dos !== null));
   // Management never requests leave; BD / BD-IL are derived from the birthday for now.
   const requestable = leaveTypes.filter((t) => t.code !== "BD" && t.code !== "BD-IL");
 
@@ -491,6 +538,11 @@ function RequestForm({ roster, viewer, selection, leaveTypes, onClear, onRemoveD
           You already have leave on {formatDateList(taken)}. Only one type of leave is allowed per day, so remove those dates.
         </p>
       )}
+      {onDuty.length > 0 && (
+        <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">
+          You have V or {DOS_LABEL} duty on {formatDateList(onDuty)}. Leave cannot be taken on a day with that duty, so remove those dates.
+        </p>
+      )}
       {tight.length > 0 && (
         <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
           No slot left on {formatDateList(tight)}. You can still submit; your supervisor decides.
@@ -498,7 +550,7 @@ function RequestForm({ roster, viewer, selection, leaveTypes, onClear, onRemoveD
       )}
       <Button
         className="w-full"
-        disabled={pending || dates.length === 0 || taken.length > 0 || !type || (type.halfDay && !half)}
+        disabled={pending || dates.length === 0 || taken.length > 0 || onDuty.length > 0 || !type || (type.halfDay && !half)}
         onClick={() =>
           run(
             () => requestLeave({ typeCode, dates, half, notes }),
@@ -559,7 +611,7 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
       {leave.notes && <p className="text-xs">Staff notes: {leave.notes}</p>}
       {leave.remarks && !editing && <p className="text-xs">Remarks: {leave.remarks}</p>}
       {leave.rejectReason && <p className="text-xs text-red-700 dark:text-red-300">Reject reason: {leave.rejectReason}</p>}
-      {leave.status === "PENDING" && <p className="text-xs text-muted-foreground">Submitted {new Date(leave.submittedAt).toLocaleString()}</p>}
+      {leave.status === "PENDING" && <p className="text-xs text-muted-foreground">Submitted {formatDateTime(leave.submittedAt)}</p>}
       {leave.auto && (
         <p className="rounded-md bg-muted p-2 text-xs">
           This {DOS_OIL_CODE} comes with the {DOS_LABEL} duty. You can change which half it covers, but not its type or date, and it cannot be cancelled. Remove the duty
@@ -663,9 +715,9 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
 // ---------------- Edit view: duties, Tasks, give leave ----------------
 
 function EditTools(props: PanelProps) {
-  const { selection, roster, tasks, leaveTypes, onClear } = props;
+  const { selection, roster, tasks, leaveTypes, onClear, swapFirstPeople, viewer, today } = props;
   // Task is the default: it is the most common action once a person's date is selected.
-  const [tab, setTab] = useState<"duty" | "task" | "leave">("task");
+  const [tab, setTab] = useState<"duty" | "task" | "leave" | "swap">("task");
   const { pending, result, run } = useAction();
   const [duty, setDuty] = useState<string>("");
   const [dos, setDos] = useState<string>("");
@@ -687,7 +739,14 @@ function EditTools(props: PanelProps) {
   const onFullLeave = cells.filter((c) => roster.cells[c.staffId]?.[c.date]?.absences.some((a) => a.status === "APPROVED" && a.counts >= 1)).length;
   // Only one type of leave per day: cells that already hold leave cannot be given more.
   const withLeave = cells.filter((c) => roster.cells[c.staffId]?.[c.date]?.absences.some(isLeaveEntry));
+  // No leave on a day already committed to V duty or a DOS/FDO duty.
+  const withDuty = cells.filter((c) => {
+    const cell = roster.cells[c.staffId]?.[c.date];
+    return cell && (cell.duty === "V" || cell.dos !== null);
+  });
   const type = leaveTypes.find((t) => t.code === typeCode);
+  // An approved duty swap holds its dates: duties and leave cannot change there (Tasks can).
+  const swapped = cells.filter((c) => roster.cells[c.staffId]?.[c.date]?.swap);
 
   return (
     <Section
@@ -714,12 +773,29 @@ function EditTools(props: PanelProps) {
         </p>
       )}
 
-      <div className="grid grid-cols-3 rounded-lg border p-0.5" role="tablist">
+      {swapped.length > 0 && (
+        <p className="rounded-md border border-emerald-600/40 bg-emerald-500/10 p-2 text-xs">
+          {swapped
+            .slice(0, 3)
+            .map((c) => {
+              const cell = roster.cells[c.staffId][c.date];
+              return `${roster.staff.find((s) => s.id === c.staffId)?.name} ${formatDateShort(c.date)} (with ${cell.swap!.partnerName})`;
+            })
+            .join(", ")}
+          {swapped.length > 3 ? ", ..." : ""}: an approved duty swap holds {swapped.length > 1 ? "these dates" : "this date"}, so duty and leave cannot change there. Tasks can still be set. To change the duty, cancel the swap first.{" "}
+          <Link href="/manage-requests" className="underline underline-offset-2">
+            Manage requests
+          </Link>
+        </p>
+      )}
+
+      <div className="grid grid-cols-4 rounded-lg border p-0.5" role="tablist">
         {(
           [
             ["duty", "Duty"],
             ["task", "Task"],
             ["leave", "Give leave"],
+            ["swap", "Swap"],
           ] as const
         ).map(([key, label]) => (
           <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={cn("rounded-md py-1 text-sm", tab === key ? "bg-secondary font-semibold" : "text-muted-foreground")}>
@@ -752,7 +828,7 @@ function EditTools(props: PanelProps) {
                 Reset to cycle
               </button>
             </div>
-            <Button className="w-full" disabled={pending || !duty || cells.length === 0} onClick={() => run(() => assignDuty({ cells, duty }), onClear)}>
+            <Button className="w-full" disabled={pending || !duty || cells.length === 0 || swapped.length > 0} onClick={() => run(() => assignDuty({ cells, duty }), onClear)}>
               {duty === "CYCLE" ? "Reset to normal cycle" : duty ? `Assign ${DUTY_LABEL[(duty === "OFF" ? "OFF_V" : duty) as Duty]}` : "Pick a duty above"}
             </Button>
           </div>
@@ -785,7 +861,7 @@ function EditTools(props: PanelProps) {
             <Button
               variant="outline"
               className="w-full"
-              disabled={pending || !dos || cells.length === 0}
+              disabled={pending || !dos || cells.length === 0 || swapped.length > 0}
               onClick={() => run(() => assignExtraDuty({ cells, kind: dos === "NONE" ? null : dos }), onClear)}
             >
               {dos === "NONE" ? `Remove ${DOS_LABEL} duty` : dos ? `Assign ${dos}` : `Pick a ${DOS_LABEL} type above`}
@@ -840,9 +916,19 @@ function EditTools(props: PanelProps) {
               {withLeave.length > 3 ? ", ..." : ""}). Only one type of leave per day: edit or cancel that leave instead.
             </p>
           )}
+          {withDuty.length > 0 && (
+            <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">
+              {withDuty.length} selected cell{withDuty.length > 1 ? "s" : ""} already {withDuty.length > 1 ? "have" : "has"} V or {DOS_LABEL} duty (
+              {withDuty
+                .slice(0, 3)
+                .map((c) => `${roster.staff.find((s) => s.id === c.staffId)?.name} ${formatDateShort(c.date)}`)
+                .join(", ")}
+              {withDuty.length > 3 ? ", ..." : ""}). Leave cannot be given on a day with that duty: remove the duty first.
+            </p>
+          )}
           <Button
             className="w-full"
-            disabled={pending || !type || (type.halfDay && !half) || cells.length === 0 || withLeave.length > 0}
+            disabled={pending || !type || (type.halfDay && !half) || cells.length === 0 || withLeave.length > 0 || withDuty.length > 0 || swapped.length > 0}
             onClick={() =>
               run(() => giveLeave({ staffDates: byStaff, typeCode, half, remarks }), () => {
                 onClear();
@@ -854,6 +940,9 @@ function EditTools(props: PanelProps) {
           </Button>
         </div>
       )}
+
+      {tab === "swap" && <SwapForm mode="record" viewerId={viewer.id} firstPeople={swapFirstPeople} today={today} />}
+
       <ResultMessage result={result} />
     </Section>
   );

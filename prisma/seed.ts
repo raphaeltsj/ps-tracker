@@ -39,6 +39,7 @@ const SHIFTS = [
 async function main() {
   // Wipe in dependency order.
   await db.session.deleteMany();
+  await db.dutySwap.deleteMany(); // days cascade
   await db.taskAssignment.deleteMany();
   await db.task.deleteMany();
   await db.leaveDay.deleteMany();

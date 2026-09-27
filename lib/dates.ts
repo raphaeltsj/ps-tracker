@@ -53,13 +53,26 @@ export function isValidMonth(month: string): boolean {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
 }
 
-/** Today in the server or browser local time zone. */
+/**
+ * The team's time zone. "Today" (which dates can be picked, when a swap request expires or can no
+ * longer be cancelled) and timestamps follow it, whatever time zone the server or browser runs in.
+ * Override with NEXT_PUBLIC_APP_TIME_ZONE if the team is elsewhere.
+ */
+export const APP_TIME_ZONE = process.env.NEXT_PUBLIC_APP_TIME_ZONE || "Asia/Singapore";
+
+/** Year, month, day, hour and minute of an instant in the app time zone. */
+function zonedParts(instant: Date): { date: string; hh: string; mm: string } {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(instant)
+      .map((p) => [p.type, p.value]),
+  );
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, hh: parts.hour, mm: parts.minute };
+}
+
+/** Today in the app time zone (Singapore by default), on the server and in the browser alike. */
 export function todayLocal(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return zonedParts(new Date()).date;
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -102,4 +115,10 @@ export function formatDateList(dates: string[]): string {
       return am === bm ? `${ad}-${bd} ${MONTHS[bm - 1]}` : `${formatDateShort(a)} - ${formatDateShort(b)}`;
     })
     .join(", ");
+}
+
+/** A timestamp in the same style as dates elsewhere, in the app time zone: "Sun 27 Sep, 09:49". */
+export function formatDateTime(iso: string): string {
+  const { date, hh, mm } = zonedParts(new Date(iso));
+  return `${weekdayShort(date)} ${formatDateShort(date)}, ${hh}:${mm}`;
 }

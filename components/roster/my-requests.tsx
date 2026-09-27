@@ -8,9 +8,19 @@ import type { Viewer } from "@/lib/permissions";
 import type { LeaveSummary } from "@/lib/roster-types";
 
 /** The viewer's own requests with status; Withdraw for pending; supervisors can approve their own. */
-export function MyRequests({ leaves, viewer, onSelect }: { leaves: LeaveSummary[]; viewer: Viewer; onSelect?: (id: string) => void }) {
+export function MyRequests({
+  leaves,
+  viewer,
+  onSelect,
+  empty = "No requests yet.",
+}: {
+  leaves: LeaveSummary[];
+  viewer: Viewer;
+  onSelect?: (id: string) => void;
+  empty?: string;
+}) {
   const { pending, result, run } = useAction();
-  if (leaves.length === 0) return <p className="text-sm text-muted-foreground">No requests yet.</p>;
+  if (leaves.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
 
   return (
     <div className="space-y-2">

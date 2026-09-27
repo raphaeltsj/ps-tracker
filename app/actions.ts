@@ -5,10 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { endSession, requireViewer, startSession } from "@/lib/auth";
 import { dosEarnsOil } from "@/lib/cycle";
-import { addDays, formatDate, isValidDate } from "@/lib/dates";
+import { addDays, formatDate, formatDateList, isValidDate } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { normalizeDayworkerName, normalizeUsername } from "@/lib/dayworkers";
-import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_OIL_HALF, NAME_MAX, type Half } from "@/lib/domain";
+import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, NAME_MAX, type AssignableDuty, type Half } from "@/lib/domain";
+import { createDosOil } from "@/lib/dos-oil";
 import {
   canDecideLeave,
   canEditShift,
@@ -22,6 +23,8 @@ import { buildRoster } from "@/lib/roster-data";
 import { findLeaveConflict } from "@/lib/leave-rules";
 import { datesWithoutSlot } from "@/lib/slots";
 import { formatFigure } from "@/lib/strength";
+import { notifyLeaveDecision } from "@/lib/notifications";
+import { swapAffectedByDutyChange, swapLockMessage } from "@/lib/swap-data";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 
@@ -68,6 +71,18 @@ async function firstCellOnLeave(cells: CellRef[]): Promise<string | null> {
   return null;
 }
 
+/** Duties cannot change on a date an approved duty swap holds (spec 11.4). Tasks still can. */
+async function firstCellSwapped(cells: CellRef[]): Promise<string | null> {
+  const byStaff = new Map<string, string[]>();
+  for (const { staffId, date } of cells) byStaff.set(staffId, [...(byStaff.get(staffId) ?? []), date]);
+  for (const [staffId, dates] of byStaff) {
+    const staff = await db.staff.findUnique({ where: { id: staffId } });
+    const message = await swapLockMessage(staffId, staff?.name ?? "This person", dates, "duties");
+    if (message) return message;
+  }
+  return null;
+}
+
 /** Removes Tasks from a person on days they have full-day leave (spec 9). */
 async function clearTasksForFullDayLeave(staffId: string, dates: string[], halfDay: boolean) {
   if (halfDay) return;
@@ -80,6 +95,24 @@ async function leaveClashMessage(staffId: string, who: string, dates: string[], 
   if (!clash) return null;
   const state = clash.status === "PENDING" ? "a pending request for" : "";
   return `${who} already ${who === "You" ? "have" : "has"} ${state} ${clash.code} on ${formatDate(clash.date)}. Only one type of leave is allowed per day.`.replace(/\s+/g, " ");
+}
+
+/**
+ * No leave on a day the person already has V duty or a DOS/FDO duty: those are committed duties, not
+ * ordinary AM/PM days. (A duty they hold through an approved or pending swap already blocks its own
+ * dates via swapLockMessage.) Remove the duty first if leave is genuinely needed that day.
+ */
+async function dutyClashMessage(staffId: string, who: string, dates: string[]): Promise<string | null> {
+  if (dates.length === 0) return null;
+  const [v, dos] = await Promise.all([
+    db.dutyOverride.findFirst({ where: { staffId, date: { in: dates }, duty: "V" }, orderBy: { date: "asc" } }),
+    db.extraDuty.findFirst({ where: { staffId, date: { in: dates } }, orderBy: { date: "asc" } }),
+  ]);
+  const candidates = [v && { date: v.date, label: "V" }, dos && { date: dos.date, label: dos.kind }].filter((c): c is { date: string; label: string } => Boolean(c));
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => a.date.localeCompare(b.date));
+  const { date, label } = candidates[0];
+  return `${who} ${who === "You" ? "have" : "has"} ${label} duty on ${formatDate(date)}, so leave cannot be taken that day. Remove the duty first if this is needed.`;
 }
 
 // ---------- Session ----------
@@ -116,6 +149,10 @@ export async function requestLeave(input: { typeCode: string; dates: string[]; h
   }
   const clash = await leaveClashMessage(viewer.id, "You", dates);
   if (clash) return fail(clash);
+  const onDuty = await dutyClashMessage(viewer.id, "You", dates);
+  if (onDuty) return fail(onDuty);
+  const swapped = await swapLockMessage(viewer.id, "You", dates, "leave");
+  if (swapped) return fail(swapped);
 
   await db.leave.create({
     data: {
@@ -162,6 +199,7 @@ export async function approveLeave(leaveId: string): Promise<ActionResult> {
     data: { status: "APPROVED", decidedById: viewer.id, decidedAt: new Date() },
   });
   await clearTasksForFullDayLeave(leave.staffId, dates, leave.type.halfDay);
+  await notifyLeaveDecision(leave.staffId, viewer.id, leave.typeCode, formatDateList(dates), true);
   return done("Leave approved.");
 }
 
@@ -176,6 +214,7 @@ export async function rejectLeave(leaveId: string, reason: string): Promise<Acti
     where: { id: leaveId },
     data: { status: "REJECTED", rejectReason: why, decidedById: viewer.id, decidedAt: new Date() },
   });
+  await notifyLeaveDecision(leave.staffId, viewer.id, leave.typeCode, formatDateList(leave.days.map((d) => d.date)), false, why);
   return done("Request rejected.");
 }
 
@@ -204,6 +243,10 @@ export async function giveLeave(input: {
     if (staff.role === "MANAGEMENT") return fail("Management does not take leave.");
     const clash = await leaveClashMessage(staffId, staffId === viewer.id ? "You" : staff.name, dates);
     if (clash) return fail(clash);
+    const onDuty = await dutyClashMessage(staffId, staffId === viewer.id ? "You" : staff.name, dates);
+    if (onDuty) return fail(onDuty);
+    const swapped = await swapLockMessage(staffId, staffId === viewer.id ? "You" : staff.name, dates, "leave");
+    if (swapped) return fail(swapped);
     plan.push({ staffId, dates });
   }
 
@@ -254,6 +297,11 @@ export async function editLeave(input: {
     if (!next) return fail("Invalid dates.");
     const clash = await leaveClashMessage(leave.staffId, leave.staff.name, next, leave.id);
     if (clash) return fail(clash);
+    const added = next.filter((d) => !leave.days.some((x) => x.date === d));
+    const onDuty = await dutyClashMessage(leave.staffId, leave.staff.name, added);
+    if (onDuty) return fail(onDuty);
+    const swapped = await swapLockMessage(leave.staffId, leave.staff.name, added, "leave");
+    if (swapped) return fail(swapped);
     dates = next;
   }
 
@@ -317,6 +365,11 @@ export async function assignDuty(input: { cells: CellRef[]; duty: string }): Pro
     const onLeave = await firstCellOnLeave(input.cells);
     if (onLeave) return fail(onLeave);
   }
+  const swapped = await firstCellSwapped(input.cells);
+  if (swapped) return fail(swapped);
+  // A V next to a swapped date can change that date's duty (PM block <-> Off(V)).
+  const knockOn = await swapAffectedByDutyChange(input.cells.map(({ staffId, date }) => ({ staffId, date, duty: isCycle ? null : (input.duty as AssignableDuty) })));
+  if (knockOn) return fail(knockOn);
 
   await db.$transaction(
     input.cells.map(({ staffId, date }) =>
@@ -341,6 +394,8 @@ export async function assignExtraDuty(input: { cells: CellRef[]; kind: string | 
   const viewer = await requireViewer();
   const error = await checkCells(viewer, input.cells);
   if (error) return fail(error);
+  const swapped = await firstCellSwapped(input.cells);
+  if (swapped) return fail(swapped);
 
   if (input.kind === null) {
     const removed = await db.extraDuty.findMany({ where: { OR: input.cells.map(({ staffId, date }) => ({ staffId, date })) } });
@@ -381,20 +436,7 @@ export async function assignExtraDuty(input: { cells: CellRef[]; kind: string | 
     });
     if (!dosEarnsOil(byId.get(staffId)!.shift!.cycleAnchor, date)) continue;
     withOil++;
-    await db.leave.create({
-      data: {
-        staffId,
-        typeCode: DOS_OIL_CODE,
-        half: DOS_OIL_HALF,
-        status: "APPROVED",
-        remarks: `Automatic after ${input.kind} duty on ${formatDate(date)}.`,
-        givenById: viewer.id,
-        decidedById: viewer.id,
-        decidedAt: new Date(),
-        autoFor: duty.id,
-        days: { create: [{ date: addDays(date, 1) }] },
-      },
-    });
+    await createDosOil(duty, viewer.id);
   }
   return done(
     withOil === input.cells.length
@@ -673,6 +715,11 @@ export async function assignExtraShift(input: { hostShiftId: string; dates: stri
   // Not on a day they are on leave, and only one host shift per day.
   const onLeave = await firstCellOnLeave(ids.flatMap((staffId) => dates.map((date) => ({ staffId, date }))));
   if (onLeave) return fail(onLeave);
+  // Not on a day an approved duty swap already has them working someone else's duty.
+  for (const person of people) {
+    const swapped = await swapLockMessage(person.id, person.name, dates, "Extra duty");
+    if (swapped) return fail(swapped);
+  }
   const clash = await db.extraShiftDuty.findFirst({
     where: { staffId: { in: ids }, date: { in: dates }, hostShiftId: { not: host.id } },
     include: { staff: true },

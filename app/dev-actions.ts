@@ -22,6 +22,7 @@ export async function devClearRoster(): Promise<ActionResult> {
     db.specialEvent.deleteMany(),
     db.opsDuty.deleteMany(),
     db.extraShiftDuty.deleteMany(),
+    db.dutySwap.deleteMany(), // duty swaps and their dates
   ]);
 
   revalidatePath("/", "layout");

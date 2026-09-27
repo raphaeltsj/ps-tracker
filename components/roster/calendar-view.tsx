@@ -1,6 +1,6 @@
 "use client";
 import { CalendarClock, Lock } from "lucide-react";
-import { DosTag, DutyChip, LeaveChip, SLOT_BG, SLOT_STYLE, TaskTag } from "@/components/roster/chips";
+import { DosTag, DutyChip, LeaveChip, SLOT_BG, SLOT_STYLE, SwapTag, TaskTag } from "@/components/roster/chips";
 import type { Selection, WorkspaceProps } from "@/components/roster/roster-workspace";
 import { weekday } from "@/lib/dates";
 import type { Duty } from "@/lib/domain";
@@ -72,6 +72,7 @@ export function CalendarView({
                   <DutyChip duty={duty} />
                 )}
                 {cell?.absences.map((a, i) => <LeaveChip key={i} absence={a} />)}
+                {cell?.swap && <SwapTag swap={cell.swap} duty={cell.duty} />}
                 {cell?.dos && <DosTag kind={cell.dos} />}
                 {cell?.task && <TaskTag name={cell.task.name} />}
               </div>

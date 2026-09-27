@@ -25,7 +25,11 @@ export type RosterCell = {
   dos: DosKind | null;
   task: { id: string; name: string } | null;
   absences: CellAbsence[];
+  /** Approved duty swap on this date (spec 11.4): `duty` is what the person works, taken from the partner. */
+  swap: CellSwap | null;
 };
+
+export type CellSwap = { swapId: string; partnerId: string; partnerName: string; partnerShiftId: string; ownDuty: Duty };
 
 export type RosterDay = {
   date: string;
