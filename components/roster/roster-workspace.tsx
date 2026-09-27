@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { dateRange, dayIndex, formatMonth, shiftMonth } from "@/lib/dates";
 import type { Viewer } from "@/lib/permissions";
-import type { LeaveSummary, LeaveTypeOption, RosterData, TaskOption } from "@/lib/roster-types";
+import { isPseudoRow, type DayworkerOption, type ExtraCandidate, type LeaveSummary, type LeaveTypeOption, type RosterData, type TaskOption } from "@/lib/roster-types";
 import { cn } from "@/lib/utils";
 
 export type WorkspaceProps = {
@@ -22,6 +22,9 @@ export type WorkspaceProps = {
   today: string;
   leaveTypes: LeaveTypeOption[];
   tasks: TaskOption[];
+  /** Active dayworkers and people from other shifts, loaded for editors only (Ops and Extra rows) */
+  dayworkers: DayworkerOption[];
+  extraCandidates: ExtraCandidate[];
   myLeaves: LeaveSummary[];
   /** Edit view on a shift the viewer may edit */
   canEdit: boolean;
@@ -136,8 +139,10 @@ export function RosterWorkspace(props: WorkspaceProps) {
       setFocusLeaveId(null);
       if (!canEdit) return;
       setSheetOpen(true);
+      const pseudo = isPseudoRow(staffId);
       setCells((prev) => {
-        const next = new Set(prev);
+        // Ops and Extra cells are selected on their own: never mixed with staff cells or with each other.
+        const next = new Set([...prev].filter((k) => (pseudo ? k.startsWith(`${staffId}|`) : !isPseudoRow(k.split("|")[0]))));
         if (shiftKey && anchor?.staffId === staffId) {
           const [a, b] = dayIndex(anchor.date) <= dayIndex(date) ? [anchor.date, date] : [date, anchor.date];
           dateRange(a, b).forEach((d) => next.add(cellKey(staffId, d)));
@@ -179,7 +184,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh-3.5rem)] lg:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh_-_3.6rem)] lg:flex-none lg:flex-row">
       <section className="flex min-w-0 flex-1 flex-col">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2.5">

@@ -37,6 +37,16 @@ export type RosterDay = {
   event: { note: string | null } | null;
 };
 
+/** Pseudo row ids: cells in the Ops duty and Extra rows are selected like staff cells, by date. */
+export const ROW_OPS = "@ops";
+export const ROW_EXTRA = "@extra";
+export const isPseudoRow = (id: string) => id === ROW_OPS || id === ROW_EXTRA;
+
+/** A dayworker clocking shift duty on a day (spec 5.3). Not part of the crew: no effect on strength. */
+export type OpsEntry = { dayworkerId: string; username: string; name: string; active: boolean };
+/** Someone from another shift serving extra duty on this shift's day (spec 5.4). */
+export type ExtraEntry = { staffId: string; name: string; fromShiftId: string };
+
 export type StaffRow = { id: string; name: string; role: Role; birthday: string | null };
 
 export type LeaveSummary = {
@@ -70,7 +80,13 @@ export type RosterData = {
   cells: Record<string, Record<string, RosterCell>>;
   days: Record<string, RosterDay>;
   leaves: Record<string, LeaveSummary>;
+  /** Bottom rows, by date */
+  ops: Record<string, OpsEntry[]>;
+  extra: Record<string, ExtraEntry[]>;
 };
 
 export type LeaveTypeOption = { code: string; name: string; halfDay: boolean; custom: boolean };
 export type TaskOption = { id: string; name: string };
+export type DayworkerOption = { id: string; name: string; username: string };
+/** Staff from other shifts who can be picked for Extra duty */
+export type ExtraCandidate = { id: string; name: string; shiftId: string };

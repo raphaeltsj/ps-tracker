@@ -1,12 +1,13 @@
 "use client";
 import { useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, Lock } from "lucide-react";
-import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, EventBadge, LABELLED_DUTIES, LeaveChip, LockBadge, TaskTag } from "@/components/roster/chips";
+import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, EventBadge, ExtraChip, LABELLED_DUTIES, LeaveChip, LockBadge, OpsChip, TaskTag } from "@/components/roster/chips";
 import { StrengthSummary } from "@/components/roster/strength-summary";
 import { cellKey, type Selection, type WorkspaceProps } from "@/components/roster/roster-workspace";
 import { Button } from "@/components/ui/button";
 import { cycleDayLabel } from "@/lib/cycle";
 import { formatDate, weekdayShort } from "@/lib/dates";
+import { ROW_EXTRA, ROW_OPS } from "@/lib/roster-types";
 import { cn } from "@/lib/utils";
 
 /** Mobile roster: a week strip with a day-by-day agenda, not a shrunken table (spec 14.1). */
@@ -140,6 +141,48 @@ export function MobileRoster({
               {/* AM, PM and Off by colour only; V and V(SB) keep their label. */}
               <span className={cn("grid h-6 w-12 place-items-center rounded-md", DUTY_CELL[cell.duty])} title={dutyTitle(cell.duty)}>
                 {LABELLED_DUTIES.includes(cell.duty) ? <DutyChip duty={cell.duty} /> : <span className="sr-only">{dutyTitle(cell.duty)}</span>}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* The bottom rows of the roster, for this day. Support and Recall are placeholders. */}
+      <h3 className="border-t px-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Other duties</h3>
+      <ul className="divide-y">
+        {(
+          [
+            { id: "support", label: "Support (AM/PM)", soon: true },
+            { id: ROW_EXTRA, label: "Extra", soon: false },
+            { id: "recall", label: "Recall", soon: true },
+            { id: ROW_OPS, label: "Ops duty", soon: false },
+          ] as const
+        ).map((row) => {
+          const editable = mode === "edit" && canEdit && !row.soon;
+          const ops = row.id === ROW_OPS ? (roster.ops[day] ?? []) : [];
+          const extra = row.id === ROW_EXTRA ? (roster.extra[day] ?? []) : [];
+          return (
+            <li
+              key={row.id}
+              onClick={() => editable && onCell(row.id, day, false)}
+              className={cn("flex items-start gap-3 px-4 py-2.5 text-sm", row.soon && "bg-muted/40", selection.cells.has(cellKey(row.id, day)) && "bg-primary/15")}
+            >
+              <span className={cn("w-28 shrink-0 text-xs font-bold uppercase tracking-wide", row.soon && "text-muted-foreground")}>{row.label}</span>
+              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                {row.soon && <span className="text-xs text-muted-foreground">Not active yet</span>}
+                {ops.map((o) => (
+                  <span key={o.dayworkerId} className="flex items-center gap-1.5">
+                    <OpsChip entry={o} />
+                    <span className="text-xs text-muted-foreground">{o.name}</span>
+                  </span>
+                ))}
+                {extra.map((e) => (
+                  <span key={e.staffId} className="flex items-center gap-1.5">
+                    <ExtraChip entry={e} />
+                    <span className="text-xs text-muted-foreground">Shift {e.fromShiftId}</span>
+                  </span>
+                ))}
+                {!row.soon && ops.length + extra.length === 0 && <span className="text-xs text-muted-foreground">None{editable ? ". Tap to add." : ""}</span>}
               </span>
             </li>
           );

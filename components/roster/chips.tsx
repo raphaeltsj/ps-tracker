@@ -1,7 +1,8 @@
 import { CalendarClock, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DOS_LABEL, DOS_REPORT_TIME, DUTY_LABEL, DUTY_TIMES, STATUS_LABEL, type DosKind, type Duty, type LeaveStatus } from "@/lib/domain";
-import type { CellAbsence } from "@/lib/roster-types";
+import type { CellAbsence, ExtraEntry, OpsEntry } from "@/lib/roster-types";
 import { formatFigure, slotLabel, type Strength } from "@/lib/strength";
 
 // Colours always come with a text label (spec 14.2).
@@ -39,11 +40,11 @@ export function dutyTitle(duty: Duty): string {
 /** Colour legend for the Roster view (spec 14.2). */
 export function DutyLegend({ className }: { className?: string }) {
   const items: [Duty, string][] = [
-    ["AM", `AM ${DUTY_TIMES.AM}`],
-    ["PM", `PM ${DUTY_TIMES.PM}`],
+    ["AM", "AM"],
+    ["PM", "PM"],
     ["OFF", "Off / Rest"],
     ["OFF_V", "Off(V)"],
-    ["V", `V ${DUTY_TIMES.V}`],
+    ["V", "V"],
     ["VSB", "V(SB) standby"],
   ];
   return (
@@ -60,7 +61,7 @@ export function DutyLegend({ className }: { className?: string }) {
         <span className="grid h-3.5 w-5 place-items-center rounded-sm border border-rose-500 bg-rose-500/15 text-[7px] font-bold text-rose-800 dark:text-rose-200" aria-hidden>
           DOS
         </span>
-        {DOS_LABEL} 24h, report {DOS_REPORT_TIME}
+        {DOS_LABEL}
       </li>
       <li className="flex items-center gap-1.5">
         <span className="h-3.5 w-5 rounded-sm border bg-hatch" aria-hidden />
@@ -132,6 +133,53 @@ export function DosTag({ kind, className }: { kind: DosKind; className?: string 
     >
       {kind}
     </span>
+  );
+}
+
+/**
+ * A dayworker clocking shift duty (spec 5.3). The roster shows the short username; hovering shows the
+ * full name, for every user. Sized so a 7-character username fits a roster column.
+ */
+export function OpsChip({ entry, className }: { entry: OpsEntry; className?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            "inline-flex max-w-full cursor-default items-center truncate rounded border border-sky-500/70 bg-sky-500/10 px-0.5 text-[9px] font-bold leading-4 tracking-tight text-sky-900 dark:text-sky-100",
+            !entry.active && "opacity-60",
+            className,
+          )}
+        >
+          {entry.username}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {entry.name} ({entry.username}), dayworker{entry.active ? "" : ", no longer active"}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** Someone from another shift serving extra duty (spec 5.4): name plus the shift they come from. */
+export function ExtraChip({ entry, className }: { entry: ExtraEntry; className?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            "inline-flex max-w-full cursor-default items-center truncate rounded border border-orange-500/70 bg-orange-500/10 px-0.5 text-[9px] font-bold leading-4 tracking-tight text-orange-900 dark:text-orange-100",
+            className,
+          )}
+        >
+          {entry.name}
+          <span className="opacity-60">·{entry.fromShiftId}</span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {entry.name}, from Shift {entry.fromShiftId}, serving extra duty
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

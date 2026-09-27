@@ -1,6 +1,6 @@
 # PS Tracker: System Context Document
 
-*Duty roster management for a shift-based team | Version 1.8 | Draft for editing*
+*Duty roster management for a shift-based team | Version 1.9 | Draft for editing*
 
 ## 1. Purpose of this document
 
@@ -12,6 +12,8 @@ It has two parts:
 - **Part B: Build framework** (section 17): the tech stack, project structure, and build conventions. Read both before implementing any feature.
 
 > **How to edit:** items in [square brackets] are still undecided. Section 16 lists assumptions and open questions. Update this document whenever a rule changes so it stays the single source of truth.
+
+**Changes in 1.9:** dayworkers and Ops duty, with a duty count for supervisors and Management (5.3); Extra shift duty from other shifts (5.4); Support and Recall placeholder rows, and the rows at the bottom of the roster (5.5); the colour legend shows names only, with no timings (14.2).
 
 **Changes in 1.8:** cycle days read "1st AM", "2nd OFF" (3.2); a DOS/FDO duty earns its 0.5 OIL only on a 1st AM (5.2); no duty can be assigned on a day a person is on leave (5.1); special events have no report time (6); OML is Ordinary Medical leave (12.1); supervisors can cancel a pending request, and the automatic 0.5 OIL can change half but not type, date or existence (12.4).
 
@@ -30,6 +32,7 @@ PS Tracker is a web application (desktop-first, with a full mobile view) that ma
 - Track staffing levels against a minimum requirement (MFL) so supervisors can see how many people can still take leave.
 - Handle exceptions: V (night) duty with standby people, special-event notes, locked leave dates, duty swaps handled by supervisors, and custom leave types.
 - Let management maintain the list of Tasks and let supervisors optionally assign them to their shift.
+- Keep dayworkers (office staff outside the shift crew) who clock shift duty as Ops duty, and show people serving extra duty on another shift.
 
 The team has about 60-90 people, divided into three shifts of 20-30 people each. The app is called **PS Tracker** (working name; no branding decided yet).
 
@@ -109,6 +112,38 @@ A second kind of duty sits **on top of** the shift duty. It has three names, **D
 - On the roster the duty shows as a small tag (DOS, DOS2IC, or FDO) beside the duty colour, like a Task tag.
 - DOS/FDO duties do not change Total Strength, MFL or slots on the day itself; the 0.5 OIL the next day counts as 0.5 like any half-day leave.
 
+### 5.3 Dayworkers and Ops duty
+
+A **dayworker** is office staff who normally works 8 to 5 and is **not part of any shift crew**. They still have to **clock shift duty**, and the system keeps a count so supervisors and Management can check **how many times each dayworker did shift duty**.
+
+- **Records.** Supervisors and Management add dayworkers. Each has a **name** and a **username**. The username is what the roster shows: **at most 7 characters**, no spaces, shown in **capitals** (for example "TYL"), and unique. Dayworkers are never deleted, only made **inactive**, so their past duty stays in the count. An inactive dayworker cannot be given new duty.
+- **Ops duty** is the shift duty that dayworkers clock. It shows in the **OPS DUTY** row at the bottom of the roster (section 5.5) as the dayworker's username.
+- **Assigning.** A supervisor (own shift) or Management (any shift) assigns one or more dayworkers to a date, or a run of dates, on that shift's roster. **More than one dayworker can clock on the same day**, so the cell stacks their usernames.
+- **One shift per day.** A dayworker clocks at most one shift on a day. Assigning a second shift on the same day is refused, naming the shift they are already on.
+- **Not part of the crew.** Ops duty does **not** change Total Strength, Not in Strength, Working Strength, MFL, or leave slots.
+- **Everyone can see who they are.** Hovering a username shows the dayworker's full name, for every role. On mobile the name is written next to the username.
+- **Duty count.** Supervisors and Management have a **Dayworkers** page to add, edit and deactivate dayworkers, and to see how many days each dayworker clocked Ops duty, in total and per shift, for a **year, month, or date range**. Like the Task report it counts up to today unless "include scheduled duty" is ticked, and opening a row shows the dates.
+- Dayworkers do not sign in: supervisors assign their duty. [To confirm whether dayworkers should clock themselves in.]
+
+### 5.4 Extra shift duty
+
+People **serving punishment by working extra shift duty** show in the **EXTRA** row of the shift they are working for (the host shift).
+
+- **Only from other shifts.** Someone can never serve Extra on their own shift. The picker lists only people from the other shifts.
+- A supervisor (host shift) or Management assigns them to one or more dates. **Several people can serve Extra on the same day**, and the cell stacks them. Each shows their name with the letter of the shift they come from, and hovering explains it.
+- It is a duty, so it is **refused on a day the person is on leave** (approved or pending), and a person serves Extra for **one host shift per day**.
+- Extra does **not** change strength or slots for either shift. [To confirm.]
+
+### 5.5 The rows at the bottom of the roster
+
+Below the last crew member, in the order of the parade state: **SUPPORT (AM/PM), EXTRA, RECALL, OPS DUTY**. The strength rows and Available Slot(s) **do not move**: they stay in sticky rows under the date header (section 8.1).
+
+- **Ops duty** and **Extra** are described in sections 5.3 and 5.4.
+- **Support (AM/PM)** and **Recall** are **placeholders**. The rows are shown so the roster matches the parade state, but they have no data and no rules yet. Their cells are greyed and marked "Not active yet". [Rules to be defined.]
+- **Layout.** One column per date. When several names share a day they **stack vertically and the row grows taller**, so nothing is clipped. Usernames use a small, tight type so a 7-character username fits a column.
+- **Editing.** In Edit view a supervisor clicks cells in the Ops duty or Extra row (shift-click for a run of dates) and edits them in the right-hand panel: who is already there (with remove), and a searchable list to add from.
+- **Mobile.** The same rows appear as an "Other duties" list under the selected day's crew list.
+
 ## 6. Special events
 
 On some dates an entire shift has something on that the roster should flag. This is called a **special event**. It carries a **note saying what the event is, and no reporting time**: duty timings stay as they are.
@@ -170,6 +205,7 @@ Rest day (Off day) example, shift total 26, with 3 people on leave and MFL blank
 - The figures sit in **sticky rows directly below the date header** of the roster, so they stay in view while scrolling through staff: Total Strength, Not in Strength, Working Strength, MFL, and Available Slot(s), for each duty and day.
 - A **toggle** (for example "Compact") minimises the strength counts and MFL and shows **only Available Slot(s)**. This is the quick view for staff planning leave.
 - In the Calendar view, each date shows its duty and the Available Slot(s) at a glance; the full figures appear when the date is selected.
+- The other roster rows (Support, Extra, Recall, Ops duty) sit at the **bottom** of the roster, not under the date header (section 5.5).
 
 ## 9. Specific duties (Tasks)
 
@@ -237,6 +273,10 @@ There are three user roles. **Everyone can view the roster of every shift.** The
 | **Add custom leave type**                 | No                | Yes                     | Yes                        |
 | **Add / rename / delete Tasks**           | No                | No                      | Yes                        |
 | **View Task report**                      | No                | Yes (all shifts)        | Yes (all shifts)           |
+| **Add / edit dayworkers**                 | No                | Yes                     | Yes                        |
+| **Assign Ops duty (dayworkers)**          | No                | Own shift only          | All shifts                 |
+| **Assign Extra shift duty**               | No                | Own shift only          | All shifts                 |
+| **View dayworker duty counts**            | No                | Yes (all shifts)        | Yes (all shifts)           |
 
 - **Regular Staff** can view every shift roster and request leave. They have no edit controls and cannot request leave on locked dates.
 - **Supervisors** have the regular staff view plus an edit view for **their own shift only**. Other shifts appear in clearly marked read-only mode. They do not have the staff restrictions.
@@ -267,6 +307,7 @@ Supervisors are also part of the shift roster, so they get the **regular staff v
 - **Swap duties** between staff (see section 11.4).
 - Assign **Tasks** to their staff, including people on V duty. Task assignment is **optional**, and each person holds only one Task per day, and a person on full-day leave cannot be given a Task.
 - Track Tasks done in the **Task report** (section 9.2).
+- Add and edit **dayworkers**, assign **Ops duty** and **Extra shift duty** for their own shift, and check dayworker duty counts (sections 5.3 to 5.5).
 - **Give leave** to staff, **including themselves**: select specific dates or a date range, pick the leave type, and add remarks. Leave given by a supervisor is **already approved**, so it has no approval step.
 - **Edit leave** (type, dates, and remarks) and **cancel approved leave**. Only supervisors and Management can cancel approved leave. They can also set leave on staff Off days.
 - **Approve or reject pending** leave requests from staff (a reason is required when rejecting). A request **cannot be approved** unless an extra slot is available on every requested date (see section 12.3).
@@ -284,6 +325,7 @@ Management can do everything a supervisor can do across **all shifts**, but does
 - Tasks need **no description**, only a name (maximum 6 characters, spaces included).
 - **Lock dates for all shifts at once**, in addition to locking dates for a single shift.
 - Track Tasks done across all shifts in the **Task report** (section 9.2).
+- Add and edit **dayworkers**, assign **Ops duty** and **Extra shift duty** for any shift, and check dayworker duty counts (sections 5.3 to 5.5).
 - **Manage staff records**: add staff, edit their details (including birthday, which drives BD / BD-IL), and move people between shifts [full field list to confirm].
 
 ### 11.4 Duty swaps between staff
@@ -405,7 +447,7 @@ Notifications will be added later and will be tailored to each user (for example
 
 **Roster view colour coding.** On the Roster view (desktop grid and mobile day list), **AM, PM, and Off are not written as text**. Each cell is filled with its duty colour instead: AM amber, PM indigo, Off grey, and Off(V) grey with a violet outline. The date header shows the shift's duty as a small colour bar. **V and V(SB) keep their text label** on top of their colour, because they are exceptions to the cycle. DOS/FDO duties show their name as a small tag. To stay accessible without text:
 
-- A **colour legend** sits above the roster grid (and on the mobile day card) naming every colour, with duty times.
+- A **colour legend** sits above the roster grid (and on the mobile day card) naming every colour **by name only**: AM, PM, V and DOS/FDO are written as just "AM", "PM", "V" and "DOS/FDO", with no timings and no report time. Times stay in the cell tooltips.
 - Each cell has a hover tooltip and a screen-reader label with the duty name and times.
 - Leave chips, Task tags, lock icons, and special-event markers still appear on top of the colour.
 
@@ -435,6 +477,7 @@ Other screens (Calendar view, side panel, Home, forms) keep text labels for duti
 | 13     | Swap duties                      | Supervisor, desktop              | Form to pick two staff and the date(s), preview each person's duty before and after the swap, MFL check, confirm. Management can use it for all shifts.                                                                                                                                                                                                                                                                                                                                                                                        |
 | 14     | Staff records                    | Management, desktop              | List of staff with shift, role, and birthday; add staff, edit details, move a person between shifts. Not visible to other roles.                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 15     | Task report                      | Supervisor / Management          | Filter by year, month, or date range, and by shift. Summary card per Task (days, people), staff-by-Task table with totals, expandable dates per person, "include scheduled" and "hide staff with no Tasks" options. See section 9.2. |
+| 16     | Dayworkers                       | Supervisor / Management          | Add a dayworker (name, username with a live 7-character counter), a year / month / date-range filter, and a table of username, name, Ops duty days per shift and in total, with Edit and Deactivate. Opening a row shows the dates. See section 5.3. |
 
 If the first generation must be limited, start with screens 1, 2, 3, 5, 6, 7, and 11, then add the rest.
 
@@ -458,6 +501,9 @@ If the first generation must be limited, start with screens 1, 2, 3, 5, 6, 7, an
 - A person on full-day leave with no Task for that day, and a person on half-day leave who keeps their Task.
 - A birthday on an Off day, showing BD on the birthday and BD-IL on the next working day.
 - A duty swap between two staff, before and after.
+- The bottom rows of the roster with several dayworkers stacked in one day, a 7-character username fitting its column, and the full name on hover.
+- An Extra person from another shift, and Support and Recall shown as greyed "not active yet" placeholders.
+- The Dayworkers page with duty days per shift, including an inactive dayworker.
 - A request or grant blocked because the date already has another type of leave.
 - A person on V duty with a Task tag.
 - The Roster view colour legend, with AM / PM / Off shown by colour only.
@@ -469,7 +515,7 @@ If the first generation must be limited, start with screens 1, 2, 3, 5, 6, 7, an
 
 ### 14.6 Sample data
 
-For now, use placeholder staff names that are each a **single 5-character word** (for example Alpha, Bravo, Delta, Eagle, Frost, Grace, Haven, Ivory, Jolly, Karma). Do not use realistic personal names. Names may repeat across different shifts.
+For now, use placeholder staff names that are each a **single 5-character word** (for example Alpha, Bravo, Delta, Eagle, Frost, Grace, Haven, Ivory, Jolly, Karma). Do not use realistic personal names. Names may repeat across different shifts. Dayworker sample data follows the same rule for names (for example Comet, Sable, Torch), with short usernames such as CMT or SBL, and one using the full 7 characters.
 
 ## 15. Out of scope
 
@@ -506,6 +552,10 @@ For now, use placeholder staff names that are each a **single 5-character word**
 - Whether half-day leave should also block a duty on that day, or only full-day leave (the app currently blocks any leave).
 - Whether AM or PM should ever be editable by hand (for example to fix a mistake), now that the picker only offers V, V(SB) and Off(V).
 - Whether a DOS/FDO duty should count anywhere in the strength figures.
+- Dayworkers: whether they should sign in and clock their own duty (now supervisors assign it), and whether Ops duty needs actual clock times rather than a count of days.
+- Ops duty: whether a dayworker may clock more than one shift on the same day (now one), and whether Ops duty is allowed on any day or only on a shift's working days (now any day).
+- Support (AM/PM) and Recall: what they mean, who can be put there, and whether they affect strength. They are placeholders until decided.
+- Extra shift duty: whether the person should also show on their own shift's roster, whether leave given later on an Extra day should be blocked, and whether Extra people count toward the host shift's Working Strength.
 - [Add further open items here.]
 
 # Part B: Build framework
@@ -548,6 +598,7 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
                             (Edit / Staff is a switch on this page: ?mode=edit)
   /(app)/requests           my requests (mobile Requests tab)
   /(app)/task-report        Task report (supervisor / management), section 9.2
+  /(app)/dayworkers         dayworkers and their Ops duty counts (supervisor / management), section 5.3
   /(app)/tasks              Task management (management only)
   /(app)/profile            profile, theme, links to Tasks and the Task report on mobile
   actions.ts                all Server Actions: requestLeave, approveLeave, giveLeave, assignDuty, assignTask, ...
@@ -562,6 +613,9 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
   permissions.ts            role and shift access checks
   roster-data.ts            loads a shift's dates and computes cells and strength rows
   task-report.ts            Task report counts
+  dayworkers.ts             dayworker username rules (max 7, capitals), report row type
+  dayworker-report.ts       Ops duty counts per dayworker
+  report-period.ts          the year / month / date-range filter shared by both reports
 /prisma
   schema.prisma
   seed.ts                   3 shifts, demo staff and users, duties, V blocks, leave, Tasks, locks, events
@@ -581,7 +635,7 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
 
 ### 17.5 Build priority
 
-Done: Roster view and same-page leave request (staff), Calendar view, Edit view roster grid (supervisor), give / edit / cancel leave, approve / reject from the leave detail panel, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and special events, Task management (management), and the Task report.
+Done: Roster view and same-page leave request (staff), Calendar view, Edit view roster grid (supervisor), give / edit / cancel leave, approve / reject from the leave detail panel, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and special events, Task management (management), the Task report, dayworkers with Ops duty and their count, Extra shift duty, and the Support and Recall placeholder rows.
 
 Next: the leave inbox page, all-shift overview, duty swaps, staff records, and custom leave types. See section 14.4 for the full hero-screen list.
 
@@ -616,6 +670,8 @@ Design polished **hero screens** for a responsive web app (desktop and mobile) c
 **Tasks:** Specific duties named Task 1, Task 2, Task 3 and so on, with a name limit of 6 characters including spaces (live counter in the form). Assignment is optional, and people on V duty can be given a Task. A person holds only one Task per day, and a person on full-day leave has no Task for that day (half-day leave keeps the Task). Two or more people can share the same Task. Tasks are purely informational and show what people are doing for that duty. Show the Task as a separate small tag on the roster cell that reads simply "Task 2", next to (never replacing) the duty. Tasks do not conflict with scheduling and do not affect leave, strength, MFL, or leave slots.
 
 **Task report (supervisor and Management):** filter by year, month, or date range and by shift; a summary card per Task, then a staff-by-Task table of days done with totals, expandable dates per person, and options to include scheduled Tasks and hide staff with no Tasks. It must stay readable when there are many Tasks.
+
+**Dayworkers and bottom rows:** Dayworkers are office staff (normally 8 to 5) outside the shift crew who clock shift duty. Supervisors and Management add them with a name and a username of at most 7 characters, shown in capitals. The roster has four rows at the very bottom, in this order: SUPPORT (AM/PM), EXTRA, RECALL, OPS DUTY; the strength rows and Available Slot(s) stay under the date header. OPS DUTY shows the usernames of the dayworkers clocking that day (several can share a day, so names stack and the row grows); hovering a username shows the full name to every user. EXTRA shows people from other shifts serving extra duty, never from the shift itself. SUPPORT and RECALL are visual placeholders only, greyed as not active yet. Supervisors and Management also get a Dayworkers page with how many times each dayworker did shift duty, filtered by year, month, or date range. The colour legend above the roster names each colour without timings.
 
 **One leave per day:** a person can hold only one type of leave on a day (including pending requests, half-days, and BD / BD-IL). Show the clash in the form and block submitting.
 

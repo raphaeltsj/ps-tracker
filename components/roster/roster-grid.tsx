@@ -2,6 +2,7 @@
 import { memo } from "react";
 import { CalendarClock, Lock } from "lucide-react";
 import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, LABELLED_DUTIES, LeaveChip, SLOT_BG, SLOT_STYLE, TaskTag } from "@/components/roster/chips";
+import { BottomRows } from "@/components/roster/bottom-rows";
 import { cellKey, type Selection, type WorkspaceProps } from "@/components/roster/roster-workspace";
 import { isWeekend, weekdayShort } from "@/lib/dates";
 import type { RosterCell, RosterDay } from "@/lib/roster-types";
@@ -19,7 +20,7 @@ type GridProps = WorkspaceProps & {
 const SHIFT_DUTY_LABEL = { AM: "AM", PM: "PM", OFF: "Rest day" } as const;
 
 /** Desktop month grid: sticky name column, sticky date header with strength rows directly below. */
-export function RosterGrid({ roster, selection, compact, today, viewer, mode, onDate, onCell, onLeave }: GridProps) {
+export function RosterGrid({ roster, selection, compact, today, viewer, mode, canEdit, onDate, onCell, onLeave }: GridProps) {
   const { dates, days } = roster;
 
   const strengthRows: { label: string; value: (d: RosterDay) => React.ReactNode; cls?: (d: RosterDay) => string }[] = [
@@ -130,6 +131,7 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, on
                 ))}
               </tr>
             ))}
+            <BottomRows roster={roster} mode={mode} canEdit={canEdit} selection={selection} onDate={onDate} onCell={onCell} />
           </tbody>
         </table>
       </div>

@@ -46,6 +46,9 @@ async function main() {
   await db.leaveType.deleteMany();
   await db.dutyOverride.deleteMany();
   await db.extraDuty.deleteMany();
+  await db.extraShiftDuty.deleteMany();
+  await db.opsDuty.deleteMany();
+  await db.dayworker.deleteMany();
   await db.lockedDate.deleteMany();
   await db.specialEvent.deleteMany();
   await db.staff.deleteMany();
@@ -57,6 +60,20 @@ async function main() {
 
   const tasks = [];
   for (let i = 1; i <= 5; i++) tasks.push(await db.task.create({ data: { name: `Task ${i}` } }));
+
+  // Dayworkers: office staff who clock shift duty as Ops duty. One username uses the full 7 characters,
+  // and one is inactive, so both show in the demo.
+  const dayworkers = [];
+  for (const [name, username, active] of [
+    ["Comet", "CMT", true],
+    ["Sable", "SBL", true],
+    ["Torch", "TRCH", true],
+    ["Ridge", "RDG", true],
+    ["Glint", "GLINT07", false],
+  ] as const) {
+    dayworkers.push(await db.dayworker.create({ data: { name, username, active } }));
+  }
+  const activeDayworkers = dayworkers.filter((d) => d.active);
 
   const thisMonth = todayLocal().slice(0, 7);
   const from = `${shiftMonth(thisMonth, -1)}-01`;
@@ -71,6 +88,7 @@ async function main() {
     ],
   });
 
+  const membersByShift: Record<string, { id: string }[]> = {};
   for (const s of SHIFTS) {
     await db.shift.create({ data: { id: s.id, name: s.name, cycleAnchor: s.cycleAnchor } });
     const members = [];
@@ -84,6 +102,8 @@ async function main() {
         }),
       );
     }
+
+    membersByShift[s.id] = members;
 
     // A birthday on an Off day this month, so BD shows as a marker and BD-IL moves to the next working day.
     const offDay = monthDays.find((d) => d.slice(8) >= "05" && shiftDutyOn(s.cycleAnchor, d) === "OFF" && cyclePosition(s.cycleAnchor, d) === 4)!;
@@ -216,6 +236,46 @@ async function main() {
     await db.specialEvent.create({ data: { shiftId: s.id, date: working[Math.min(12, working.length - 1)], note: "Ceremony: the whole shift attends." } });
     // V MFL is always 1, so there is no per-date V headcount to seed.
   }
+
+  // Ops duty: dayworkers clocking shift duty on AM and PM days. Some days have two dayworkers and some
+  // none, so stacked cells show. A dayworker clocks one shift per day. Past days may use the inactive one.
+  const today = todayLocal();
+  const opsRows: { dayworkerId: string; shiftId: string; date: string }[] = [];
+  const clocked = new Set<string>();
+  let opsTurn = 0;
+  for (const date of range) {
+    const pool = date <= today ? dayworkers : activeDayworkers;
+    for (const s of SHIFTS) {
+      if (shiftDutyOn(s.cycleAnchor, date) === "OFF") continue;
+      const n = rand() < 0.2 ? 0 : rand() < 0.35 ? 2 : 1;
+      for (let k = 0; k < n; k++) {
+        const dw = pool[opsTurn++ % pool.length];
+        if (clocked.has(dw.id + "|" + date)) continue;
+        clocked.add(dw.id + "|" + date);
+        opsRows.push({ dayworkerId: dw.id, shiftId: s.id, date });
+      }
+    }
+  }
+  await db.opsDuty.createMany({ data: opsRows });
+
+  // Extra duty: people serving extra shifts on another shift's days, never on a day they have leave.
+  const extraRows: { staffId: string; hostShiftId: string; date: string }[] = [];
+  const serving = new Set<string>();
+  for (const host of SHIFTS) {
+    const others = SHIFTS.filter((x) => x.id !== host.id).flatMap((x) => membersByShift[x.id].slice(1));
+    let added = 0;
+    for (const date of monthDays) {
+      if (added >= 6 || rand() < 0.7) continue;
+      for (let c = rand() < 0.3 ? 2 : 1; c > 0; c--) {
+        const person = pick(others);
+        if (serving.has(person.id + "|" + date) || activeLeaveDays.get(person.id)?.has(date)) continue;
+        serving.add(person.id + "|" + date);
+        extraRows.push({ staffId: person.id, hostShiftId: host.id, date });
+        added++;
+      }
+    }
+  }
+  await db.extraShiftDuty.createMany({ data: extraRows });
 
   // Festive lock on every shift.
   const year = thisMonth.slice(0, 4);

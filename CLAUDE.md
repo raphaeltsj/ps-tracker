@@ -21,6 +21,8 @@ Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, n
 
 **DOS/FDO duties.** DOS, DOS2IC and FDO are three names for the same 24-hour duty, reporting at 0800 on top of the shift duty. One day only, on an AM day, and the Task is kept. On a 1st AM it earns an automatic 0.5 OIL (first half) the next day; on a 2nd AM it earns none, because the next day is already Off. That OIL cannot be cancelled and its type and date cannot change, though a supervisor may change which half it covers. Removing the duty removes it. No duty can be assigned on a day the person is on leave.
 
+**Dayworkers, Ops duty and Extra.** Dayworkers are office staff (normally 8-5) outside every shift crew who clock shift duty as Ops duty. Supervisors and Management add them with a name and a username (max 7 characters, no spaces, shown in capitals; never deleted, only made inactive). The username shows on the roster; hovering shows the full name to everyone. Several dayworkers can share a day, so cells stack. A dayworker clocks one shift per day, and Ops duty never changes strength. Supervisors and Management see how many days each dayworker clocked, by year, month, or date range, on the Dayworkers page. Extra shows people serving extra duty from other shifts only (never the host shift), not on a day they are on leave. Support (AM/PM) and Recall are placeholder rows with no logic yet.
+
 **V duty.** A temporary overlay, not a separate team. Exactly 1 person covers V each night. The person works 2 days of V on what would have been their 2 Off days after AM; their next 2-day PM block becomes 2 Off (label it "Off(V)"); then AM, AM, Off, Off and back to normal. Nothing about that is stored, so cancelling the V duty restores the PM block. Each of the 2 V days has a standby on V(SB), a different person each day, from the same shift. V(SB) never affects Total Strength, Not in Strength, Working Strength, MFL, or leave slots.
 
 **Special events.** A note on a date for the whole shift, with no reporting time. Show "Special Event" and the note on the day header, day view, mobile day card, and affected cells. They do not change MFL or leave slots. Public holidays change nothing.
@@ -49,16 +51,16 @@ Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, n
 
 **Roles.**
 - Regular Staff: view all shifts, Calendar/Roster switch, see strength, request and withdraw own leave. No edit controls.
-- Supervisor: staff view plus Edit view for their own shift only (other shifts read-only). Assign duties and Tasks, swap duties, give/edit/cancel leave (including their own, no approval needed), approve/reject requests, lock dates, set special-event times and V headcount, add custom leave types. In Staff view they can request leave and approve their own request.
-- Management: everything a supervisor can do across all shifts, plus lock all shifts at once, manage Tasks, and manage staff records. Management never requests or takes leave.
+- Supervisor: staff view plus Edit view for their own shift only (other shifts read-only). Assign duties and Tasks, swap duties, give/edit/cancel leave (including their own, no approval needed), approve/reject requests, lock dates, set special events, add custom leave types, add dayworkers, assign Ops duty and Extra for their own shift. In Staff view they can request leave and approve their own request.
+- Management: everything a supervisor can do across all shifts (including Ops duty and Extra for any shift), plus lock all shifts at once, manage Tasks, and manage staff records. Management never requests or takes leave.
 
 **UI.**
 - Calendar/Roster switch (all roles) is separate from the Edit/Staff switch (supervisors and Management).
-- Strength rows are sticky directly below the date header, with a "Compact" toggle that shows only Available Slot(s).
+- Strength rows are sticky directly below the date header, with a "Compact" toggle that shows only Available Slot(s). The other rows (Support, Extra, Recall, Ops duty) sit at the bottom of the roster.
 - The request form sits on the same page as the calendar/roster (right panel on desktop, bottom sheet on mobile).
 - Clicking a date shows that date's details. It never selects every person on that day: staff see details only, supervisors also get lock and special-event settings.
 - Mobile uses bottom tabs (Home, Roster, Requests, Profile). Include a notification bell placeholder.
-- Light and dark mode, calm and readable, colours paired with text, icons, or a legend. On the Roster view, AM / PM / Off are colour-coded cells with no text (legend above the grid, tooltips and screen-reader labels); V and V(SB) keep their labels. Suggested: AM amber, PM indigo, V deep navy/purple, V(SB) lighter outline of V, Off grey, Leave teal, Special Event magenta, locked dates hatched with a lock icon.
+- Light and dark mode, calm and readable, colours paired with text, icons, or a legend. On the Roster view, AM / PM / Off are colour-coded cells with no text (legend above the grid names each colour without timings; tooltips and screen-reader labels carry the details); V and V(SB) keep their labels. Suggested: AM amber, PM indigo, V deep navy/purple, V(SB) lighter outline of V, Off grey, Leave teal, Special Event magenta, locked dates hatched with a lock icon.
 - Sample data: placeholder staff names that are each a single 5-character word (Alpha, Bravo, Delta...). No realistic personal names.
 
 **Out of scope.** Payroll, timesheets and attendance, HR records, festive balloting.
