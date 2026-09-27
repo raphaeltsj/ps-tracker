@@ -158,7 +158,8 @@ const GridCell = memo(function GridCell({
       onClick={(e) => onClick(e.shiftKey)}
       title={dutyTitle(cell.duty)}
       className={cn(
-        "h-12 cursor-pointer select-none border-b border-r border-background/60 p-0.5 align-top",
+        // Vertically centered: a cell with just a duty (no leave/DOS/Task chip below) isn't pinned to the top.
+        "h-12 cursor-pointer select-none border-b border-r border-background/60 p-0.5 align-middle",
         DUTY_CELL[cell.duty],
         day.locked && "bg-hatch",
         selected && "outline-2 -outline-offset-2 outline-primary",
