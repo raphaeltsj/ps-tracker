@@ -341,26 +341,34 @@ Management can do everything a supervisor can do across **all shifts**, but does
 
 ### 11.4 Duty swaps between staff
 
-Swapping duties (often called shift swaps) is **in scope**. Staff request swaps in the app, and supervisors approve them. Picking one is done on the **roster** itself, in the same side panel as Request leave (staff) or Duty / Task / Give leave (Edit view): a **Request swap** tab, or a **Swap** tab, sits alongside them and holds the same form (partner, one or two dates). This keeps the shift's roster in view while picking the swap. The partner list only offers a **different** shift, since a swap is never within the same shift.
+Swapping duties (often called shift swaps) is **in scope**. Staff request swaps in the app, and supervisors approve them. Picking one is done on the **roster** itself, in the same side panel as Request leave (staff) or Duty / Task / Give leave (Edit view): a **Request swap** tab, or a **Swap** tab, sits alongside them. This keeps the shift's roster in view while picking the swap: pick the date first, then a partner from a list that shows everyone's duty that day and why anyone cannot swap (same duty, on leave or birthday leave, already in a swap, on Extra duty, V(SB) across shifts, or V then AM).
 
-**What a swap is.** A **one-for-one exchange** of duties between two people on **different shifts**. Duty swaps are never between two people on the same shift. On each swapped date, each person works the other's duty. For example, if A's Bravo is on AM and C's Charl is on PM, then after the swap Bravo works PM and Charl works AM. On A's roster, Bravo's cell shows PM with a "⇄ Charl·C" tag, and C's roster shows the reverse.
+**What a swap is.** A **one-for-one exchange** of duties between two people, usually on different shifts — a shift's own staff normally share the same duty on any given date, so there is rarely anything to swap within one, though nothing stops it if their duties genuinely differ (for example a V or DOS day). On each swapped date, each person works the other's duty. For example, if A's Bravo is on AM and C's Charl is on PM, then after the swap Bravo works PM and Charl works AM. On A's roster, Bravo's cell shows PM with a "⇄ Charl·C" tag, and C's roster shows the reverse.
 
 - **One date or two.** A swap has one date (a straight exchange) or two (a give-and-take: Charl covers Bravo's AM on the 3rd, and Bravo covers Charl's PM on the 7th). Each date is an exchange of that day's duties, so a two-date swap works the same way as two one-date exchanges.
 - **Any duties** can be exchanged: AM, PM, Off, V, V(SB), Off(V). The two duties must differ on each date, and Off and Off(V) count as the same day off.
+- **V(SB) stays within the shift.** The standby comes from the V person's own shift, so a V(SB) day can only be swapped with someone in the same shift.
+- **Rest after V.** V ends at 0745, so no swap may leave anyone on V followed by AM at 0745 the next morning. Swap both V nights, or pick another date. The same check runs when a supervisor later assigns a V next to a swapped day.
+- **No double booking.** No swap on a day either person serves Extra duty for another shift, and no Extra duty on a day an approved swap holds.
+- **DOS/FDO on a swapped day.** The DOS stays with its holder (24 hours from 0800, on top of the swapped duty) and earns no 0.5 OIL. The preview and the approval card say so, so approvers can move the DOS to someone on AM first.
+- **Birthday leave.** BD-IL never lands on a swapped day; it moves to the next free working day.
+- **Swaps keep the shifts they were made in.** If someone later moves shift, or leaves the shift roster, an approved swap still exchanges the duties that were agreed.
+- **Today onwards only.** "Today" is Singapore time (the app time zone, `NEXT_PUBLIC_APP_TIME_ZONE`), whatever time zone the server runs in. Swaps are for dates from today on. A swap can still be cancelled on its first date. Once that date has passed, the swap is part of what was worked and can no longer be cancelled. It drops off the My Requests / Manage requests lists once all its dates have passed, but the roster still shows who worked what. A pending request whose first date passes before it is fully approved becomes **Expired**.
 - **Off(V) follows the V.** Whoever actually works a V earns the Off(V). A V swapped away gives the original person their PM block back. The person who takes it over gets Off(V) on their own next PM block, the first PM block after the V night. The swap form previews these knock-on days.
 - **Strength does not change.** Each crew loses one person and gains one on that duty, so Total, Not in, Working Strength, MFL and slots stay as they were. V cover (V on duty / MFL) counts the crew's own duty.
-- **Leave and Tasks do not move.** No swap on a date where either person has leave (pending or approved, including BD / BD-IL). A person can be in only one swap per date (pending or approved).
+- **Leave and Tasks do not move.** No swap on a date where either person has leave (pending or approved, including BD / BD-IL). A person can be in only one swap per date (pending or approved). A Task stays with its holder on a swapped date.
 - **DOS/FDO.** A DOS/FDO duty stays with its holder, but a DOS on a swapped date earns **no 0.5 OIL**. Approving the swap removes that OIL, and cancelling the swap restores it.
 
 **Flow.** Request → partner accepts or declines → each side's shift supervisor approves → Approved.
 
 - Staff (and supervisors in their own name) request a swap for today or later, with an optional note. The requester can withdraw it until it is approved.
-- Once the partner accepts, the supervisor of **each** person's shift approves their own side; the swap is confirmed only once **both** shifts' supervisors have approved. Management can approve both sides at once, since Management covers every shift. Either supervisor can reject (a reason is required) while the swap is pending.
-- A supervisor (for someone in their own shift) or Management can also **record** a swap directly. That counts as both people's agreement and approves the side(s) the recorder supervises; the other shift's supervisor still has to approve their side before it is confirmed, unless the recorder is Management (who supervises both).
+- Once the partner accepts, the supervisor of each person's shift approves their side. A same-shift swap needs one approval. Management can approve both sides at once. A supervisor may approve their own swap (as with their own leave). Either supervisor can reject (a reason is required) while the swap is pending.
+- A supervisor (for someone in their own shift) or Management can also **record** a swap directly. That counts as both people's agreement and approves every side the recorder supervises, so a swap with another shift still needs that shift's supervisor.
 - Every step re-checks the rules above. Duties, leave or other swaps may have changed since the request, and a pending swap that can no longer go through shows why.
-- **Once approved**, the swapped dates are held for both people. Duties (V, V(SB), Off(V), DOS/FDO) and leave cannot change on those dates, but Tasks still can. A supervisor of either shift, or Management, can cancel the swap, which restores both people's own duties.
-- Leave cannot be requested or given on a date a **pending** swap holds either.
-- Pending swaps waiting for the viewer count toward the notification bell.
+- **Once approved**, the swapped dates are held for both people. Duties (V, V(SB), Off(V), DOS/FDO) and leave cannot change on those dates, but Tasks still can. A duty change on another day that would change a swapped date is refused as well; for example, a V placed before a swapped PM would turn that PM into Off(V). A supervisor of either shift, or Management, can cancel the swap until its first date has passed, which restores both people's own duties.
+- A **pending** request never blocks leave or duties. It is re-checked when it is accepted and approved, and shows why it can no longer go through. This means nobody can block someone else's leave just by sending them a request.
+- **Finding a partner:** pick the date first. The list then shows everyone's duty that day, with the people who cannot swap (and why) set aside: same duty, on leave or birthday leave, already in a swap, on Extra duty, V(SB) across shifts, or V then AM.
+- Swaps waiting for the viewer show as a banner on the Roster page, and count toward the bell, which opens My Requests (staff) or Manage requests (supervisors and Management). The roster's date details list that day's swaps and who covers each swapped duty.
 
 ### 11.5 My Requests and Manage requests
 
@@ -374,7 +382,7 @@ Two pages replace the old separate Home, My requests, and Duty swaps pages. Neit
 **Manage requests** (`/manage-requests`), for supervisors (their own shift) and Management (every shift):
 
 - **Leave requests**: every pending request for the shifts they edit, **earliest submitted first** (a supervisor's own request is excluded here: that is self-service on My Requests). Approve or reject (a reason is required) inline.
-- **Duty swaps needing your approval**, and the shift's full swap history (approve, reject, or cancel an approved one).
+- **Duty swaps needing your approval**, and the shift's swap history with a date from today on (approve, reject, or cancel an approved one; past swaps drop off the list).
 
 The roster no longer shows the viewer's own pending requests in its side panel: that list moved to My Requests.
 
@@ -498,6 +506,14 @@ Other screens (Calendar view, side panel, Home, forms) keep text labels for duti
 - **Calendar view / Roster view** switch: available to every role, always visible near the top of the roster area.
 - **Edit view / Staff view** switch: Supervisors and Management only, clearly distinct from the calendar/roster switch so the two are not confused. Edit controls appear only in Edit view.
 
+### 14.3.1 Navigation, loading and error states
+
+- The requests page is called **Requests** everywhere (desktop menu, mobile tab, page heading).
+- On phones and tablets (where the top menu is hidden), Profile links to every page the role can open, including **Duty swaps**.
+- Changing month, shift or view shows a thin progress bar and dims the roster until the new data arrives; moving between pages shows a loading indicator.
+- A mistyped address shows "Page not found", and a page the role cannot open (for example Tasks for staff) shows "This page isn't available", both with links back to Home and the roster. If a page fails to load, an error screen offers "Try again".
+- Every page has one heading for screen readers, and text colours meet WCAG AA contrast (4.5:1) in light and dark mode.
+
 ### 14.4 Hero screens (first design pass)
 
 | **#** | **Screen**                       | **Role / platform**              | **Key content**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -580,7 +596,7 @@ For now, use placeholder staff names that are each a **single 5-character word**
 ### Open items
 
 - BD / BD-IL: whether they are given automatically or requested, whether they need an available slot, and whether the BD-IL day can be moved.
-- Duty swaps: whether staff may request a swap on a locked date (currently allowed), whether a swap needs an extra slot or MFL check (currently no, since it is one for one), and whether a V taken over in a swap should earn Off(V) on the taker's next PM block when the V did not fall on the taker's Off days (currently yes).
+- Duty swaps: whether staff may request a swap on a locked date (currently allowed), whether a swap needs an extra slot or MFL check (currently no, since it is one for one), and whether a V taken over in a swap should earn Off(V) on the taker's next PM block when the V did not fall on the taker's Off days (currently yes). When staff records can move people between shifts, decide what happens to their pending and approved swaps (a swap stores each person's shift when it was made).
 - Staff records: which details are kept (for example name, shift, role, birthday).
 - V(SB): how a standby person's own cycle looks around their standby day (for example, which days they are normally on, and whether their following block changes).
 - Whether the "extra slot needed" rule for approval also applies to leave a supervisor gives directly, to a supervisor's own leave, and to edits of existing leave.

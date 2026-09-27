@@ -74,7 +74,14 @@ export async function getPendingLeaves(shiftIds: string[], excludeStaffId?: stri
  * Builds everything the roster, calendar and strength rows need for one shift over a date range.
  * Pending leave is only included for its owner and for people who can edit the shift.
  */
-export async function buildRoster(shiftId: string, from: string, to: string, viewer: Viewer | null): Promise<RosterData> {
+export async function buildRoster(
+  shiftId: string,
+  from: string,
+  to: string,
+  viewer: Viewer | null,
+  /** Only these people (for checks on one person). Strength figures then cover only them. */
+  opts: { staffIds?: string[] } = {},
+): Promise<RosterData> {
   const shift = await db.shift.findUniqueOrThrow({ where: { id: shiftId } });
   const dates = dateRange(from, to);
   // Load a little either side: post-V looks back up to 3 days, BD-IL looks ahead up to 21.
@@ -82,7 +89,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
   const loadTo = addDays(to, 21);
 
   const staff = await db.staff.findMany({
-    where: { shiftId, active: true, role: { not: "MANAGEMENT" } },
+    where: { shiftId, active: true, role: { not: "MANAGEMENT" }, id: opts.staffIds ? { in: opts.staffIds } : undefined },
     orderBy: [{ role: "desc" }, { name: "asc" }],
   });
   const staffIds = staff.map((s) => s.id);
@@ -132,6 +139,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
   for (const person of staff) {
     const dutyOn = (date: string) => duties.resolve(person.id, date);
     // All approved/pending leave days (visible or not), so BD / BD-IL land the same for every viewer.
+    // A swapped day is never free for BD-IL either: no leave on a swapped day (spec 11.4).
     const leaveDates = new Set(leaves.filter((l) => l.staffId === person.id).flatMap((l) => l.days.map((d) => d.date)));
     const row: Record<string, RosterCell> = {};
     for (const date of dates) {
@@ -143,7 +151,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
         dos: null,
         task: null,
         absences: [],
-        swap: swap && partner ? { swapId: swap.swapId, partnerId: partner.id, partnerName: partner.name, partnerShiftId: partner.shiftId ?? "", ownDuty: swap.ownDuty } : null,
+        swap: swap && partner ? { swapId: swap.swapId, partnerId: partner.id, partnerName: partner.name, partnerShiftId: swap.partnerShiftId ?? partner.shiftId ?? "", ownDuty: swap.ownDuty } : null,
       };
       // A swap is one for one, so V cover is counted on the crew's own duties.
       if ((swap?.ownDuty ?? duty) === "V") vOnDuty.set(date, vOnDuty.get(date)! + 1);
@@ -167,7 +175,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
     if (person.birthday) {
       const years = new Set([Number(from.slice(0, 4)) - 1, Number(from.slice(0, 4)), Number(to.slice(0, 4))]);
       for (const year of years) {
-        for (const ev of birthdayEvents(person.birthday, year, (d) => dutyOn(d).duty, (d) => leaveDates.has(d))) {
+        for (const ev of birthdayEvents(person.birthday, year, (d) => dutyOn(d).duty, (d) => leaveDates.has(d) || dutyOn(d).swap !== null)) {
           if (!dateSet.has(ev.date)) continue;
           row[ev.date].absences.push({
             leaveId: null,

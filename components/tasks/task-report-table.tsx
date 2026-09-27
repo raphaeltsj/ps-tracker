@@ -27,7 +27,7 @@ export function TaskReportTable({ report, hideEmpty, showShift }: { report: Task
   return (
     <div className="space-y-4">
       {/* Summary per Task: a horizontal strip so it never grows taller with more Tasks */}
-      <ul className="flex gap-2 overflow-x-auto pb-1" aria-label="Days per Task">
+      <ul className="flex gap-2 overflow-x-auto pb-1" aria-label="Days per Task" tabIndex={0}>
         <li className="min-w-32 shrink-0 rounded-lg border bg-muted/50 p-3">
           <span className="text-xs font-medium">All Tasks</span>
           <div className="mt-1 text-2xl font-semibold tabular-nums">{report.total}</div>

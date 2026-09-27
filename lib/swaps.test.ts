@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { dateRange, dayIndex } from "./dates";
 import type { AssignableDuty } from "./domain";
-import { dutiesDiffer, makeDutyResolver, previewSwap, type PersonCycle } from "./swaps";
+import { dutiesDiffer, makeDutyResolver, previewSwap, vThenAm, type PersonCycle } from "./swaps";
 
 // Same anchors as the spec's table: 1-6 Jan 2026 is A: PM PM AM AM Off Off, B: Off Off PM PM AM AM,
 // C: AM AM Off Off PM PM.
@@ -14,10 +14,10 @@ test("a same-date swap is a one-for-one exchange: A's PM for C's AM", () => {
     ["alpha", person(DAY1)],
     ["charl", person(DAY1 - 2)],
   ]);
-  const resolve = makeDutyResolver(people, [{ swapId: "s1", date: "2026-01-01", a: "alpha", b: "charl" }]);
+  const resolve = makeDutyResolver(people, [{ swapId: "s1", date: "2026-01-01", a: "alpha", b: "charl", shifts: { a: "A", b: "C" } }]);
   assert.equal(resolve("alpha", "2026-01-01").duty, "AM");
   assert.equal(resolve("charl", "2026-01-01").duty, "PM");
-  assert.deepEqual(resolve("alpha", "2026-01-01").swap, { swapId: "s1", partnerId: "charl", ownDuty: "PM" });
+  assert.deepEqual(resolve("alpha", "2026-01-01").swap, { swapId: "s1", partnerId: "charl", ownDuty: "PM", partnerShiftId: "C" });
   // Other days are untouched.
   assert.equal(resolve("alpha", "2026-01-02").duty, "PM");
   assert.equal(resolve("alpha", "2026-01-02").swap, null);
@@ -90,4 +90,31 @@ test("only different duties can be exchanged; Off and Off(V) count as the same d
   assert.equal(dutiesDiffer("V", "VSB"), true);
   assert.equal(dutiesDiffer("PM", "PM"), false);
   assert.equal(dutiesDiffer("OFF", "OFF_V"), false);
+});
+
+test("a V night followed by AM at 0745 the next morning is caught (no rest)", () => {
+  // Bravo (B) is on AM on 5-6 Jan. Taking only Alpha's V on the 5th leaves Bravo's AM on the 6th.
+  const people = new Map([
+    ["alpha", person(DAY1, [["2026-01-05", "V"], ["2026-01-06", "V"]])],
+    ["bravo", person(DAY1 - 4)],
+  ]);
+  const oneNight = makeDutyResolver(people, [{ swapId: "s1", date: "2026-01-05", a: "alpha", b: "bravo" }]);
+  assert.equal(vThenAm((d) => oneNight("bravo", d).duty, dateRange("2026-01-04", "2026-01-06")), "2026-01-05");
+  // Taking both nights is fine: V, V, then Off.
+  const bothNights = makeDutyResolver(people, ["2026-01-05", "2026-01-06"].map((date) => ({ swapId: "s1", date, a: "alpha", b: "bravo" })));
+  assert.equal(vThenAm((d) => bothNights("bravo", d).duty, dateRange("2026-01-04", "2026-01-07")), null);
+  // Alpha, now on AM 5-6 Jan, is fine too.
+  assert.equal(vThenAm((d) => bothNights("alpha", d).duty, dateRange("2026-01-04", "2026-01-07")), null);
+});
+
+test("a swap keeps the shifts both people were in when it was made", () => {
+  // Charl moves from C to B after the swap was approved: the swap still exchanges C's duty.
+  const people = new Map([
+    ["alpha", person(DAY1)],
+    ["charl", person(DAY1 - 4)], // now in B
+  ]);
+  const swap = { swapId: "s1", date: "2026-01-01", a: "alpha", b: "charl", anchors: { a: DAY1, b: DAY1 - 2 } };
+  const resolve = makeDutyResolver(people, [swap]);
+  assert.equal(resolve("alpha", "2026-01-01").duty, "AM"); // C's AM, not B's Off
+  assert.equal(resolve("charl", "2026-01-01").duty, "PM");
 });

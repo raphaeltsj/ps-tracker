@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { canDecideLeave, canEditShift, canRequestLeave, canRequestOnLockedDate, hasEditView } from "@/lib/permissions";
 import { buildRoster, getMyLeaves } from "@/lib/roster-data";
 import { firstDateWithoutSlot } from "@/lib/slots";
+import { swapsAwaiting } from "@/lib/swap-data";
 
 export const metadata = { title: "Roster | PS Tracker" };
 
@@ -23,12 +24,13 @@ export default async function RosterPage({ searchParams }: PageProps<"/roster">)
   const mode = hasEditView(viewer) ? (param("mode") === "edit" || param("mode") === "staff" ? param("mode")! : defaultMode) : "staff";
 
   const dates = monthDates(month);
-  const [roster, leaveTypes, tasks, myLeaves, swapStaff] = await Promise.all([
+  const [roster, leaveTypes, tasks, myLeaves, swapStaff, swapsWaiting] = await Promise.all([
     buildRoster(shiftId, dates[0], dates[dates.length - 1], viewer),
     db.leaveType.findMany({ orderBy: [{ custom: "asc" }, { sortOrder: "asc" }] }),
     db.task.findMany({ orderBy: { createdAt: "asc" } }),
     canRequestLeave(viewer) ? getMyLeaves(viewer.id) : Promise.resolve([]),
     db.staff.findMany({ where: { active: true, role: { not: "MANAGEMENT" }, shiftId: { not: null } }, orderBy: [{ shiftId: "asc" }, { name: "asc" }] }),
+    swapsAwaiting(viewer),
   ]);
 
   // Pick lists for the Ops duty and Extra rows: only editors of this shift need them.
@@ -40,11 +42,9 @@ export default async function RosterPage({ searchParams }: PageProps<"/roster">)
       ])
     : [[], []];
 
-  // Duty swaps are only between different shifts: the Request swap tab excludes the viewer's own
-  // shift outright, and the Swap tab's "person 2" list is filtered dynamically once person 1 is picked.
-  const swapPeople = swapStaff.map((s) => ({ id: s.id, name: s.name, shiftId: s.shiftId! }));
-  const swapPartners = swapPeople.filter((p) => p.id !== viewer.id && p.shiftId !== shiftId);
-  const swapFirstPeople = swapPeople.filter((p) => canEditShift(viewer, p.shiftId));
+  // Record mode's "Person 1" list: people the viewer supervises. The partner list itself loads per
+  // date from the swap actions, so no full candidate list is needed up front.
+  const swapFirstPeople = swapStaff.filter((s) => canEditShift(viewer, s.shiftId)).map((s) => ({ id: s.id, name: s.name, shiftId: s.shiftId! }));
 
   // Approve is disabled when a requested date has no Available Slot.
   for (const leave of [...Object.values(roster.leaves), ...myLeaves]) {
@@ -67,9 +67,8 @@ export default async function RosterPage({ searchParams }: PageProps<"/roster">)
       dayworkers={dayworkers.map((d) => ({ id: d.id, name: d.name, username: d.username }))}
       extraCandidates={extraCandidates.map((c) => ({ id: c.id, name: c.name, shiftId: c.shiftId! }))}
       myLeaves={myLeaves}
-      swapPartners={swapPartners}
       swapFirstPeople={swapFirstPeople}
-      swapPeople={swapPeople}
+      swapsWaiting={swapsWaiting}
       canEdit={mode === "edit" && canEditShift(viewer, shiftId)}
       canRequest={canRequestLeave(viewer) && viewer.shiftId === shiftId}
       canRequestLocked={canRequestOnLockedDate(viewer)}

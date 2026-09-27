@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { LeaveInbox } from "@/components/requests/leave-inbox";
-import { SwapList } from "@/components/swaps/swap-list";
+import { SwapFeedbackProvider, SwapList } from "@/components/swaps/swap-list";
 import { requireViewer } from "@/lib/auth";
 import { canEditShift, hasEditView } from "@/lib/permissions";
 import { getPendingLeaves } from "@/lib/roster-data";
@@ -45,23 +45,25 @@ export default async function ManageRequestsPage() {
     );
 
   return (
-    <main className="mx-auto w-full max-w-4xl space-y-4 p-4 pb-24 lg:pb-6">
-      <div>
-        <h1 className="text-xl font-semibold">Manage requests</h1>
-        <p className="text-sm text-muted-foreground">
-          Leave and duty swap requests for {viewer.role === "MANAGEMENT" ? "every shift" : `Shift ${viewer.shiftId}`}. Your own requests are on My Requests. Record a swap from the Roster.
-        </p>
-      </div>
+    <SwapFeedbackProvider>
+      <main className="mx-auto w-full max-w-4xl space-y-4 p-4 pb-24 lg:pb-6">
+        <div>
+          <h1 className="text-xl font-semibold">Manage requests</h1>
+          <p className="text-sm text-muted-foreground">
+            Leave and duty swap requests for {viewer.role === "MANAGEMENT" ? "every shift" : `Shift ${viewer.shiftId}`}. Your own requests are on My Requests. Record a swap from the Roster.
+          </p>
+        </div>
 
-      <Section title="Leave requests" note="Earliest submitted first.">
-        <LeaveInbox leaves={pendingLeaves} empty="Nothing pending." />
-      </Section>
-      <Section title="Duty swaps needing your approval">
-        <SwapList swaps={order(needsApproval)} viewerId={viewer.id} empty="Nothing waiting for you." />
-      </Section>
-      <Section title={viewer.role === "MANAGEMENT" ? "All shifts' swaps" : `Shift ${viewer.shiftId} swaps`} note="Pending and approved swaps, and the last 60 days of history.">
-        <SwapList swaps={order(otherSwaps)} viewerId={viewer.id} empty="No other swaps." />
-      </Section>
-    </main>
+        <Section title="Leave requests" note="Earliest submitted first.">
+          <LeaveInbox leaves={pendingLeaves} empty="Nothing pending." />
+        </Section>
+        <Section title="Duty swaps needing your approval">
+          <SwapList swaps={order(needsApproval)} viewerId={viewer.id} empty="Nothing waiting for you." />
+        </Section>
+        <Section title={viewer.role === "MANAGEMENT" ? "All shifts' swaps" : `Shift ${viewer.shiftId} swaps`} note="Swaps with a date from today on; past swaps drop off this list.">
+          <SwapList swaps={order(otherSwaps)} viewerId={viewer.id} empty="No other swaps." />
+        </Section>
+      </main>
+    </SwapFeedbackProvider>
   );
 }

@@ -94,6 +94,14 @@ export const COMMON_LEAVE_TYPES: { code: string; name: string; halfDay?: boolean
   { code: "1 OIL", name: "Off in lieu (full day)" },
 ];
 
+/**
+ * The type a half/full-day pair of codes share, for combining them in stats: "0.5 AL" and "AL" are
+ * both "AL"; "0.5 OIL" and "1 OIL" are both "OIL". Everything else is its own base code unchanged.
+ */
+export function baseLeaveCode(code: string): string {
+  return code.replace(/^(?:0\.5|1)\s+/, "");
+}
+
 export const NAME_MAX = 6; // Task names and custom leave type codes
 
 export const MFL: Record<"weekday" | "weekend", { AM: number; PM: number; V: number }> = {

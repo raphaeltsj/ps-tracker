@@ -45,6 +45,7 @@ model Staff {
   sessions         Session[]
   swapsRequested   DutySwap[]       @relation("SwapRequester")
   swapsPartnered   DutySwap[]       @relation("SwapPartner")
+  notifications    Notification[]
 }
 
 model Session {
@@ -52,6 +53,20 @@ model Session {
   staffId   String
   staff     Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+}
+
+// Tells a staff member something happened to their own request (for now: a leave decision). Clicking
+// one in the bell takes the viewer to `href` and marks it read.
+model Notification {
+  id        String   @id @default(cuid())
+  staffId   String
+  staff     Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  message   String
+  href      String   @default("/requests")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([staffId, read])
 }
 
 // A duty set by a supervisor that replaces the person's cycle duty for one day.

@@ -11,7 +11,7 @@ const DUTY_STYLE: Record<Duty, string> = {
   PM: "bg-indigo-100 text-indigo-900 border-indigo-300 dark:bg-indigo-400/20 dark:text-indigo-200 dark:border-indigo-400/40",
   V: "bg-violet-900 text-violet-50 border-violet-900 dark:bg-violet-500/40 dark:text-violet-50 dark:border-violet-400/60",
   VSB: "bg-transparent text-violet-800 border-violet-500 border-dashed dark:text-violet-200 dark:border-violet-400",
-  OFF: "bg-neutral-100 text-neutral-500 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:border-neutral-700",
+  OFF: "bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:border-neutral-700",
   OFF_V: "bg-neutral-100 text-violet-700 border-violet-400 border-dashed dark:bg-neutral-800 dark:text-violet-300 dark:border-violet-500/60",
 };
 
@@ -118,7 +118,7 @@ export function LeaveChip({ absence, className }: { absence: Pick<CellAbsence, "
           ? "border-dashed border-teal-500 text-teal-800 dark:text-teal-200"
           : half
             ? "border-teal-600 text-teal-900 dark:text-teal-50 bg-[linear-gradient(135deg,var(--color-teal-300)_50%,transparent_50%)] dark:bg-[linear-gradient(135deg,var(--color-teal-700)_50%,transparent_50%)]"
-            : "border-teal-600 bg-teal-600 text-white dark:bg-teal-500 dark:border-teal-500 dark:text-teal-950",
+            : "border-teal-700 bg-teal-700 text-white dark:bg-teal-500 dark:border-teal-500 dark:text-teal-950",
         className,
       )}
     >
@@ -154,7 +154,7 @@ export function OpsChip({ entry, className }: { entry: OpsEntry; className?: str
         <span
           className={cn(
             "inline-flex max-w-full cursor-default items-center truncate rounded border border-sky-500/70 bg-sky-500/10 px-0.5 text-[9px] font-bold leading-4 tracking-tight text-sky-900 dark:text-sky-100",
-            !entry.active && "opacity-60",
+            !entry.active && "border-dashed bg-transparent",
             className,
           )}
         >
@@ -204,7 +204,7 @@ export function SwapTag({ swap, duty, className }: { swap: CellSwap; duty: Duty;
     <span
       title={swapTitle(swap, duty)}
       className={cn(
-        "inline-flex max-w-full items-center gap-0.5 truncate rounded-sm border border-emerald-600 bg-emerald-500/15 px-0.5 text-[9px] font-bold leading-4 tracking-tight text-emerald-900 dark:text-emerald-100",
+        "inline-flex h-4 max-w-full items-center gap-0.5 truncate rounded-sm border border-emerald-600 bg-emerald-100 px-0.5 text-[10px] font-bold leading-none tracking-tight text-emerald-900 dark:bg-emerald-500/25 dark:text-emerald-50",
         className,
       )}
     >

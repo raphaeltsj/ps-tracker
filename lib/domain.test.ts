@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { birthdayEvents } from "./birthday";
 import { cycleDayLabel, cyclePositionLabel, dosEarnsOil, effectiveDuty, shiftDutyOn } from "./cycle";
-import { addDays, dateRange, dayIndex, formatDateList } from "./dates";
+import { addDays, dateRange, dayIndex, formatDateList, formatDateTime } from "./dates";
 import { ASSIGNABLE_DUTIES, type AssignableDuty } from "./domain";
 import { computeStrength, formatFigure, mflFor, V_MFL } from "./strength";
 
@@ -106,4 +106,9 @@ test("one leave type per day: BD-IL skips working days that already have leave",
 test("date helpers", () => {
   assert.equal(addDays("2026-02-28", 1), "2026-03-01");
   assert.equal(formatDateList(["2026-10-03", "2026-10-04", "2026-10-05", "2026-10-09"]), "3-5 Oct, 9 Oct");
+});
+
+test("timestamps and today follow Singapore time, not the server's", () => {
+  // 17:30 UTC on 27 Sep is 01:30 on Mon 28 Sep in Singapore.
+  assert.equal(formatDateTime("2026-09-27T17:30:00Z"), "Mon 28 Sep, 01:30");
 });

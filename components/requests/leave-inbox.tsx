@@ -7,7 +7,7 @@ import { LeaveChip } from "@/components/roster/chips";
 import { ResultMessage, useAction } from "@/components/roster/use-action";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDate, formatDateList } from "@/lib/dates";
+import { formatDate, formatDateList, formatDateTime } from "@/lib/dates";
 import type { LeaveSummary } from "@/lib/roster-types";
 
 export function LeaveInbox({ leaves, empty }: { leaves: LeaveSummary[]; empty: string }) {
@@ -33,7 +33,7 @@ function LeaveInboxRow({ leave }: { leave: LeaveSummary }) {
         {leave.shiftId && <span className="text-xs text-muted-foreground">Shift {leave.shiftId}</span>}
         <LeaveChip absence={{ code: leave.typeCode, half: leave.half, status: leave.status, counts: 1, derived: false }} />
         <span className="font-medium">{leave.typeName}</span>
-        <span className="ml-auto text-xs text-muted-foreground">{new Date(leave.submittedAt).toLocaleString()}</span>
+        <span className="ml-auto text-xs text-muted-foreground">{formatDateTime(leave.submittedAt)}</span>
       </div>
       <p className="text-xs">
         {formatDateList(leave.days)}
