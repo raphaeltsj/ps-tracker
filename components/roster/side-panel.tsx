@@ -25,6 +25,7 @@ import { DosTag, DutyChip, EventBadge, ExtraChip, LeaveChip, LockBadge, OpsChip,
 import type { Selection, WorkspaceProps } from "@/components/roster/roster-workspace";
 import { StrengthSummary } from "@/components/roster/strength-summary";
 import { ResultMessage, useAction } from "@/components/roster/use-action";
+import { SwapForm } from "@/components/swaps/swap-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,6 +59,9 @@ function Section({ title, children, action }: { title: string; children: React.R
 
 export function SidePanel(props: PanelProps) {
   const { mode, canEdit, canRequest, selection, roster, myLeaves, viewer, onCloseDateSettings } = props;
+  // "Request leave" vs "Request swap" in Staff view: local to the panel, since (unlike Duty/Task/Give
+  // leave) the swap form doesn't drive cell selection on the roster.
+  const [staffTool, setStaffTool] = useState<"leave" | "swap">("leave");
   // Cells picked in the Ops duty or Extra row open their own editor instead of the staff tools.
   const rowKind = [...selection.cells].some((k) => k.startsWith(`${ROW_OPS}|`))
     ? ("ops" as const)
@@ -76,7 +80,32 @@ export function SidePanel(props: PanelProps) {
         <DateSettingsPanel roster={roster} date={selection.focusDate!} isManagement={viewer.role === "MANAGEMENT"} onClose={onCloseDateSettings} />
       )}
       {!focusLeave && !showDateSettings && mode === "edit" && canEdit && (rowKind ? <RowEditor key={rowKind} {...props} kind={rowKind} /> : <EditTools {...props} />)}
-      {mode === "staff" && canRequest && <RequestForm {...props} />}
+      {mode === "staff" && canRequest && (
+        <div className="grid grid-cols-2 gap-0.5 border-b p-2" role="tablist" aria-label="Request leave or a swap">
+          <button
+            role="tab"
+            aria-selected={staffTool === "leave"}
+            onClick={() => setStaffTool("leave")}
+            className={cn("rounded-md py-1.5 text-sm", staffTool === "leave" ? "bg-secondary font-semibold" : "text-muted-foreground")}
+          >
+            Request leave
+          </button>
+          <button
+            role="tab"
+            aria-selected={staffTool === "swap"}
+            onClick={() => setStaffTool("swap")}
+            className={cn("rounded-md py-1.5 text-sm", staffTool === "swap" ? "bg-secondary font-semibold" : "text-muted-foreground")}
+          >
+            Request swap
+          </button>
+        </div>
+      )}
+      {mode === "staff" && canRequest && staffTool === "swap" && (
+        <Section title="Request a swap">
+          <SwapForm mode="request" viewerId={viewer.id} firstPeople={[]} partners={props.swapPartners} today={props.today} />
+        </Section>
+      )}
+      {mode === "staff" && canRequest && staffTool === "leave" && <RequestForm {...props} />}
       {selection.focusDate && <DateDetails {...props} date={selection.focusDate} />}
     </div>
   );
@@ -666,9 +695,9 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
 // ---------------- Edit view: duties, Tasks, give leave ----------------
 
 function EditTools(props: PanelProps) {
-  const { selection, roster, tasks, leaveTypes, onClear } = props;
+  const { selection, roster, tasks, leaveTypes, onClear, swapFirstPeople, swapPeople, viewer, today } = props;
   // Task is the default: it is the most common action once a person's date is selected.
-  const [tab, setTab] = useState<"duty" | "task" | "leave">("task");
+  const [tab, setTab] = useState<"duty" | "task" | "leave" | "swap">("task");
   const { pending, result, run } = useAction();
   const [duty, setDuty] = useState<string>("");
   const [dos, setDos] = useState<string>("");
@@ -740,12 +769,13 @@ function EditTools(props: PanelProps) {
         </p>
       )}
 
-      <div className="grid grid-cols-3 rounded-lg border p-0.5" role="tablist">
+      <div className="grid grid-cols-4 rounded-lg border p-0.5" role="tablist">
         {(
           [
             ["duty", "Duty"],
             ["task", "Task"],
             ["leave", "Give leave"],
+            ["swap", "Swap"],
           ] as const
         ).map(([key, label]) => (
           <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={cn("rounded-md py-1 text-sm", tab === key ? "bg-secondary font-semibold" : "text-muted-foreground")}>
@@ -890,6 +920,8 @@ function EditTools(props: PanelProps) {
           </Button>
         </div>
       )}
+
+      {tab === "swap" && <SwapForm mode="record" viewerId={viewer.id} firstPeople={swapFirstPeople} partners={swapPeople} today={today} />}
 
       <ResultMessage result={result} />
     </Section>

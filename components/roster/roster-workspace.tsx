@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { dateRange, dayIndex, formatMonth, shiftMonth } from "@/lib/dates";
 import type { Viewer } from "@/lib/permissions";
 import { isPseudoRow, type DayworkerOption, type ExtraCandidate, type LeaveSummary, type LeaveTypeOption, type RosterData, type TaskOption } from "@/lib/roster-types";
+import type { SwapCandidate } from "@/components/swaps/swap-form";
 import { cn } from "@/lib/utils";
 
 export type WorkspaceProps = {
@@ -26,6 +27,12 @@ export type WorkspaceProps = {
   dayworkers: DayworkerOption[];
   extraCandidates: ExtraCandidate[];
   myLeaves: LeaveSummary[];
+  /** People the viewer could request a swap with: a different shift than the one being viewed. */
+  swapPartners: SwapCandidate[];
+  /** Record mode: people the viewer supervises (person 1). */
+  swapFirstPeople: SwapCandidate[];
+  /** Everyone swappable, across shifts, for person 2 once person 1 is picked. */
+  swapPeople: SwapCandidate[];
   /** Edit view on a shift the viewer may edit */
   canEdit: boolean;
   /** Staff view on the viewer's own shift */

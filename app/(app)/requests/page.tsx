@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { MyRequests } from "@/components/roster/my-requests";
-import { SwapForm } from "@/components/swaps/swap-form";
 import { SwapList } from "@/components/swaps/swap-list";
 import { requireViewer } from "@/lib/auth";
 import { monthDates, todayLocal } from "@/lib/dates";
@@ -27,6 +26,8 @@ function Section({ title, children, action }: { title: string; children: React.R
   );
 }
 
+/** Status only: leave taken, and every leave request / duty swap with its status. Request leave or a
+ * swap from the Roster (spec 11.1, 11.4). */
 export default async function RequestsPage({ searchParams }: PageProps<"/requests">) {
   const viewer = await requireViewer();
   if (!canRequestLeave(viewer)) {
@@ -40,11 +41,10 @@ export default async function RequestsPage({ searchParams }: PageProps<"/request
   const from = period === "year" ? `${year}-01-01` : `${month}-01`;
   const to = period === "year" ? `${year}-12-31` : monthDates(month).at(-1)!;
 
-  const [leaves, swaps, roster, staff, leaveTypes] = await Promise.all([
+  const [leaves, swaps, roster, leaveTypes] = await Promise.all([
     getMyLeaves(viewer.id),
     getSwapsFor(viewer),
     buildRoster(viewer.shiftId!, from, to, viewer),
-    db.staff.findMany({ where: { active: true, role: { not: "MANAGEMENT" }, shiftId: { not: null } }, orderBy: [{ shiftId: "asc" }, { name: "asc" }] }),
     db.leaveType.findMany({ orderBy: [{ custom: "asc" }, { sortOrder: "asc" }] }),
   ]);
   for (const l of leaves) {
@@ -53,13 +53,10 @@ export default async function RequestsPage({ searchParams }: PageProps<"/request
   const { total, byType } = tallyLeaveTaken(roster.cells[viewer.id], roster.dates);
   // Every leave type shows, even at zero, not just the ones actually taken.
   const fullByType = leaveTypes.map((t) => ({ code: t.code, count: byType.find((b) => b.code === t.code)?.count ?? 0 }));
-  // Duty swaps are only between different shifts.
-  const partners = staff.filter((s) => s.id !== viewer.id && s.shiftId !== viewer.shiftId).map((s) => ({ id: s.id, name: s.name, shiftId: s.shiftId! }));
 
-  const pendingLeaves = leaves.filter((l) => l.status === "PENDING");
+  // Full history, every status (Pending, Approved, Rejected, Withdrawn/Declined/Cancelled), not only pending.
   const mySwaps = swaps.filter((s) => s.requester.id === viewer.id || s.partner.id === viewer.id);
-  const pendingSwaps = mySwaps.filter((s) => s.status === "PENDING_PARTNER" || s.status === "PENDING_APPROVAL");
-  const nothingPending = pendingLeaves.length === 0 && pendingSwaps.length === 0;
+  const nothingYet = leaves.length === 0 && mySwaps.length === 0;
 
   const periodTabs = (
     <div className="flex rounded-lg border p-0.5 text-xs" role="tablist" aria-label="Leave taken period">
@@ -78,65 +75,50 @@ export default async function RequestsPage({ searchParams }: PageProps<"/request
   );
 
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-4 p-4 pb-24 lg:pb-6">
+    <main className="mx-auto w-full max-w-4xl space-y-4 p-4 pb-24 lg:pb-6">
       <div>
         <h1 className="text-xl font-semibold">My Requests</h1>
         <p className="text-sm text-muted-foreground">
-          Your leave and duty swaps. Request leave from the{" "}
+          Your leave taken, and the status of every leave request and duty swap. Request leave, or a swap, from the{" "}
           <Link href="/roster" className="underline underline-offset-2">
             Roster
           </Link>
-          , or request a swap with someone on another shift below.
+          .
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-4">
-          <Section title="Leave taken" action={periodTabs}>
-            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {fullByType.map((t) => (
-                <li key={t.code} className={cn("rounded-lg border p-2.5", t.count === 0 && "opacity-60")}>
-                  <div className="truncate text-xs font-medium text-muted-foreground" title={t.code}>
-                    {t.code}
-                  </div>
-                  <div className="text-lg font-semibold tabular-nums">{formatFigure(t.count)}</div>
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs text-muted-foreground">
-              {formatFigure(total)} day{total === 1 ? "" : "s"} total, {period === "year" ? `in ${year}` : "this month"}.
-            </p>
-          </Section>
-
-          <Section title="Pending">
-            {nothingPending ? (
-              <p className="text-sm text-muted-foreground">Nothing pending.</p>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {pendingLeaves.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-medium text-muted-foreground">Leave requests</h3>
-                    <MyRequests leaves={pendingLeaves} viewer={viewer} />
-                  </div>
-                )}
-                {pendingSwaps.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-medium text-muted-foreground">Duty swaps</h3>
-                    <SwapList swaps={pendingSwaps} viewerId={viewer.id} empty="" />
-                  </div>
-                )}
+      <Section title="Leave taken" action={periodTabs}>
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {fullByType.map((t) => (
+            <li key={t.code} className={cn("rounded-lg border p-2.5", t.count === 0 && "opacity-60")}>
+              <div className="truncate text-xs font-medium text-muted-foreground" title={t.code}>
+                {t.code}
               </div>
-            )}
-          </Section>
-        </div>
+              <div className="text-lg font-semibold tabular-nums">{formatFigure(t.count)}</div>
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-muted-foreground">
+          {formatFigure(total)} day{total === 1 ? "" : "s"} total, {period === "year" ? `in ${year}` : "this month"}.
+        </p>
+      </Section>
 
-        <div className="space-y-4">
-          <Section title="Request a swap">
-            <p className="text-xs text-muted-foreground">Duty swaps are only between two different shifts.</p>
-            <SwapForm mode="request" viewerId={viewer.id} firstPeople={[]} partners={partners} today={today} />
-          </Section>
-        </div>
-      </div>
+      <Section title="Your requests">
+        {nothingYet ? (
+          <p className="text-sm text-muted-foreground">Nothing yet.</p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <h3 className="text-xs font-medium text-muted-foreground">Leave requests</h3>
+              <MyRequests leaves={leaves} viewer={viewer} />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xs font-medium text-muted-foreground">Duty swaps</h3>
+              <SwapList swaps={mySwaps} viewerId={viewer.id} empty="No swaps yet." />
+            </div>
+          </div>
+        )}
+      </Section>
     </main>
   );
 }
