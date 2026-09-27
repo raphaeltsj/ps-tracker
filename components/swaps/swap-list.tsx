@@ -147,6 +147,12 @@ function SwapCard({ swap: s, viewerId }: { swap: SwapSummary; viewerId: string }
       {s.notes && <p className="text-xs">Notes: {s.notes}</p>}
       {s.rejectReason && <p className="text-xs text-red-700 dark:text-red-300">Reject reason: {s.rejectReason}</p>}
       {s.status === "APPROVED" && s.started && <p className="text-xs text-muted-foreground">Started on {formatDateShort(s.dates[0])}, so it stays as worked and can no longer be cancelled.</p>}
+      {pendingState &&
+        s.warnings.map((w) => (
+          <p key={w} className="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
+            {w}
+          </p>
+        ))}
       {s.problem && pendingState && <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">Cannot go through as things stand: {s.problem}</p>}
 
       {!rejecting && !confirmCancel && (s.can.respond || s.can.withdraw || s.can.approve || s.can.reject || s.can.cancel) && (

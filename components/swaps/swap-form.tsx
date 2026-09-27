@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowLeftRight } from "lucide-react";
 import { listSwapCandidates, previewDutySwap, recordSwap, requestSwap } from "@/app/swap-actions";
 import { DutyChip } from "@/components/roster/chips";
@@ -45,6 +45,13 @@ export function SwapForm({
   const [loadingList, startList] = useTransition();
   const [checking, startCheck] = useTransition();
   const { pending, result, run } = useAction();
+
+  // A date typed before the page finished loading is in the box but not yet in state: pick it up.
+  const date1Ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const typed = date1Ref.current?.value;
+    if (typed) setDate1(typed);
+  }, []);
 
   const dates = useMemo(() => [date1, twoDates ? date2 : ""].filter(Boolean).sort(), [date1, date2, twoDates]);
   const datesReady = Boolean(aId && date1 && (!twoDates || date2));
@@ -134,7 +141,7 @@ export function SwapForm({
       <div className="space-y-1.5">
         <span className="text-xs font-medium">{mode === "record" ? "2. " : "1. "}Date</span>
         <div className="grid gap-2 sm:grid-cols-2">
-          <Input type="date" aria-label={twoDates ? "First date" : "Date"} value={date1} min={today} onChange={(e) => setDate1(e.target.value)} />
+          <Input ref={date1Ref} type="date" aria-label={twoDates ? "First date" : "Date"} value={date1} min={today} onChange={(e) => setDate1(e.target.value)} />
           {twoDates && <Input type="date" aria-label="Second date" value={date2} min={today} onChange={(e) => setDate2(e.target.value)} />}
         </div>
         <label className="flex items-center gap-2 text-xs">
@@ -217,6 +224,11 @@ export function SwapForm({
               ))}
             </div>
           )}
+          {preview.warnings.map((w) => (
+            <p key={w} className="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
+              {w}
+            </p>
+          ))}
           <p className="text-[11px] text-muted-foreground">Strength and slots stay the same: each crew loses one person and gains one on that duty. Leave and Tasks do not move.</p>
         </div>
       )}

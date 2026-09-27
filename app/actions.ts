@@ -688,6 +688,11 @@ export async function assignExtraShift(input: { hostShiftId: string; dates: stri
   // Not on a day they are on leave, and only one host shift per day.
   const onLeave = await firstCellOnLeave(ids.flatMap((staffId) => dates.map((date) => ({ staffId, date }))));
   if (onLeave) return fail(onLeave);
+  // Not on a day an approved duty swap already has them working someone else's duty.
+  for (const person of people) {
+    const swapped = await swapLockMessage(person.id, person.name, dates, "Extra duty");
+    if (swapped) return fail(swapped);
+  }
   const clash = await db.extraShiftDuty.findFirst({
     where: { staffId: { in: ids }, date: { in: dates }, hostShiftId: { not: host.id } },
     include: { staff: true },

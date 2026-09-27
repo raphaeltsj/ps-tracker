@@ -24,7 +24,8 @@ export async function findLeaveConflict(staffId: string, dates: string[], exclud
 
   const staff = await db.staff.findUnique({ where: { id: staffId } });
   if (!staff?.shiftId || !staff.birthday) return null;
-  const roster = await buildRoster(staff.shiftId, sorted[0], sorted[sorted.length - 1], null);
+  // Only this person's cells are needed (BD / BD-IL), not the whole shift.
+  const roster = await buildRoster(staff.shiftId, sorted[0], sorted[sorted.length - 1], null, { staffIds: [staffId] });
   for (const date of sorted) {
     const derived = roster.cells[staffId]?.[date]?.absences.find((a) => a.derived && a.counts > 0);
     if (derived) return { date, code: derived.code, status: "APPROVED" };
