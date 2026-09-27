@@ -7,10 +7,12 @@ import { endSession, requireViewer, startSession } from "@/lib/auth";
 import { dosEarnsOil } from "@/lib/cycle";
 import { addDays, formatDate, isValidDate } from "@/lib/dates";
 import { db } from "@/lib/db";
+import { normalizeDayworkerName, normalizeUsername } from "@/lib/dayworkers";
 import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_OIL_HALF, NAME_MAX, type Half } from "@/lib/domain";
 import {
   canDecideLeave,
   canEditShift,
+  canManageDayworkers,
   canManageTasks,
   canRequestLeave,
   canRequestOnLockedDate,
@@ -543,4 +545,163 @@ export async function deleteTask(id: string): Promise<ActionResult> {
   if (!task) return fail("Task not found.");
   await db.task.delete({ where: { id } }); // assignments cascade
   return done(`${task.name} and all its assignments deleted.`);
+}
+
+// ---------- Dayworkers (supervisors and Management) ----------
+
+export async function createDayworker(input: { name: string; username: string }): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  if (!canManageDayworkers(viewer)) return fail("Only supervisors and Management can add dayworkers.");
+  const name = normalizeDayworkerName(input.name);
+  if (!name) return fail("Enter the dayworker's name.");
+  const username = normalizeUsername(input.username);
+  if (!username.ok) return fail(username.error);
+  if (await db.dayworker.findUnique({ where: { username: username.username } })) {
+    return fail(`The username ${username.username} is already taken.`);
+  }
+  await db.dayworker.create({ data: { name, username: username.username } });
+  return done(`${username.username} added.`);
+}
+
+export async function updateDayworker(input: { id: string; name: string; username: string }): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  if (!canManageDayworkers(viewer)) return fail("Only supervisors and Management can edit dayworkers.");
+  const existing = await db.dayworker.findUnique({ where: { id: input.id } });
+  if (!existing) return fail("Dayworker not found.");
+  const name = normalizeDayworkerName(input.name);
+  if (!name) return fail("Enter the dayworker's name.");
+  const username = normalizeUsername(input.username);
+  if (!username.ok) return fail(username.error);
+  const taken = await db.dayworker.findUnique({ where: { username: username.username } });
+  if (taken && taken.id !== existing.id) return fail(`The username ${username.username} is already taken.`);
+  await db.dayworker.update({ where: { id: existing.id }, data: { name, username: username.username } });
+  return done("Dayworker updated.");
+}
+
+/** Dayworkers are never deleted: the duty history behind the report is kept. */
+export async function setDayworkerActive(id: string, active: boolean): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  if (!canManageDayworkers(viewer)) return fail("Only supervisors and Management can change dayworkers.");
+  const existing = await db.dayworker.findUnique({ where: { id } });
+  if (!existing) return fail("Dayworker not found.");
+  await db.dayworker.update({ where: { id }, data: { active } });
+  return done(active ? `${existing.username} is active again.` : `${existing.username} deactivated. Past duty stays in the report.`);
+}
+
+// ---------- Ops duty: dayworkers clocking shift duty (spec 5.3) ----------
+
+function cleanIds(ids: unknown, max = 60): string[] | null {
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > max) return null;
+  if (!ids.every((id) => typeof id === "string")) return null;
+  return [...new Set(ids as string[])];
+}
+
+async function shiftOrNull(shiftId: unknown) {
+  return typeof shiftId === "string" ? db.shift.findUnique({ where: { id: shiftId } }) : null;
+}
+
+export async function assignOpsDuty(input: { shiftId: string; dates: string[]; dayworkerIds: string[] }): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  const shift = await shiftOrNull(input.shiftId);
+  if (!shift) return fail("Shift not found.");
+  if (!canEditShift(viewer, shift.id)) return fail("You can only assign Ops duty for your own shift.");
+  const dates = cleanDates(input.dates);
+  if (!dates) return fail("Pick at least one valid date.");
+  const ids = cleanIds(input.dayworkerIds);
+  if (!ids) return fail("Pick at least one dayworker.");
+
+  const dayworkers = await db.dayworker.findMany({ where: { id: { in: ids } } });
+  if (dayworkers.length !== ids.length) return fail("Dayworker not found.");
+  const inactive = dayworkers.find((d) => !d.active);
+  if (inactive) return fail(`${inactive.username} is inactive. Reactivate them first.`);
+
+  // A dayworker clocks one shift per day.
+  const clash = await db.opsDuty.findFirst({
+    where: { dayworkerId: { in: ids }, date: { in: dates }, shiftId: { not: shift.id } },
+    include: { dayworker: true },
+    orderBy: { date: "asc" },
+  });
+  if (clash) return fail(`${clash.dayworker.username} is already on Ops duty for Shift ${clash.shiftId} on ${formatDate(clash.date)}.`);
+
+  await db.$transaction(
+    ids.flatMap((dayworkerId) =>
+      dates.map((date) =>
+        db.opsDuty.upsert({
+          where: { dayworkerId_date: { dayworkerId, date } },
+          create: { dayworkerId, shiftId: shift.id, date },
+          update: {},
+        }),
+      ),
+    ),
+  );
+  const names = dayworkers.map((d) => d.username).join(", ");
+  return done(`${names} on Ops duty for ${dates.length} day${dates.length > 1 ? "s" : ""}.`);
+}
+
+export async function removeOpsDuty(input: { shiftId: string; dates: string[]; dayworkerIds: string[] }): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  const shift = await shiftOrNull(input.shiftId);
+  if (!shift) return fail("Shift not found.");
+  if (!canEditShift(viewer, shift.id)) return fail("You can only change Ops duty for your own shift.");
+  const dates = cleanDates(input.dates);
+  const ids = cleanIds(input.dayworkerIds);
+  if (!dates || !ids) return fail("Nothing selected.");
+  const { count } = await db.opsDuty.deleteMany({ where: { shiftId: shift.id, date: { in: dates }, dayworkerId: { in: ids } } });
+  return done(count === 0 ? "Nothing to remove." : `Removed ${count} Ops duty day${count > 1 ? "s" : ""}.`);
+}
+
+// ---------- Extra shift duty: serving extra duty on another shift (spec 5.4) ----------
+
+export async function assignExtraShift(input: { hostShiftId: string; dates: string[]; staffIds: string[] }): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  const host = await shiftOrNull(input.hostShiftId);
+  if (!host) return fail("Shift not found.");
+  if (!canEditShift(viewer, host.id)) return fail("You can only assign Extra duty for your own shift.");
+  const dates = cleanDates(input.dates);
+  if (!dates) return fail("Pick at least one valid date.");
+  const ids = cleanIds(input.staffIds);
+  if (!ids) return fail("Pick at least one person.");
+
+  const people = await db.staff.findMany({ where: { id: { in: ids } } });
+  if (people.length !== ids.length) return fail("Staff not found.");
+  for (const person of people) {
+    if (!person.active || person.role === "MANAGEMENT" || !person.shiftId) return fail(`${person.name} cannot serve Extra duty.`);
+    // Extra duty can only come from other shifts.
+    if (person.shiftId === host.id) return fail(`${person.name} is in ${host.name}. Extra duty comes from the other shifts.`);
+  }
+
+  // Not on a day they are on leave, and only one host shift per day.
+  const onLeave = await firstCellOnLeave(ids.flatMap((staffId) => dates.map((date) => ({ staffId, date }))));
+  if (onLeave) return fail(onLeave);
+  const clash = await db.extraShiftDuty.findFirst({
+    where: { staffId: { in: ids }, date: { in: dates }, hostShiftId: { not: host.id } },
+    include: { staff: true },
+    orderBy: { date: "asc" },
+  });
+  if (clash) return fail(`${clash.staff.name} is already on Extra duty for Shift ${clash.hostShiftId} on ${formatDate(clash.date)}.`);
+
+  await db.$transaction(
+    ids.flatMap((staffId) =>
+      dates.map((date) =>
+        db.extraShiftDuty.upsert({
+          where: { staffId_date: { staffId, date } },
+          create: { staffId, hostShiftId: host.id, date },
+          update: {},
+        }),
+      ),
+    ),
+  );
+  return done(`${people.map((p) => p.name).join(", ")} on Extra duty for ${dates.length} day${dates.length > 1 ? "s" : ""}.`);
+}
+
+export async function removeExtraShift(input: { hostShiftId: string; dates: string[]; staffIds: string[] }): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  const host = await shiftOrNull(input.hostShiftId);
+  if (!host) return fail("Shift not found.");
+  if (!canEditShift(viewer, host.id)) return fail("You can only change Extra duty for your own shift.");
+  const dates = cleanDates(input.dates);
+  const ids = cleanIds(input.staffIds);
+  if (!dates || !ids) return fail("Nothing selected.");
+  const { count } = await db.extraShiftDuty.deleteMany({ where: { hostShiftId: host.id, date: { in: dates }, staffId: { in: ids } } });
+  return done(count === 0 ? "Nothing to remove." : `Removed ${count} Extra duty day${count > 1 ? "s" : ""}.`);
 }

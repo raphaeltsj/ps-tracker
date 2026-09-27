@@ -7,7 +7,7 @@ A duty roster web app for a shift-based team: three fixed shifts on a 6-day AM /
 
 ## Status
 
-Core loop built (build priority, spec section 17.5): Roster and Calendar views with the same-page leave request, supervisor Edit view, give / edit / cancel leave, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and set special events, approve or reject from the leave detail panel, Task management, and the Task report. One type of leave per person per day is enforced. Still to come: leave inbox page, all-shift overview, lock-date and special-event editors, duty swaps, staff records, and custom leave type editor.
+Core loop built (build priority, spec section 17.5): Roster and Calendar views with the same-page leave request, supervisor Edit view, give / edit / cancel leave, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and set special events, approve or reject from the leave detail panel, Task management, the Task report, dayworkers with Ops duty and a duty count, Extra shift duty, and placeholder Support and Recall rows. One type of leave per person per day is enforced. Still to come: leave inbox page, all-shift overview, lock-date and special-event editors, duty swaps, staff records, and custom leave type editor.
 
 ## Stack
 
@@ -33,6 +33,7 @@ Pick a demo user on the login screen (Management, or a Supervisor / Regular Staf
 | `npm test` | Unit tests for the cycle, V overlay, strength and birthday rules |
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
 | `npm run db:seed` | Wipe and reseed demo data (around the current month) |
+| **Clear roster (dev)** button | TEMPORARY, top of every page for supervisors and Management, dev only. Deletes every duty, leave, Task assignment, lock, event, Ops duty and Extra; keeps staff, dayworkers, the Task list and leave types. Remove `app/dev-actions.ts` and `components/dev-clear-roster.tsx` when no longer needed |
 | `npm run db:migrate` | Create and apply a migration after changing `prisma/schema.prisma` |
 
 ## Where things live
@@ -43,6 +44,8 @@ Pick a demo user on the login screen (Management, or a Supervisor / Regular Staf
 - `lib/leave-rules.ts`: one type of leave per person per day
 - `lib/domain.ts`: duty types, DOS/FDO duties, leave types and MFL
 - `lib/task-report.ts`: Task report counts (page: `/task-report`)
+- `lib/dayworkers.ts`, `lib/dayworker-report.ts`: dayworker username rules and Ops duty counts (page: `/dayworkers`)
+- `lib/report-period.ts`: the year / month / range filter shared by both reports
 - `lib/roster-data.ts`: loads a shift's month and computes cells and strength rows
 - `components/roster/`: roster grid, calendar, mobile agenda, side panel
 - `prisma/seed.ts`: demo shifts, staff, leave, V blocks, Tasks, locks and events

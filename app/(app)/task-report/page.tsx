@@ -1,16 +1,16 @@
 import { notFound } from "next/navigation";
-import { TaskReportFilters, type Period } from "@/components/tasks/task-report-filters";
+import { TaskReportFilters } from "@/components/tasks/task-report-filters";
 import { TaskReportTable } from "@/components/tasks/task-report-table";
 import { requireViewer } from "@/lib/auth";
-import { dayIndex, formatDate, fromDayIndex, isValidDate, isValidMonth, monthDates, todayLocal } from "@/lib/dates";
+import { formatDate, todayLocal } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { canViewTaskReport } from "@/lib/permissions";
+import { resolveReportPeriod } from "@/lib/report-period";
 import { getTaskReport, taskReportYears } from "@/lib/task-report";
 
 export const metadata = { title: "Task report | PS Tracker" };
 
 const SHIFTS = ["A", "B", "C"];
-const MAX_RANGE_DAYS = 366 * 3;
 
 export default async function TaskReportPage({ searchParams }: PageProps<"/task-report">) {
   const viewer = await requireViewer();
@@ -21,33 +21,7 @@ export default async function TaskReportPage({ searchParams }: PageProps<"/task-
   const today = todayLocal();
 
   // Period: a year, a month, or a date range. Defaults to this month.
-  const period: Period = param("period") === "year" || param("period") === "range" ? (param("period") as Period) : "month";
-  const year = /^\d{4}$/.test(param("year")) ? param("year") : today.slice(0, 4);
-  const month = isValidMonth(param("month")) ? param("month") : today.slice(0, 7);
-  let from: string;
-  let to: string;
-  let rangeError: string | null = null;
-  if (period === "year") {
-    [from, to] = [`${year}-01-01`, `${year}-12-31`];
-  } else if (period === "range") {
-    from = isValidDate(param("from")) ? param("from") : `${today.slice(0, 7)}-01`;
-    to = isValidDate(param("to")) ? param("to") : today;
-    if (from > to) {
-      rangeError = "The start date is after the end date.";
-      [from, to] = [to, from];
-    }
-    if (dayIndex(to) - dayIndex(from) > MAX_RANGE_DAYS) {
-      rangeError = "Ranges are limited to 3 years, so the end date was shortened.";
-      to = fromDayIndex(dayIndex(from) + MAX_RANGE_DAYS);
-    }
-  } else {
-    const days = monthDates(month);
-    [from, to] = [days[0], days[days.length - 1]];
-  }
-
-  // "Done" means up to today unless the viewer includes scheduled (future) Tasks.
-  const includeScheduled = param("scheduled") === "1";
-  const countTo = includeScheduled || to < today ? to : today;
+  const { period, year, month, from, to, rangeError, includeScheduled, countTo } = resolveReportPeriod(param, today);
 
   // Supervisors start on their own shift; everyone can look at every shift, like the roster.
   const defaultShift = viewer.role === "SUPERVISOR" && viewer.shiftId ? viewer.shiftId : "all";

@@ -70,7 +70,7 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
   });
   const staffIds = staff.map((s) => s.id);
 
-  const [overrides, leaves, tasks, locks, events, extraDuties] = await Promise.all([
+  const [overrides, leaves, tasks, locks, events, extraDuties, opsDuties, extraShift] = await Promise.all([
     db.dutyOverride.findMany({ where: { staffId: { in: staffIds }, date: { gte: loadFrom, lte: loadTo } } }),
     db.leave.findMany({
       where: {
@@ -87,6 +87,9 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
     db.lockedDate.findMany({ where: { shiftId, date: { gte: from, lte: to } } }),
     db.specialEvent.findMany({ where: { shiftId, date: { gte: from, lte: to } } }),
     db.extraDuty.findMany({ where: { staffId: { in: staffIds }, date: { gte: from, lte: to } } }),
+    // Bottom rows: dayworkers clocking Ops duty, and people from other shifts serving Extra (visible to everyone).
+    db.opsDuty.findMany({ where: { shiftId, date: { gte: from, lte: to } }, include: { dayworker: true } }),
+    db.extraShiftDuty.findMany({ where: { hostShiftId: shiftId, date: { gte: from, lte: to } }, include: { staff: true } }),
   ]);
 
   const editor = viewer ? canEditShift(viewer, shiftId) : false;
@@ -169,6 +172,17 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
   const lockByDate = new Map(locks.map((l) => [l.date, l.remarks]));
   const eventByDate = new Map(events.map((e) => [e.date, { note: e.note }]));
 
+  const ops: RosterData["ops"] = {};
+  for (const o of opsDuties) {
+    (ops[o.date] ??= []).push({ dayworkerId: o.dayworkerId, username: o.dayworker.username, name: o.dayworker.name, active: o.dayworker.active });
+  }
+  const extra: RosterData["extra"] = {};
+  for (const e of extraShift) {
+    (extra[e.date] ??= []).push({ staffId: e.staffId, name: e.staff.name, fromShiftId: e.staff.shiftId ?? "" });
+  }
+  for (const list of Object.values(ops)) list.sort((a, b) => a.username.localeCompare(b.username));
+  for (const list of Object.values(extra)) list.sort((a, b) => a.name.localeCompare(b.name) || a.fromShiftId.localeCompare(b.fromShiftId));
+
   const days: Record<string, RosterDay> = {};
   for (const date of dates) {
     const shiftDuty = shiftDutyOn(shift.cycleAnchor, date);
@@ -192,6 +206,8 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
     staff: staff.map((s) => ({ id: s.id, name: s.name, role: s.role as Role, birthday: s.birthday })),
     cells,
     days,
+    ops,
+    extra,
     leaves: Object.fromEntries(
       visibleLeaves.map((l) => {
         const summary = toLeaveSummary(l);

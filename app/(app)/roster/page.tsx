@@ -30,6 +30,15 @@ export default async function RosterPage({ searchParams }: PageProps<"/roster">)
     canRequestLeave(viewer) ? getMyLeaves(viewer.id) : Promise.resolve([]),
   ]);
 
+  // Pick lists for the Ops duty and Extra rows: only editors of this shift need them.
+  const editing = mode === "edit" && canEditShift(viewer, shiftId);
+  const [dayworkers, extraCandidates] = editing
+    ? await Promise.all([
+        db.dayworker.findMany({ where: { active: true }, orderBy: { username: "asc" } }),
+        db.staff.findMany({ where: { active: true, role: { not: "MANAGEMENT" }, shiftId: { not: shiftId } }, orderBy: [{ shiftId: "asc" }, { name: "asc" }] }),
+      ])
+    : [[], []];
+
   // Approve is disabled when a requested date has no Available Slot.
   for (const leave of [...Object.values(roster.leaves), ...myLeaves]) {
     if (leave.status === "PENDING" && canDecideLeave(viewer, leave.staffId, leave.shiftId)) {
@@ -48,6 +57,8 @@ export default async function RosterPage({ searchParams }: PageProps<"/roster">)
       today={today}
       leaveTypes={leaveTypes.map((t) => ({ code: t.code, name: t.name, halfDay: t.halfDay, custom: t.custom }))}
       tasks={tasks.map((t) => ({ id: t.id, name: t.name }))}
+      dayworkers={dayworkers.map((d) => ({ id: d.id, name: d.name, username: d.username }))}
+      extraCandidates={extraCandidates.map((c) => ({ id: c.id, name: c.name, shiftId: c.shiftId! }))}
       myLeaves={myLeaves}
       canEdit={mode === "edit" && canEditShift(viewer, shiftId)}
       canRequest={canRequestLeave(viewer) && viewer.shiftId === shiftId}

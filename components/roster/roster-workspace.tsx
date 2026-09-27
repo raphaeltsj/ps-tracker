@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { dateRange, dayIndex, formatMonth, shiftMonth } from "@/lib/dates";
 import type { Viewer } from "@/lib/permissions";
-import type { LeaveSummary, LeaveTypeOption, RosterData, TaskOption } from "@/lib/roster-types";
+import { isPseudoRow, type DayworkerOption, type ExtraCandidate, type LeaveSummary, type LeaveTypeOption, type RosterData, type TaskOption } from "@/lib/roster-types";
 import { cn } from "@/lib/utils";
 
 export type WorkspaceProps = {
@@ -22,6 +22,9 @@ export type WorkspaceProps = {
   today: string;
   leaveTypes: LeaveTypeOption[];
   tasks: TaskOption[];
+  /** Active dayworkers and people from other shifts, loaded for editors only (Ops and Extra rows) */
+  dayworkers: DayworkerOption[];
+  extraCandidates: ExtraCandidate[];
   myLeaves: LeaveSummary[];
   /** Edit view on a shift the viewer may edit */
   canEdit: boolean;
@@ -52,6 +55,10 @@ export type Selection = {
   dates: Set<string>; // Staff view: dates for a leave request
   cells: Set<string>; // Edit view: staffId|date
   focusDate: string | null;
+  // True when focusDate came from clicking a date (header, calendar cell, mobile week strip), not a
+  // person's cell: editors then see that date's lock and special-event settings instead of the normal
+  // duty / Task / leave tools (spec 8.1).
+  dateSettingsOpen: boolean;
   focusLeaveId: string | null;
 };
 
@@ -64,6 +71,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
   const [dates, setDates] = useState<Set<string>>(new Set());
   const [cells, setCells] = useState<Set<string>>(new Set());
   const [focusDate, setFocusDate] = useState<string | null>(roster.dates.includes(today) ? today : null);
+  const [dateSettingsOpen, setDateSettingsOpen] = useState(false);
   const [focusLeaveId, setFocusLeaveId] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<{ staffId: string | null; date: string } | null>(null);
   const [compact, setCompact] = useState(false);
@@ -98,20 +106,39 @@ export function RosterWorkspace(props: WorkspaceProps) {
     [canRequestLocked, roster.days],
   );
 
-  /** Date header: show the date details (and, for editors, its lock and event settings). */
-  const focusDateOnly = useCallback((date: string) => {
-    setFocusDate(date);
-    setFocusLeaveId(null);
-    setSheetOpen(true);
+  /**
+   * Date header, calendar cell, or mobile week strip: show that date's details. For editors this
+   * replaces the normal duty / Task / leave tools with the date's lock and special-event settings.
+   * Clicking the same date again (or the panel's close button, via closeDateSettings) goes back.
+   */
+  const focusDateOnly = useCallback(
+    (date: string) => {
+      if (focusDate === date && dateSettingsOpen) {
+        setFocusDate(null);
+        setDateSettingsOpen(false);
+        return;
+      }
+      setFocusDate(date);
+      setDateSettingsOpen(true);
+      setFocusLeaveId(null);
+      setSheetOpen(true);
+    },
+    [focusDate, dateSettingsOpen],
+  );
+
+  const closeDateSettings = useCallback(() => {
+    setFocusDate(null);
+    setDateSettingsOpen(false);
   }, []);
 
   /** Staff view: pick dates for a request (click toggles, shift-click selects a range). */
   const clickDate = useCallback(
     (date: string, shiftKey: boolean) => {
       setFocusDate(date);
+      setDateSettingsOpen(true);
       setFocusLeaveId(null);
       setSheetOpen(true);
-      // Editors see the date details (lock, event) instead of selecting every person on that day.
+      // Editors see the date settings (lock, event) instead of selecting every person on that day.
       if (mode === "edit" || !canRequest || !selectable(date)) return;
       setSheetOpen(true);
       setDates((prev) => {
@@ -133,11 +160,14 @@ export function RosterWorkspace(props: WorkspaceProps) {
     (staffId: string, date: string, shiftKey: boolean) => {
       if (mode !== "edit") return clickDate(date, shiftKey);
       setFocusDate(date);
+      setDateSettingsOpen(false);
       setFocusLeaveId(null);
       if (!canEdit) return;
       setSheetOpen(true);
+      const pseudo = isPseudoRow(staffId);
       setCells((prev) => {
-        const next = new Set(prev);
+        // Ops and Extra cells are selected on their own: never mixed with staff cells or with each other.
+        const next = new Set([...prev].filter((k) => (pseudo ? k.startsWith(`${staffId}|`) : !isPseudoRow(k.split("|")[0]))));
         if (shiftKey && anchor?.staffId === staffId) {
           const [a, b] = dayIndex(anchor.date) <= dayIndex(date) ? [anchor.date, date] : [date, anchor.date];
           dateRange(a, b).forEach((d) => next.add(cellKey(staffId, d)));
@@ -155,6 +185,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
 
   const clickLeave = useCallback((leaveId: string | null, date: string) => {
     setFocusDate(date);
+    setDateSettingsOpen(false);
     setFocusLeaveId(leaveId);
     setSheetOpen(true);
   }, []);
@@ -165,7 +196,10 @@ export function RosterWorkspace(props: WorkspaceProps) {
     setAnchor(null);
   }, []);
 
-  const selection: Selection = useMemo(() => ({ dates, cells, focusDate, focusLeaveId }), [dates, cells, focusDate, focusLeaveId]);
+  const selection: Selection = useMemo(
+    () => ({ dates, cells, focusDate, dateSettingsOpen, focusLeaveId }),
+    [dates, cells, focusDate, dateSettingsOpen, focusLeaveId],
+  );
   const selectedCount = mode === "edit" ? cells.size : dates.size;
 
   const panel = (
@@ -174,12 +208,13 @@ export function RosterWorkspace(props: WorkspaceProps) {
       selection={selection}
       onClear={clearSelection}
       onFocusLeave={(id) => setFocusLeaveId(id)}
+      onCloseDateSettings={closeDateSettings}
       onRemoveDate={(d) => setDates((prev) => new Set([...prev].filter((x) => x !== d)))}
     />
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh-3.5rem)] lg:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh_-_3.6rem)] lg:flex-none lg:flex-row">
       <section className="flex min-w-0 flex-1 flex-col">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2.5">

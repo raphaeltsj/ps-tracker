@@ -1,19 +1,39 @@
 "use client";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { X } from "lucide-react";
-import { approveLeave, assignDuty, assignExtraDuty, assignTask, cancelLeave, clearSpecialEvent, editLeave, giveLeave, lockDates, rejectLeave, requestLeave, setSpecialEvent, unlockDate } from "@/app/actions";
-import { DosTag, DutyChip, EventBadge, LeaveChip, LockBadge, StatusBadge, TaskTag } from "@/components/roster/chips";
+import {
+  approveLeave,
+  assignDuty,
+  assignExtraDuty,
+  assignExtraShift,
+  assignOpsDuty,
+  assignTask,
+  cancelLeave,
+  clearSpecialEvent,
+  editLeave,
+  giveLeave,
+  lockDates,
+  rejectLeave,
+  removeExtraShift,
+  removeOpsDuty,
+  requestLeave,
+  setSpecialEvent,
+  unlockDate,
+} from "@/app/actions";
+import { DosTag, DutyChip, EventBadge, ExtraChip, LeaveChip, LockBadge, OpsChip, StatusBadge, TaskTag } from "@/components/roster/chips";
 import { MyRequests } from "@/components/roster/my-requests";
 import type { Selection, WorkspaceProps } from "@/components/roster/roster-workspace";
 import { StrengthSummary } from "@/components/roster/strength-summary";
 import { ResultMessage, useAction } from "@/components/roster/use-action";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cycleDayLabel, cyclePositionLabel } from "@/lib/cycle";
 import { formatDate, formatDateList, formatDateShort } from "@/lib/dates";
 import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_REPORT_TIME, DUTY_LABEL, HALF_DAY_TIMES, type Duty, type Half } from "@/lib/domain";
 import { canDecideLeave } from "@/lib/permissions";
-import { isLeaveEntry, type LeaveSummary, type LeaveTypeOption, type RosterDay } from "@/lib/roster-types";
+import { isLeaveEntry, ROW_EXTRA, ROW_OPS, type LeaveSummary, type LeaveTypeOption } from "@/lib/roster-types";
 import { formatFigure } from "@/lib/strength";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +41,7 @@ type PanelProps = WorkspaceProps & {
   selection: Selection;
   onClear: () => void;
   onFocusLeave: (id: string | null) => void;
+  onCloseDateSettings: () => void;
   onRemoveDate: (date: string) => void;
 };
 
@@ -37,13 +58,25 @@ function Section({ title, children, action }: { title: string; children: React.R
 }
 
 export function SidePanel(props: PanelProps) {
-  const { mode, canEdit, canRequest, selection, roster, myLeaves, viewer } = props;
+  const { mode, canEdit, canRequest, selection, roster, myLeaves, viewer, onCloseDateSettings } = props;
+  // Cells picked in the Ops duty or Extra row open their own editor instead of the staff tools.
+  const rowKind = [...selection.cells].some((k) => k.startsWith(`${ROW_OPS}|`))
+    ? ("ops" as const)
+    : [...selection.cells].some((k) => k.startsWith(`${ROW_EXTRA}|`))
+      ? ("extra" as const)
+      : null;
   const focusLeave = selection.focusLeaveId ? (roster.leaves[selection.focusLeaveId] ?? myLeaves.find((l) => l.id === selection.focusLeaveId)) : null;
+  // Clicking a date (not a person's cell) opens its lock and special-event settings in place of the
+  // normal duty / Task / leave tools. Clicking the date again, or the panel's close button, returns.
+  const showDateSettings = mode === "edit" && canEdit && !focusLeave && selection.dateSettingsOpen && selection.focusDate;
 
   return (
     <div className="text-sm">
       {focusLeave && <LeaveDetail {...props} leave={focusLeave} />}
-      {mode === "edit" && canEdit && <EditTools {...props} />}
+      {!focusLeave && showDateSettings && (
+        <DateSettingsPanel roster={roster} date={selection.focusDate!} isManagement={viewer.role === "MANAGEMENT"} onClose={onCloseDateSettings} />
+      )}
+      {!focusLeave && !showDateSettings && mode === "edit" && canEdit && (rowKind ? <RowEditor key={rowKind} {...props} kind={rowKind} /> : <EditTools {...props} />)}
       {mode === "staff" && canRequest && <RequestForm {...props} />}
       {selection.focusDate && <DateDetails {...props} date={selection.focusDate} />}
       {mode === "staff" && canRequest && (
@@ -64,13 +97,14 @@ export function SidePanel(props: PanelProps) {
 
 // ---------------- Date details ----------------
 
-function DateDetails({ roster, viewer, date, onFocusLeave, canEdit, mode }: PanelProps & { date: string }) {
+function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date: string }) {
   const day = roster.days[date];
   const own = roster.cells[viewer.id]?.[date];
+  const ops = roster.ops[date] ?? [];
+  const extra = roster.extra[date] ?? [];
   if (!day) return null;
   return (
     <Section title={formatDate(date)}>
-      {mode === "edit" && canEdit && <DateSettings shiftId={roster.shiftId} date={date} day={day} isManagement={viewer.role === "MANAGEMENT"} />}
       <p className="text-muted-foreground">
         {roster.shiftName}: {cycleDayLabel(roster.anchor, date)}
         {day.shiftDuty === "OFF" ? " (Rest day, MFL blank)" : " duty"}
@@ -88,6 +122,36 @@ function DateDetails({ roster, viewer, date, onFocusLeave, canEdit, mode }: Pane
         </div>
       )}
       <StrengthSummary day={day} />
+      {(ops.length > 0 || extra.length > 0) && (
+        <div className="space-y-2 rounded-md border p-2">
+          {ops.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-muted-foreground">Ops duty (dayworkers)</div>
+              <ul className="mt-1 space-y-1">
+                {ops.map((o) => (
+                  <li key={o.dayworkerId} className="flex items-center gap-2">
+                    <OpsChip entry={o} />
+                    <span className="text-xs">{o.name}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {extra.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-muted-foreground">Extra duty</div>
+              <ul className="mt-1 space-y-1">
+                {extra.map((e) => (
+                  <li key={e.staffId} className="flex items-center gap-2">
+                    <ExtraChip entry={e} />
+                    <span className="text-xs">from Shift {e.fromShiftId}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
       {own && (
         <div className="space-y-1.5 rounded-md border p-2">
           <div className="text-xs font-medium text-muted-foreground">You on this date</div>
@@ -111,16 +175,165 @@ function DateDetails({ roster, viewer, date, onFocusLeave, canEdit, mode }: Pane
   );
 }
 
-/** Supervisors and Management: lock the date for events and set the special-event report time. */
-function DateSettings({ shiftId, date, day, isManagement }: { shiftId: string; date: string; day: RosterDay; isManagement: boolean }) {
+/** Editor for cells picked in the Ops duty row (dayworkers) or the Extra row (people from other shifts). */
+function RowEditor(props: PanelProps & { kind: "ops" | "extra" }) {
+  const { kind, roster, selection, dayworkers, extraCandidates, onClear } = props;
+  const rowId = kind === "ops" ? ROW_OPS : ROW_EXTRA;
+  const dates = useMemo(
+    () => [...selection.cells].filter((k) => k.startsWith(`${rowId}|`)).map((k) => k.split("|")[1]).sort(),
+    [selection.cells, rowId],
+  );
+  const { pending, result, run } = useAction();
+  const [picked, setPicked] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
+
+  // Who is already on the selected dates, and on how many of them.
+  const current = new Map<string, { id: string; label: string; detail: string; days: number }>();
+  for (const date of dates) {
+    if (kind === "ops") {
+      for (const o of roster.ops[date] ?? []) {
+        const row = current.get(o.dayworkerId) ?? { id: o.dayworkerId, label: o.username, detail: o.name, days: 0 };
+        current.set(o.dayworkerId, { ...row, days: row.days + 1 });
+      }
+    } else {
+      for (const e of roster.extra[date] ?? []) {
+        const row = current.get(e.staffId) ?? { id: e.staffId, label: e.name, detail: `Shift ${e.fromShiftId}`, days: 0 };
+        current.set(e.staffId, { ...row, days: row.days + 1 });
+      }
+    }
+  }
+
+  const q = query.trim().toLowerCase();
+  const options =
+    kind === "ops"
+      ? dayworkers
+          .filter((d) => (current.get(d.id)?.days ?? 0) < dates.length)
+          .filter((d) => !q || d.name.toLowerCase().includes(q) || d.username.toLowerCase().includes(q))
+          .map((d) => ({ id: d.id, label: d.username, detail: d.name }))
+      : extraCandidates
+          .filter((c) => (current.get(c.id)?.days ?? 0) < dates.length)
+          .filter((c) => !q || c.name.toLowerCase().includes(q) || c.shiftId.toLowerCase() === q)
+          .map((c) => ({ id: c.id, label: c.name, detail: `Shift ${c.shiftId}` }));
+
+  const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const add = () =>
+    run(
+      () => (kind === "ops" ? assignOpsDuty({ shiftId: roster.shiftId, dates, dayworkerIds: picked }) : assignExtraShift({ hostShiftId: roster.shiftId, dates, staffIds: picked })),
+      () => setPicked([]),
+    );
+  const remove = (id: string) =>
+    run(() => (kind === "ops" ? removeOpsDuty({ shiftId: roster.shiftId, dates, dayworkerIds: [id] }) : removeExtraShift({ hostShiftId: roster.shiftId, dates, staffIds: [id] })));
+
+  return (
+    <Section
+      title={kind === "ops" ? "Ops duty" : "Extra duty"}
+      action={
+        <Button variant="ghost" size="sm" onClick={onClear}>
+          Clear
+        </Button>
+      }
+    >
+      <p className="text-xs text-muted-foreground">
+        {kind === "ops"
+          ? "Dayworkers clocking shift duty. They are not part of the crew, so this does not change strength or slots. A dayworker clocks one shift per day."
+          : "People from the other shifts serving extra duty here. Does not change strength or slots. Not possible on a day they are on leave."}
+      </p>
+      <p>
+        <span className="font-medium">
+          {dates.length} date{dates.length > 1 ? "s" : ""}
+        </span>{" "}
+        <span className="text-muted-foreground">({formatDateList(dates)})</span>
+      </p>
+
+      {current.size > 0 && (
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-muted-foreground">Already on these dates</div>
+          <ul className="space-y-1">
+            {[...current.values()].map((c) => (
+              <li key={c.id} className="flex items-center gap-2 rounded-md bg-muted/60 px-2 py-1">
+                <span className="font-medium">{c.label}</span>
+                <span className="text-xs text-muted-foreground">
+                  {c.detail}, {c.days === dates.length ? "all dates" : `${c.days} of ${dates.length} dates`}
+                </span>
+                <button className="ml-auto" aria-label={`Remove ${c.label} from the selected dates`} disabled={pending} onClick={() => remove(c.id)}>
+                  <X className="size-3.5 text-muted-foreground" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">{kind === "ops" ? "Add dayworkers" : "Add people from other shifts"}</span>
+          {kind === "ops" && (
+            <Link href="/dayworkers" className="text-xs underline underline-offset-2">
+              Manage dayworkers
+            </Link>
+          )}
+        </div>
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={kind === "ops" ? "Search name or username" : "Search name, or type a shift letter"} className="h-8" aria-label="Search" />
+        <ul className="max-h-48 space-y-0.5 overflow-y-auto">
+          {options.map((o) => (
+            <li key={o.id}>
+              <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-accent">
+                <input type="checkbox" checked={picked.includes(o.id)} onChange={() => toggle(o.id)} className="size-4" />
+                <span className="font-medium">{o.label}</span>
+                <span className="text-xs text-muted-foreground">{o.detail}</span>
+              </label>
+            </li>
+          ))}
+          {options.length === 0 && (
+            <li className="px-1 text-xs text-muted-foreground">
+              {kind === "ops" && dayworkers.length === 0 ? "No active dayworkers yet. Add one first." : "Nobody left to add."}
+            </li>
+          )}
+        </ul>
+        <Button className="w-full" disabled={pending || picked.length === 0} onClick={add}>
+          {picked.length === 0 ? "Pick who to add" : `Add ${picked.length} to ${dates.length} date${dates.length > 1 ? "s" : ""}`}
+        </Button>
+      </div>
+      <ResultMessage result={result} />
+    </Section>
+  );
+}
+
+/**
+ * Opened by clicking a date (header, calendar cell, or mobile week strip) instead of a person's cell:
+ * lock the date and set its special event, in place of the normal duty / Task / leave tools. Clicking
+ * the date again, or Close here, goes back (spec 8.1).
+ */
+function DateSettingsPanel({ roster, date, isManagement, onClose }: { roster: PanelProps["roster"]; date: string; isManagement: boolean; onClose: () => void }) {
+  const day = roster.days[date];
   const { pending, result, run } = useAction();
   const [remarks, setRemarks] = useState(day.locked ?? "");
   const [allShifts, setAllShifts] = useState(false);
   const [note, setNote] = useState(day.event?.note ?? "");
-  const [open, setOpen] = useState<"lock" | "event" | null>(null);
+  const [open, setOpen] = useState<"lock" | "event" | null>(day.locked ? "lock" : day.event ? "event" : null);
+  const shiftId = roster.shiftId;
 
   return (
-    <div className="space-y-2 rounded-md border p-2">
+    <Section
+      title={`${formatDate(date)}: lock & event`}
+      action={
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      <p className="text-muted-foreground">
+        {roster.shiftName}: {cycleDayLabel(roster.anchor, date)}
+        {day.shiftDuty === "OFF" ? " (Rest day, MFL blank)" : " duty"}
+      </p>
+      {day.event && <EventBadge note={day.event.note} />}
+      {day.locked && (
+        <div className="space-y-1 rounded-md border bg-hatch p-2">
+          <LockBadge />
+          <p className="text-xs">{day.locked}</p>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-1.5">
         <Button size="sm" variant={open === "lock" ? "secondary" : "outline"} onClick={() => setOpen(open === "lock" ? null : "lock")}>
           {day.locked ? "Edit lock" : "Lock date"}
@@ -169,7 +382,7 @@ function DateSettings({ shiftId, date, day, isManagement }: { shiftId: string; d
         </div>
       )}
       <ResultMessage result={result} />
-    </div>
+    </Section>
   );
 }
 
@@ -451,7 +664,8 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
 
 function EditTools(props: PanelProps) {
   const { selection, roster, tasks, leaveTypes, onClear } = props;
-  const [tab, setTab] = useState<"duty" | "task" | "leave">("duty");
+  // Task is the default: it is the most common action once a person's date is selected.
+  const [tab, setTab] = useState<"duty" | "task" | "leave">("task");
   const { pending, result, run } = useAction();
   const [duty, setDuty] = useState<string>("");
   const [dos, setDos] = useState<string>("");
@@ -515,29 +729,36 @@ function EditTools(props: PanelProps) {
       </div>
 
       {tab === "duty" && (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            AM and PM come from the shift cycle and are not set by hand. Assigning a 2-day V turns the next PM block into Off(V) by itself; resetting the V duty puts that PM block back.
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {ASSIGNABLE_DUTIES.map((d) => {
-              const shown = d === "OFF" ? "OFF_V" : d;
-              return (
-                <button key={d} onClick={() => setDuty(d)} className={cn("rounded-md border p-1", duty === d && "border-primary ring-2 ring-primary")} aria-pressed={duty === d}>
-                  <DutyChip duty={shown as Duty} long />
-                </button>
-              );
-            })}
-            <button onClick={() => setDuty("CYCLE")} className={cn("rounded-md border px-2 py-1 text-xs", duty === "CYCLE" && "border-primary ring-2 ring-primary")} aria-pressed={duty === "CYCLE"}>
-              Reset to cycle
-            </button>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Shift duty</p>
+            <p className="text-xs text-muted-foreground">
+              AM and PM come from the shift cycle and are not set by hand. Assigning a 2-day V turns the next PM block into Off(V) by itself; resetting the V duty puts that PM block back.
+            </p>
+            <div className="flex flex-wrap items-stretch gap-1.5">
+              {ASSIGNABLE_DUTIES.map((d) => {
+                const shown = d === "OFF" ? "OFF_V" : d;
+                return (
+                  <button key={d} onClick={() => setDuty(d)} className={cn("rounded-md border p-1", duty === d && "border-primary ring-2 ring-primary")} aria-pressed={duty === d}>
+                    <DutyChip duty={shown as Duty} long />
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setDuty("CYCLE")}
+                className={cn("rounded-md border px-2 text-xs font-medium text-muted-foreground", duty === "CYCLE" && "border-primary text-foreground ring-2 ring-primary")}
+                aria-pressed={duty === "CYCLE"}
+              >
+                Reset to cycle
+              </button>
+            </div>
+            <Button className="w-full" disabled={pending || !duty || cells.length === 0} onClick={() => run(() => assignDuty({ cells, duty }), onClear)}>
+              {duty === "CYCLE" ? "Reset to normal cycle" : duty ? `Assign ${DUTY_LABEL[(duty === "OFF" ? "OFF_V" : duty) as Duty]}` : "Pick a duty above"}
+            </Button>
           </div>
-          <Button className="w-full" disabled={pending || !duty || cells.length === 0} onClick={() => run(() => assignDuty({ cells, duty }), onClear)}>
-            {duty === "CYCLE" ? "Reset to normal cycle" : duty ? `Assign ${DUTY_LABEL[(duty === "OFF" ? "OFF_V" : duty) as Duty]}` : "Pick a duty above"}
-          </Button>
 
-          <div className="space-y-2 rounded-md border p-2">
-            <p className="text-xs font-medium">{DOS_LABEL} duty</p>
+          <div className="space-y-1.5 rounded-md border p-2">
+            <p className="text-xs font-medium text-muted-foreground">{DOS_LABEL} (24-hour duty)</p>
             <p className="text-xs text-muted-foreground">
               One day only, on an AM day. 24 hours, report at {DOS_REPORT_TIME}, on top of the shift duty, and a Task is still allowed. A {DOS_OIL_CODE} (first half) is added the next day
               automatically and cannot be cancelled on its own.
@@ -556,7 +777,7 @@ function EditTools(props: PanelProps) {
               <button
                 onClick={() => setDos("NONE")}
                 aria-pressed={dos === "NONE"}
-                className={cn("rounded-md border px-2 py-1 text-xs", dos === "NONE" && "border-primary ring-2 ring-primary")}
+                className={cn("rounded-md border px-2 py-1 text-xs text-muted-foreground", dos === "NONE" && "border-primary text-foreground ring-2 ring-primary")}
               >
                 Remove
               </button>

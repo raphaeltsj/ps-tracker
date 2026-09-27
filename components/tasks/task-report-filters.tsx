@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-export type Period = "year" | "month" | "range";
+import type { Period } from "@/lib/report-period";
+
+export type { Period };
 
 type Props = {
   period: Period;

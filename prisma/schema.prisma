@@ -19,6 +19,8 @@ model Shift {
   staff       Staff[]
   lockedDates LockedDate[]
   events      SpecialEvent[]
+  opsDuties   OpsDuty[]
+  extraHosted ExtraShiftDuty[]
 }
 
 model Staff {
@@ -35,6 +37,7 @@ model Staff {
 
   dutyOverrides   DutyOverride[]
   extraDuties     ExtraDuty[]
+  extraShiftDuties ExtraShiftDuty[]
   leaves          Leave[]           @relation("LeaveStaff")
   leavesGiven     Leave[]           @relation("LeaveGivenBy")
   leavesDecided   Leave[]           @relation("LeaveDecidedBy")
@@ -155,3 +158,41 @@ model SpecialEvent {
 }
 
 
+
+// A dayworker: office staff (8-5) who are not part of any shift crew but clock shift duty as Ops duty
+// (spec 5.3). Never deleted, only deactivated, so the duty history behind the report is kept.
+model Dayworker {
+  id        String    @id @default(cuid())
+  name      String
+  username  String    @unique // upper case, max 7 characters, shown on the roster
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  opsDuties OpsDuty[]
+}
+
+// One dayworker clocking shift duty for one shift on one day. Several dayworkers can share a day.
+model OpsDuty {
+  id          String    @id @default(cuid())
+  dayworkerId String
+  dayworker   Dayworker @relation(fields: [dayworkerId], references: [id], onDelete: Cascade)
+  shiftId     String
+  shift       Shift     @relation(fields: [shiftId], references: [id])
+  date        String
+
+  // A dayworker clocks at most one shift per day.
+  @@unique([dayworkerId, date])
+  @@index([shiftId, date])
+}
+
+// Extra shift duty (spec 5.4): a person from another shift serving extra duty on a host shift day.
+model ExtraShiftDuty {
+  id          String @id @default(cuid())
+  staffId     String
+  staff       Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  hostShiftId String
+  hostShift   Shift  @relation(fields: [hostShiftId], references: [id])
+  date        String
+
+  @@unique([staffId, date])
+  @@index([hostShiftId, date])
+}
