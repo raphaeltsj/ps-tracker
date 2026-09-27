@@ -60,7 +60,8 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* 0.52 (not the shadcn 0.556) so muted text passes 4.5:1 on the muted tile background too */
+  --muted-foreground: oklch(0.52 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -140,4 +141,10 @@
 }
 .bg-hatch {
   background-image: repeating-linear-gradient(135deg, var(--hatch) 0 2px, transparent 2px 7px);
+}
+
+/* Thin progress bar while the roster loads another month, shift or view. */
+@keyframes loading-bar {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
 }

@@ -27,7 +27,7 @@ export function AppHeader({
   const links = [
     { href: "/home", label: "Home" },
     { href: "/roster", label: "Roster" },
-    ...(viewer.role !== "MANAGEMENT" ? [{ href: "/requests", label: "My requests" }] : []),
+    ...(viewer.role !== "MANAGEMENT" ? [{ href: "/requests", label: "Requests" }] : []),
     { href: "/swaps", label: "Duty swaps" },
     ...(showTaskReport ? [{ href: "/task-report", label: "Task report" }] : []),
     ...(showDayworkers ? [{ href: "/dayworkers", label: "Dayworkers" }] : []),

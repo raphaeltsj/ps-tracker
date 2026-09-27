@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, ChevronUp, Eye, Pencil } from "lucide-react";
 import { CalendarView } from "@/components/roster/calendar-view";
@@ -77,6 +77,8 @@ export function RosterWorkspace(props: WorkspaceProps) {
   const [compact, setCompact] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const isDesktop = useIsDesktop();
+  // Month, shift and view changes reload the page data: show that something is happening.
+  const [navPending, startNav] = useTransition();
 
   useEffect(() => {
     try {
@@ -96,7 +98,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
     (changes: Record<string, string>) => {
       const next = new URLSearchParams(searchParams.toString());
       for (const [k, v] of Object.entries(changes)) next.set(k, v);
-      router.push(`${pathname}?${next.toString()}`);
+      startNav(() => router.push(`${pathname}?${next.toString()}`));
     },
     [pathname, router, searchParams],
   );
@@ -215,7 +217,16 @@ export function RosterWorkspace(props: WorkspaceProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh_-_3.6rem)] lg:flex-none lg:flex-row">
-      <section className="flex min-w-0 flex-1 flex-col">
+      <section className="relative flex min-w-0 flex-1 flex-col" aria-busy={navPending}>
+        <h1 className="sr-only">
+          {roster.shiftName} {view === "calendar" ? "calendar" : "roster"}, {formatMonth(month)}
+          {mode === "edit" ? " (Edit view)" : ""}
+        </h1>
+        {navPending && (
+          <div className="absolute inset-x-0 top-0 z-40 h-0.5 overflow-hidden bg-primary/15" role="progressbar" aria-label="Loading">
+            <div className="h-full w-1/3 animate-[loading-bar_1s_ease-in-out_infinite] bg-primary" />
+          </div>
+        )}
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2.5">
           <div className="flex rounded-lg border p-0.5" role="tablist" aria-label="Shift">
@@ -302,7 +313,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
           </div>
         )}
 
-        <div className="min-h-0 flex-1">
+        <div className={cn("min-h-0 flex-1 transition-opacity", navPending && "pointer-events-none opacity-50")}>
           {view === "calendar" ? (
             <CalendarView {...props} selection={selection} compact={compact} onDate={clickDate} />
           ) : isDesktop ? (

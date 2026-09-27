@@ -7,7 +7,7 @@ import Link from "next/link";
 import { SwapWaitingBanner } from "@/components/swaps/swap-waiting-banner";
 import { swapsAwaiting } from "@/lib/swap-data";
 
-export const metadata = { title: "My requests | PS Tracker" };
+export const metadata = { title: "Requests | PS Tracker" };
 
 export default async function RequestsPage() {
   const viewer = await requireViewer();
@@ -22,7 +22,7 @@ export default async function RequestsPage() {
     <main className="mx-auto w-full max-w-2xl space-y-4 p-4">
       <SwapWaitingBanner count={swapsWaiting} />
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">My requests</h1>
+        <h1 className="text-xl font-semibold">Requests</h1>
         <span className="flex gap-4">
           <Link href="/swaps" className="text-sm underline underline-offset-4">
             Duty swaps

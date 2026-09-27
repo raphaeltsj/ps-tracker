@@ -57,7 +57,10 @@ export default async function HomePage() {
     <main className="mx-auto w-full max-w-2xl space-y-4 p-4">
       <SwapWaitingBanner count={swapsWaiting} />
       <section className="space-y-2 rounded-xl border p-4">
-        <p className="text-sm text-muted-foreground">{formatDate(today)}</p>
+        <h1 className="text-sm font-normal text-muted-foreground">
+          <span className="sr-only">Home: your duty today, </span>
+          {formatDate(today)}
+        </h1>
         <div className="flex flex-wrap items-center gap-2">
           <DutyChip duty={todayCell.duty} long className="h-7 px-2.5 text-sm" />
           {DUTY_TIMES[todayCell.duty] && <span className="text-sm">{DUTY_TIMES[todayCell.duty]}</span>}

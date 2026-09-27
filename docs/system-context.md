@@ -482,6 +482,14 @@ Other screens (Calendar view, side panel, Home, forms) keep text labels for duti
 - **Calendar view / Roster view** switch: available to every role, always visible near the top of the roster area.
 - **Edit view / Staff view** switch: Supervisors and Management only, clearly distinct from the calendar/roster switch so the two are not confused. Edit controls appear only in Edit view.
 
+### 14.3.1 Navigation, loading and error states
+
+- The requests page is called **Requests** everywhere (desktop menu, mobile tab, page heading).
+- On phones and tablets (where the top menu is hidden), Profile links to every page the role can open, including **Duty swaps**.
+- Changing month, shift or view shows a thin progress bar and dims the roster until the new data arrives; moving between pages shows a loading indicator.
+- A mistyped address shows "Page not found", and a page the role cannot open (for example Tasks for staff) shows "This page isn't available", both with links back to Home and the roster. If a page fails to load, an error screen offers "Try again".
+- Every page has one heading for screen readers, and text colours meet WCAG AA contrast (4.5:1) in light and dark mode.
+
 ### 14.4 Hero screens (first design pass)
 
 | **#** | **Screen**                       | **Role / platform**              | **Key content**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |

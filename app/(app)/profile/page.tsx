@@ -37,6 +37,10 @@ export default async function ProfilePage() {
           </>
         )}
       </dl>
+      <Link href="/swaps" className="flex items-center justify-between rounded-xl border p-4 text-sm hover:bg-accent/40">
+        <span>Duty swaps</span>
+        <span className="text-muted-foreground">{viewer.role === "STAFF" ? "Request and track swaps" : "Approve, record and track swaps"}</span>
+      </Link>
       {canViewTaskReport(viewer) && (
         <Link href="/task-report" className="flex items-center justify-between rounded-xl border p-4 text-sm hover:bg-accent/40">
           <span>Task report</span>
