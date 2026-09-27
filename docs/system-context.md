@@ -123,7 +123,7 @@ A **dayworker** is office staff who normally works 8 to 5 and is **not part of a
 - **Not part of the crew.** Ops duty does **not** change Total Strength, Not in Strength, Working Strength, MFL, or leave slots.
 - **Everyone can see who they are.** Hovering a username shows the dayworker's full name, for every role. On mobile the name is written next to the username.
 - **Duty count.** Supervisors and Management have a **Dayworkers** page to add, edit and deactivate dayworkers, and to see how many days each dayworker clocked Ops duty, in total and per shift, for a **year, month, or date range**. Like the Task report it counts up to today unless "include scheduled duty" is ticked, and opening a row shows the dates.
-- Dayworkers do not sign in: supervisors assign their duty. [To confirm whether dayworkers should clock themselves in.]
+- **Supervisors assign, dayworkers do not apply.** Only supervisors (own shift) and Management put dayworkers on a shift. Dayworkers do **not** request or apply for duty themselves, and they have **no account and no sign-in** for now: they exist only as records that supervisors and Management manage. Do not add dayworker logins, a dayworker view, or self-clocking until this is decided.
 
 ### 5.4 Extra shift duty
 
@@ -552,7 +552,7 @@ For now, use placeholder staff names that are each a **single 5-character word**
 - Whether half-day leave should also block a duty on that day, or only full-day leave (the app currently blocks any leave).
 - Whether AM or PM should ever be editable by hand (for example to fix a mistake), now that the picker only offers V, V(SB) and Off(V).
 - Whether a DOS/FDO duty should count anywhere in the strength figures.
-- Dayworkers: whether they should sign in and clock their own duty (now supervisors assign it), and whether Ops duty needs actual clock times rather than a count of days.
+- Dayworkers: whether Ops duty needs actual clock times rather than a count of days. (Decided for now: supervisors assign dayworkers, dayworkers do not apply, and they have no accounts. Revisit later if dayworkers should ever sign in.)
 - Ops duty: whether a dayworker may clock more than one shift on the same day (now one), and whether Ops duty is allowed on any day or only on a shift's working days (now any day).
 - Support (AM/PM) and Recall: what they mean, who can be put there, and whether they affect strength. They are placeholders until decided.
 - Extra shift duty: whether the person should also show on their own shift's roster, whether leave given later on an Extra day should be blocked, and whether Extra people count toward the host shift's Working Strength.
