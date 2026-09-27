@@ -204,7 +204,7 @@ export function SwapTag({ swap, duty, className }: { swap: CellSwap; duty: Duty;
     <span
       title={swapTitle(swap, duty)}
       className={cn(
-        "inline-flex max-w-full items-center gap-0.5 truncate rounded-sm border border-emerald-600 bg-emerald-500/15 px-0.5 text-[9px] font-bold leading-4 tracking-tight text-emerald-900 dark:text-emerald-100",
+        "inline-flex h-4 max-w-full items-center gap-0.5 truncate rounded-sm border border-emerald-600 bg-emerald-100 px-0.5 text-[10px] font-bold leading-none tracking-tight text-emerald-900 dark:bg-emerald-500/25 dark:text-emerald-50",
         className,
       )}
     >

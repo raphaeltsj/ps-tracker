@@ -15,12 +15,14 @@ export function AppHeader({
   showTaskReport,
   showDayworkers,
   badge,
+  bellHref,
 }: {
   viewer: Viewer;
   showTasks: boolean;
   showTaskReport: boolean;
   showDayworkers: boolean;
   badge: number;
+  bellHref: string;
 }) {
   const links = [
     { href: "/home", label: "Home" },
@@ -44,13 +46,15 @@ export function AppHeader({
           {/* TEMPORARY developer tool: clears the whole roster. Never shown in production. */}
           {process.env.NODE_ENV !== "production" && viewer.role !== "STAFF" && <DevClearRoster />}
           {/* Notifications are a future feature: bell with badge as a placeholder (spec 13). */}
-          <Button variant="ghost" size="icon" className="relative" aria-label={`Notifications (${badge})`} title="Notifications (coming later)">
-            <Bell className="size-4" />
-            {badge > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
-                {badge}
-              </span>
-            )}
+          <Button asChild variant="ghost" size="icon" className="relative">
+            <Link href={bellHref} aria-label={`${badge} waiting for you`} title={badge ? `${badge} waiting for you (full notifications coming later)` : "Nothing waiting (full notifications coming later)"}>
+              <Bell className="size-4" />
+              {badge > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                  {badge}
+                </span>
+              )}
+            </Link>
           </Button>
           <ThemeToggle />
           <Link href="/profile" className="hidden text-right text-xs leading-tight sm:block">

@@ -5,9 +5,10 @@
 // does not change (each crew loses one person and gains one on that duty). The Off(V) that a V
 // earns follows whoever actually works the V (see VSwaps in lib/cycle.ts).
 import { effectiveDuty, type EffectiveDuty } from "@/lib/cycle";
+import { addDays } from "@/lib/dates";
 import type { AssignableDuty, Duty } from "@/lib/domain";
 
-export const SWAP_STATUSES = ["PENDING_PARTNER", "PENDING_APPROVAL", "APPROVED", "DECLINED", "REJECTED", "WITHDRAWN", "CANCELLED"] as const;
+export const SWAP_STATUSES = ["PENDING_PARTNER", "PENDING_APPROVAL", "APPROVED", "DECLINED", "REJECTED", "WITHDRAWN", "CANCELLED", "EXPIRED"] as const;
 export type SwapStatus = (typeof SWAP_STATUSES)[number];
 
 /** Swaps that hold their dates: a person can be in only one of these per date. */
@@ -22,6 +23,8 @@ export const SWAP_STATUS_LABEL: Record<SwapStatus, string> = {
   REJECTED: "Rejected",
   WITHDRAWN: "Withdrawn",
   CANCELLED: "Cancelled",
+  // A pending request whose first date arrived before it was fully approved.
+  EXPIRED: "Expired",
 };
 
 /** One swap has one date (a straight exchange) or two (give and take across two dates). */
@@ -118,4 +121,15 @@ export function previewSwap(
     }
   }
   return { rows, ripples };
+}
+
+/**
+ * V runs 2130-0745, so an AM the next morning (0745) leaves no rest at all. Returns the first V
+ * date in `dates` that is followed by an AM, or null. Checked for both people after a swap.
+ */
+export function vThenAm(dutyOn: (date: string) => Duty, dates: string[]): string | null {
+  for (const date of dates) {
+    if (dutyOn(date) === "V" && dutyOn(addDays(date, 1)) === "AM") return date;
+  }
+  return null;
 }

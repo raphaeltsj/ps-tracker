@@ -1,5 +1,5 @@
 import "server-only";
-import { addDays, dateRange, formatDate } from "@/lib/dates";
+import { addDays, dateRange, formatDate, todayLocal } from "@/lib/dates";
 import { db } from "@/lib/db";
 import type { AssignableDuty, Duty } from "@/lib/domain";
 import { findLeaveConflict } from "@/lib/leave-rules";
@@ -15,6 +15,7 @@ import {
   type SwapPreviewRow,
   type SwapRipple,
   type SwapStatus,
+  vThenAm,
 } from "@/lib/swaps";
 
 // A V taken over in a swap earns Off(V) up to 6 days later, and post-V looks back 2 more days.
@@ -82,14 +83,60 @@ export async function findSwapClash(staffIds: string[], dates: string[], exclude
   });
 }
 
-/** Message for dates a person cannot change because a swap holds them, or null. */
-export async function swapLockMessage(staffId: string, who: string, dates: string[], what: string, statuses: SwapStatus[] = ACTIVE_SWAP_STATUSES): Promise<string | null> {
+/**
+ * Message for dates a person cannot change because an approved swap holds them, or null. A pending
+ * request never blocks anything: it is re-checked when it is accepted and approved.
+ */
+export async function swapLockMessage(staffId: string, who: string, dates: string[], what: string): Promise<string | null> {
   if (dates.length === 0) return null;
-  const clash = await findSwapClash([staffId], dates, undefined, statuses);
+  const clash = await findSwapClash([staffId], dates, undefined, ["APPROVED"]);
   if (!clash) return null;
   const other = clash.swap.requesterId === staffId ? clash.swap.partner : clash.swap.requester;
-  const state = clash.swap.status === "APPROVED" ? "an approved" : "a pending";
-  return `${who} ${who === "You" ? "have" : "has"} ${state} duty swap with ${other.name} on ${formatDate(clash.date)}, so ${what} cannot change that day. Cancel the swap first.`;
+  const otherShift = clash.swap.requesterId === staffId ? clash.swap.partnerShiftId : clash.swap.requesterShiftId;
+  return `${who} ${who === "You" ? "have" : "has"} an approved duty swap with ${other.name} (${otherShift}) on ${formatDate(clash.date)}, so ${what} cannot change that day. A supervisor must cancel the swap first.`;
+}
+
+/**
+ * Would these duty changes alter a date held by an approved swap? A V placed (or removed) near a
+ * swapped date can turn a PM block into Off(V) or back, which silently changes what the two people
+ * agreed to exchange. Returns a message naming the swap, or null. `duty` null = reset to cycle.
+ */
+export async function swapAffectedByDutyChange(changes: { staffId: string; date: string; duty: AssignableDuty | null }[]): Promise<string | null> {
+  if (changes.length === 0) return null;
+  const staffIds = [...new Set(changes.map((c) => c.staffId))];
+  const dates = changes.map((c) => c.date).sort();
+  // A V earns Off(V) on a PM block up to 6 days later (8 covers post-V's look-back too).
+  const from = dates[0];
+  const to = addDays(dates[dates.length - 1], LOOK_BACK);
+  const held = await db.dutySwapDay.findMany({
+    where: { date: { gte: from, lte: to }, swap: { status: "APPROVED", OR: [{ requesterId: { in: staffIds } }, { partnerId: { in: staffIds } }] } },
+    include: { swap: { include: { requester: true, partner: true } } },
+    orderBy: { date: "asc" },
+  });
+  if (held.length === 0) return null;
+
+  const ctx = await loadDutyContext(staffIds, from, to);
+  const changed = new Map(ctx.people);
+  for (const id of staffIds) {
+    const person = ctx.people.get(id);
+    if (!person) continue;
+    const overrides = new Map(person.overrides);
+    for (const c of changes.filter((x) => x.staffId === id)) {
+      if (c.duty) overrides.set(c.date, c.duty);
+      else overrides.delete(c.date);
+    }
+    changed.set(id, { ...person, overrides });
+  }
+  const after = makeDutyResolver(changed, ctx.swaps);
+  for (const day of held) {
+    for (const id of [day.swap.requesterId, day.swap.partnerId]) {
+      if (ctx.resolve(id, day.date).duty !== after(id, day.date).duty) {
+        const { requester: r, partner: p } = day.swap;
+        return `This would change what ${r.name} (${day.swap.requesterShiftId}) and ${p.name} (${day.swap.partnerShiftId}) swapped on ${formatDate(day.date)} (a V changes the PM block after it into Off(V)). Cancel that swap first, then change the duty.`;
+      }
+    }
+  }
+  return null;
 }
 
 export type SwapCheck =
@@ -105,6 +152,8 @@ export async function checkSwap(aId: string, bId: string, rawDates: string[], ex
   const dates = [...new Set(rawDates)].sort();
   if (dates.length === 0 || dates.length > 2) return fail("Pick one date, or two for a give-and-take swap.");
   if (aId === bId) return fail("Pick someone else to swap with.");
+  // Past days are done: the roster keeps what was worked, so swaps are for today onwards only.
+  if (dates[0] < todayLocal()) return fail("Swap dates must be today or later.");
 
   const staff = await db.staff.findMany({ where: { id: { in: [aId, bId] } } });
   const a = staff.find((s) => s.id === aId);
@@ -133,6 +182,21 @@ export async function checkSwap(aId: string, bId: string, rawDates: string[], ex
   for (const r of rows) {
     if (!dutiesDiffer(r.aBefore, r.bBefore)) {
       return fail(`${a.name} and ${b.name} both have ${dutyWord(r.aBefore)} on ${formatDate(r.date)}, so there is nothing to swap that day.`);
+    }
+    // V(SB) standbys come from the V person's own shift, so a V(SB) only swaps within the shift.
+    if ((r.aBefore === "VSB" || r.bBefore === "VSB") && a.shiftId !== b.shiftId) {
+      return fail(`V(SB) on ${formatDate(r.date)} can only be swapped with someone in the same shift (the standby comes from the V person's shift).`);
+    }
+  }
+  // No V night straight into an AM at 0745 the next morning.
+  const after = makeDutyResolver(ctx.people, [...ctx.swaps, ...dates.map((date) => ({ swapId: "new", date, a: aId, b: bId }))]);
+  const around = dateRange(addDays(dates[0], -1), dates[dates.length - 1]);
+  for (const p of [a, b]) {
+    const clashDate = vThenAm((d) => after(p.id, d).duty, around);
+    if (clashDate) {
+      return fail(
+        `${p.name} (${p.shiftId}) would work V on ${formatDate(clashDate)} (until 0745) and then AM at 0745 the next morning, with no rest. Swap both days, or pick another date.`,
+      );
     }
   }
   return { ok: true, rows, ripples, names: { [aId]: `${a.name} (${a.shiftId})`, [bId]: `${b.name} (${b.shiftId})` } };
@@ -166,6 +230,8 @@ export type SwapSummary = {
   can: { respond: boolean; withdraw: boolean; approve: boolean; reject: boolean; cancel: boolean };
   /** For a pending swap: why it cannot go through as things stand (checked when shown). */
   problem: string | null;
+  /** The first date has passed: an approved swap is now part of what was worked. */
+  started: boolean;
 };
 
 const swapInclude = { requester: true, partner: true, days: { orderBy: { date: "asc" as const } } };
@@ -174,23 +240,33 @@ export function canApproveSide(viewer: Viewer, shiftId: string): boolean {
   return canEditShift(viewer, shiftId);
 }
 
-/** Swaps the viewer is in, or that touch a shift they supervise. Recent and active ones only. */
-export async function getSwapsFor(viewer: Viewer, opts: { since?: string } = {}): Promise<SwapSummary[]> {
+/**
+ * A pending request whose first date has arrived can no longer be agreed in time: mark it Expired.
+ * Runs whenever swaps are listed or counted, so nothing stale waits for an answer.
+ */
+export async function expireStaleSwaps(): Promise<void> {
+  await db.dutySwap.updateMany({
+    where: { status: { in: PENDING_SWAP_STATUSES }, days: { some: { date: { lt: todayLocal() } } } },
+    data: { status: "EXPIRED" },
+  });
+}
+
+/**
+ * Swaps the viewer is in, or that touch a shift they supervise. Only swaps with a date from today on
+ * are listed: once the dates have passed nobody needs them (the roster still shows who worked what).
+ */
+export async function getSwapsFor(viewer: Viewer): Promise<SwapSummary[]> {
+  await expireStaleSwaps();
   const editableShifts = ["A", "B", "C"].filter((id) => canEditShift(viewer, id));
-  const since = opts.since ?? addDays(new Date().toISOString().slice(0, 10), -60);
   const swaps = await db.dutySwap.findMany({
     where: {
-      AND: [
-        {
-          OR: [
-            { requesterId: viewer.id },
-            { partnerId: viewer.id },
-            { requesterShiftId: { in: editableShifts } },
-            { partnerShiftId: { in: editableShifts } },
-          ],
-        },
-        { OR: [{ status: { in: ACTIVE_SWAP_STATUSES } }, { submittedAt: { gte: new Date(since) } }] },
+      OR: [
+        { requesterId: viewer.id },
+        { partnerId: viewer.id },
+        { requesterShiftId: { in: editableShifts } },
+        { partnerShiftId: { in: editableShifts } },
       ],
+      days: { some: { date: { gte: todayLocal() } } },
     },
     include: swapInclude,
     orderBy: { submittedAt: "asc" },
@@ -221,7 +297,8 @@ async function summarize(viewer: Viewer, s: NonNullable<Awaited<ReturnType<typeo
     withdraw: pending && viewer.id === s.requesterId && s.createdById === s.requesterId,
     approve: status === "PENDING_APPROVAL" && pendingSides,
     reject: pending && (editsA || editsB),
-    cancel: status === "APPROVED" && (editsA || editsB),
+    // Once a swap's first date has passed, it is part of what was worked and cannot be undone.
+    cancel: status === "APPROVED" && (editsA || editsB) && dates[0] >= todayLocal(),
   };
   let problem: string | null = null;
   if (pending) {
@@ -246,11 +323,13 @@ async function summarize(viewer: Viewer, s: NonNullable<Awaited<ReturnType<typeo
     rows,
     can,
     problem,
+    started: dates[0] < todayLocal(),
   };
 }
 
 /** How many swaps are waiting on the viewer: to answer as partner, or to approve as supervisor. */
 export async function swapsAwaiting(viewer: Viewer): Promise<number> {
+  await expireStaleSwaps();
   const swaps = await db.dutySwap.findMany({
     where: { status: { in: PENDING_SWAP_STATUSES } },
     select: { status: true, partnerId: true, requesterShiftId: true, partnerShiftId: true, requesterSideById: true, partnerSideById: true },
@@ -260,4 +339,50 @@ export async function swapsAwaiting(viewer: Viewer): Promise<number> {
       ? s.partnerId === viewer.id
       : (!s.requesterSideById && canApproveSide(viewer, s.requesterShiftId)) || (!s.partnerSideById && canApproveSide(viewer, s.partnerShiftId)),
   ).length;
+}
+
+// ---------- Partner picker ----------
+
+export type SwapCandidateInfo = {
+  id: string;
+  name: string;
+  shiftId: string;
+  /** Their duty on each chosen date, before any swap. */
+  duties: Duty[];
+  /** Why they cannot swap with person A on these dates, or null. Leave and other swaps are checked
+   *  here; the full check (BD / BD-IL, no rest after V) runs on the preview. */
+  blocked: string | null;
+};
+
+/** Everyone person A could swap with on `dates`, with their duties, so the picker is not blind. */
+export async function swapCandidates(aId: string, dates: string[]): Promise<{ aDuties: Duty[]; people: SwapCandidateInfo[] }> {
+  const staff = await db.staff.findMany({
+    where: { active: true, role: { not: "MANAGEMENT" }, shiftId: { not: null } },
+    orderBy: [{ shiftId: "asc" }, { name: "asc" }],
+  });
+  const ids = staff.map((s) => s.id);
+  const a = staff.find((s) => s.id === aId);
+  if (!a) return { aDuties: [], people: [] };
+  const sorted = [...dates].sort();
+  const [ctx, leaveDays, swapDays] = await Promise.all([
+    loadDutyContext(ids, sorted[0], sorted[sorted.length - 1]),
+    db.leaveDay.findMany({ where: { date: { in: sorted }, leave: { staffId: { in: ids }, status: { in: ["PENDING", "APPROVED"] } } }, include: { leave: true } }),
+    db.dutySwapDay.findMany({ where: { date: { in: sorted }, swap: { status: { in: ACTIVE_SWAP_STATUSES } } }, include: { swap: true } }),
+  ]);
+  const onLeave = new Set(leaveDays.map((d) => d.leave.staffId));
+  const inSwap = new Set(swapDays.flatMap((d) => [d.swap.requesterId, d.swap.partnerId]));
+  const aDuties = sorted.map((d) => ctx.resolve(aId, d).duty);
+
+  const people = staff
+    .filter((s) => s.id !== aId)
+    .map((s) => {
+      const duties = sorted.map((d) => ctx.resolve(s.id, d).duty);
+      let blocked: string | null = null;
+      if (onLeave.has(s.id)) blocked = "On leave";
+      else if (inSwap.has(s.id)) blocked = "Already in a swap";
+      else if (duties.some((d, i) => !dutiesDiffer(d, aDuties[i]))) blocked = "Same duty";
+      else if (s.shiftId !== a.shiftId && [...duties, ...aDuties].includes("VSB")) blocked = "V(SB): same shift only";
+      return { id: s.id, name: s.name, shiftId: s.shiftId!, duties, blocked };
+    });
+  return { aDuties, people };
 }

@@ -10,11 +10,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   // Bell badge placeholder: pending requests the viewer could review, or their own pending ones.
   const pending = await db.leave.findMany({ where: { status: "PENDING" }, select: { staffId: true, staff: { select: { shiftId: true } } } });
   // Plus duty swaps waiting for the viewer's answer or approval.
-  const badge = pending.filter((l) => l.staffId === viewer.id || canEditShift(viewer, l.staff.shiftId)).length + (await swapsAwaiting(viewer));
+  const swapsWaiting = await swapsAwaiting(viewer);
+  const badge = pending.filter((l) => l.staffId === viewer.id || canEditShift(viewer, l.staff.shiftId)).length + swapsWaiting;
+  // Until notifications exist, the bell opens where the waiting items are.
+  const bellHref = swapsWaiting > 0 ? "/swaps" : viewer.role === "MANAGEMENT" ? "/roster?mode=edit" : "/requests";
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <AppHeader viewer={viewer} showTasks={canManageTasks(viewer)} showTaskReport={canViewTaskReport(viewer)} showDayworkers={canManageDayworkers(viewer)} badge={badge} />
+      <AppHeader viewer={viewer} showTasks={canManageTasks(viewer)} showTaskReport={canViewTaskReport(viewer)} showDayworkers={canManageDayworkers(viewer)} badge={badge} bellHref={bellHref} />
       <div className="flex min-h-0 flex-1 flex-col pb-16 lg:pb-0">{children}</div>
       <MobileTabs showRequests={viewer.role !== "MANAGEMENT"} />
     </div>

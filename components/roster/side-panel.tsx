@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cycleDayLabel, cyclePositionLabel } from "@/lib/cycle";
-import { formatDate, formatDateList, formatDateShort } from "@/lib/dates";
+import { formatDate, formatDateList, formatDateShort, formatDateTime } from "@/lib/dates";
 import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_REPORT_TIME, DUTY_LABEL, HALF_DAY_TIMES, type Duty, type Half } from "@/lib/domain";
 import { canDecideLeave } from "@/lib/permissions";
 import { isLeaveEntry, ROW_EXTRA, ROW_OPS, type LeaveSummary, type LeaveTypeOption } from "@/lib/roster-types";
@@ -102,6 +102,8 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
   const own = roster.cells[viewer.id]?.[date];
   const ops = roster.ops[date] ?? [];
   const extra = roster.extra[date] ?? [];
+  // Who in this shift swapped on this date, and who covers their own duty.
+  const swapsToday = roster.staff.map((person) => ({ person, cell: roster.cells[person.id]?.[date] })).filter((x) => x.cell?.swap);
   if (!day) return null;
   return (
     <Section title={formatDate(date)}>
@@ -122,6 +124,24 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
         </div>
       )}
       <StrengthSummary day={day} />
+      {swapsToday.length > 0 && (
+        <div className="space-y-1 rounded-md border border-emerald-600/40 p-2">
+          <div className="text-xs font-medium text-muted-foreground">Duty swaps on this date</div>
+          <ul className="space-y-1.5">
+            {swapsToday.map(({ person, cell }) => (
+              <li key={person.id} className="text-xs">
+                <span className="flex flex-wrap items-center gap-1">
+                  <span className="font-medium">{person.name}</span> works <DutyChip duty={cell.duty} />
+                  <span className="text-muted-foreground">instead of {DUTY_LABEL[cell.swap!.ownDuty]}</span>
+                </span>
+                <span className="text-muted-foreground">
+                  Covered by {cell.swap!.partnerName} (Shift {cell.swap!.partnerShiftId}), who works {person.name}&apos;s {DUTY_LABEL[cell.swap!.ownDuty]} in their place.
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {(ops.length > 0 || extra.length > 0) && (
         <div className="space-y-2 rounded-md border p-2">
           {ops.length > 0 && (
@@ -568,7 +588,7 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
       {leave.notes && <p className="text-xs">Staff notes: {leave.notes}</p>}
       {leave.remarks && !editing && <p className="text-xs">Remarks: {leave.remarks}</p>}
       {leave.rejectReason && <p className="text-xs text-red-700 dark:text-red-300">Reject reason: {leave.rejectReason}</p>}
-      {leave.status === "PENDING" && <p className="text-xs text-muted-foreground">Submitted {new Date(leave.submittedAt).toLocaleString()}</p>}
+      {leave.status === "PENDING" && <p className="text-xs text-muted-foreground">Submitted {formatDateTime(leave.submittedAt)}</p>}
       {leave.auto && (
         <p className="rounded-md bg-muted p-2 text-xs">
           This {DOS_OIL_CODE} comes with the {DOS_LABEL} duty. You can change which half it covers, but not its type or date, and it cannot be cancelled. Remove the duty
@@ -734,7 +754,7 @@ function EditTools(props: PanelProps) {
               return `${roster.staff.find((s) => s.id === c.staffId)?.name} ${formatDateShort(c.date)} (with ${cell.swap!.partnerName})`;
             })
             .join(", ")}
-          {swapped.length > 3 ? ", ..." : ""}: a duty swap holds {swapped.length > 1 ? "these dates" : "this date"}, so duty and leave cannot change there. Tasks can still be set.{" "}
+          {swapped.length > 3 ? ", ..." : ""}: an approved duty swap holds {swapped.length > 1 ? "these dates" : "this date"}, so duty and leave cannot change there. Tasks can still be set. To change the duty, cancel the swap first.{" "}
           <Link href="/swaps" className="underline underline-offset-2">
             Manage duty swaps
           </Link>
@@ -779,7 +799,7 @@ function EditTools(props: PanelProps) {
                 Reset to cycle
               </button>
             </div>
-            <Button className="w-full" disabled={pending || !duty || cells.length === 0} onClick={() => run(() => assignDuty({ cells, duty }), onClear)}>
+            <Button className="w-full" disabled={pending || !duty || cells.length === 0 || swapped.length > 0} onClick={() => run(() => assignDuty({ cells, duty }), onClear)}>
               {duty === "CYCLE" ? "Reset to normal cycle" : duty ? `Assign ${DUTY_LABEL[(duty === "OFF" ? "OFF_V" : duty) as Duty]}` : "Pick a duty above"}
             </Button>
           </div>
@@ -812,7 +832,7 @@ function EditTools(props: PanelProps) {
             <Button
               variant="outline"
               className="w-full"
-              disabled={pending || !dos || cells.length === 0}
+              disabled={pending || !dos || cells.length === 0 || swapped.length > 0}
               onClick={() => run(() => assignExtraDuty({ cells, kind: dos === "NONE" ? null : dos }), onClear)}
             >
               {dos === "NONE" ? `Remove ${DOS_LABEL} duty` : dos ? `Assign ${dos}` : `Pick a ${DOS_LABEL} type above`}
@@ -869,7 +889,7 @@ function EditTools(props: PanelProps) {
           )}
           <Button
             className="w-full"
-            disabled={pending || !type || (type.halfDay && !half) || cells.length === 0 || withLeave.length > 0}
+            disabled={pending || !type || (type.halfDay && !half) || cells.length === 0 || withLeave.length > 0 || swapped.length > 0}
             onClick={() =>
               run(() => giveLeave({ staffDates: byStaff, typeCode, half, remarks }), () => {
                 onClear();

@@ -11,7 +11,7 @@ import { DOS_OIL_CODE } from "@/lib/domain";
 import { createDosOil } from "@/lib/dos-oil";
 import { findLeaveConflict } from "@/lib/leave-rules";
 import { canEditShift, canRequestLeave, type Viewer } from "@/lib/permissions";
-import { canApproveSide, checkSwap, findSwapClash, loadSwap, type SwapCheck } from "@/lib/swap-data";
+import { canApproveSide, checkSwap, findSwapClash, loadSwap, swapCandidates, type SwapCheck } from "@/lib/swap-data";
 import { PENDING_SWAP_STATUSES, SWAP_MAX_DATES } from "@/lib/swaps";
 
 const fail = (error: string): ActionResult => ({ ok: false, error });
@@ -33,10 +33,9 @@ function cleanText(text: unknown, max = 500): string | null {
   return t.length ? t : null;
 }
 
-/** Staff and supervisors request for themselves, and only for today onwards. */
-function requestProblem(viewer: Viewer, dates: string[]): string | null {
+/** Staff and supervisors request for themselves (dates from today on: checked in checkSwap). */
+function requestProblem(viewer: Viewer): string | null {
   if (!canRequestLeave(viewer)) return "Management is not on a shift roster, so does not swap duties.";
-  if (dates[0] < todayLocal()) return "Swap dates must be today or later.";
   return null;
 }
 
@@ -45,6 +44,18 @@ async function mayArrange(viewer: Viewer, aId: string, bId: string): Promise<boo
   if (viewer.id === aId || viewer.id === bId) return true;
   const people = await db.staff.findMany({ where: { id: { in: [aId, bId] } } });
   return people.some((p) => canEditShift(viewer, p.shiftId));
+}
+
+/** Who person A could swap with on these dates, with everyone's duty, for the partner picker. */
+export async function listSwapCandidates(input: { aId: string; dates: string[] }) {
+  const viewer = await requireViewer();
+  const dates = cleanSwapDates(input.dates);
+  if (!dates) return { aDuties: [], people: [] };
+  if (viewer.id !== input.aId) {
+    const a = await db.staff.findUnique({ where: { id: input.aId } });
+    if (!a || !canEditShift(viewer, a.shiftId)) return { aDuties: [], people: [] };
+  }
+  return swapCandidates(input.aId, dates);
 }
 
 /** Before/after for each date and the Off(V) knock-on, so the form can show the swap before submitting. */
@@ -61,7 +72,7 @@ export async function requestSwap(input: { partnerId: string; dates: string[]; n
   const viewer = await requireViewer();
   const dates = cleanSwapDates(input.dates);
   if (!dates) return fail("Pick one date, or two for a give-and-take swap.");
-  const problem = requestProblem(viewer, dates);
+  const problem = requestProblem(viewer);
   if (problem) return fail(problem);
   const check = await checkSwap(viewer.id, input.partnerId, dates);
   if (!check.ok) return fail(check.error);
@@ -203,6 +214,7 @@ export async function cancelSwap(swapId: string): Promise<ActionResult> {
   if (!swap) return fail("Swap not found.");
   if (!canApproveSide(viewer, swap.requesterShiftId) && !canApproveSide(viewer, swap.partnerShiftId)) return fail("Only supervisors and Management can cancel an approved swap.");
   if (swap.status !== "APPROVED") return fail("Only approved swaps can be cancelled.");
+  if (swap.days[0].date < todayLocal()) return fail("This swap's first date has passed, so it stays as worked. Swaps can be cancelled up to and including their first date.");
   await db.dutySwap.update({ where: { id: swapId }, data: { status: "CANCELLED", decidedById: viewer.id, decidedAt: new Date() } });
   const restored = await restoreDosOil([swap.requesterId, swap.partnerId], swap.days.map((d) => d.date), viewer.id);
   return done(`Swap cancelled. Both people are back on their normal duties.${restored ? ` ${DOS_OIL_CODE} restored after ${restored} DOS/FDO duty.` : ""}`);

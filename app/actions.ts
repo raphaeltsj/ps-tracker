@@ -8,7 +8,7 @@ import { dosEarnsOil } from "@/lib/cycle";
 import { addDays, formatDate, isValidDate } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { normalizeDayworkerName, normalizeUsername } from "@/lib/dayworkers";
-import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, NAME_MAX, type Half } from "@/lib/domain";
+import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, NAME_MAX, type AssignableDuty, type Half } from "@/lib/domain";
 import { createDosOil } from "@/lib/dos-oil";
 import {
   canDecideLeave,
@@ -23,7 +23,7 @@ import { buildRoster } from "@/lib/roster-data";
 import { findLeaveConflict } from "@/lib/leave-rules";
 import { datesWithoutSlot } from "@/lib/slots";
 import { formatFigure } from "@/lib/strength";
-import { swapLockMessage } from "@/lib/swap-data";
+import { swapAffectedByDutyChange, swapLockMessage } from "@/lib/swap-data";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 
@@ -76,7 +76,7 @@ async function firstCellSwapped(cells: CellRef[]): Promise<string | null> {
   for (const { staffId, date } of cells) byStaff.set(staffId, [...(byStaff.get(staffId) ?? []), date]);
   for (const [staffId, dates] of byStaff) {
     const staff = await db.staff.findUnique({ where: { id: staffId } });
-    const message = await swapLockMessage(staffId, staff?.name ?? "This person", dates, "duties", ["APPROVED"]);
+    const message = await swapLockMessage(staffId, staff?.name ?? "This person", dates, "duties");
     if (message) return message;
   }
   return null;
@@ -340,6 +340,9 @@ export async function assignDuty(input: { cells: CellRef[]; duty: string }): Pro
   }
   const swapped = await firstCellSwapped(input.cells);
   if (swapped) return fail(swapped);
+  // A V next to a swapped date can change that date's duty (PM block <-> Off(V)).
+  const knockOn = await swapAffectedByDutyChange(input.cells.map(({ staffId, date }) => ({ staffId, date, duty: isCycle ? null : (input.duty as AssignableDuty) })));
+  if (knockOn) return fail(knockOn);
 
   await db.$transaction(
     input.cells.map(({ staffId, date }) =>

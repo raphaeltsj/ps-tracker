@@ -6,18 +6,22 @@ import { cycleDayLabel, cyclePositionLabel } from "@/lib/cycle";
 import { addDays, formatDate, formatDateShort, todayLocal } from "@/lib/dates";
 import { DUTY_TIMES } from "@/lib/domain";
 import { buildRoster } from "@/lib/roster-data";
+import { SwapWaitingBanner } from "@/components/swaps/swap-waiting-banner";
+import { swapsAwaiting } from "@/lib/swap-data";
 
 export const metadata = { title: "Home | PS Tracker" };
 
 export default async function HomePage() {
   const viewer = await requireViewer();
   const today = todayLocal();
+  const swapsWaiting = await swapsAwaiting(viewer);
 
   if (!viewer.shiftId) {
     // Management: today across all shifts.
     const rosters = await Promise.all(["A", "B", "C"].map((id) => buildRoster(id, today, today, viewer)));
     return (
       <main className="mx-auto w-full max-w-4xl space-y-4 p-4">
+        <SwapWaitingBanner count={swapsWaiting} />
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold">Today, {formatDate(today)}</h1>
           <Link href="/swaps" className="text-sm underline underline-offset-4">
@@ -51,6 +55,7 @@ export default async function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-2xl space-y-4 p-4">
+      <SwapWaitingBanner count={swapsWaiting} />
       <section className="space-y-2 rounded-xl border p-4">
         <p className="text-sm text-muted-foreground">{formatDate(today)}</p>
         <div className="flex flex-wrap items-center gap-2">

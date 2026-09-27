@@ -1,5 +1,5 @@
 import { SwapForm } from "@/components/swaps/swap-form";
-import { SwapList } from "@/components/swaps/swap-list";
+import { SwapFeedbackProvider, SwapList } from "@/components/swaps/swap-list";
 import { requireViewer } from "@/lib/auth";
 import { todayLocal } from "@/lib/dates";
 import { db } from "@/lib/db";
@@ -29,7 +29,6 @@ export default async function SwapsPage() {
     db.staff.findMany({ where: { active: true, role: { not: "MANAGEMENT" }, shiftId: { not: null } }, orderBy: [{ shiftId: "asc" }, { name: "asc" }] }),
   ]);
   const people = staff.map((s) => ({ id: s.id, name: s.name, shiftId: s.shiftId! }));
-  const partners = people.filter((p) => p.id !== viewer.id);
   const supervised = people.filter((p) => canEditShift(viewer, p.shiftId));
 
   const needsMe = swaps.filter((s) => s.can.respond || s.can.approve);
@@ -48,36 +47,38 @@ export default async function SwapsPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-4">
-          <Section title="Needs your action" note="Requests waiting for your answer, and swaps waiting for your approval (earliest submitted first).">
-            <SwapList swaps={needsMe} viewerId={viewer.id} empty="Nothing waiting for you." />
-          </Section>
-          {canRequestLeave(viewer) && (
-            <Section title="My swaps">
-              <SwapList swaps={order(mine)} viewerId={viewer.id} empty="No swaps yet." />
+      <SwapFeedbackProvider>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="space-y-4">
+            <Section title="Needs your action" note="Requests waiting for your answer, and swaps waiting for your approval (earliest submitted first).">
+              <SwapList swaps={needsMe} viewerId={viewer.id} empty="Nothing waiting for you." />
             </Section>
-          )}
-          {hasEditView(viewer) && (
-            <Section title={viewer.role === "MANAGEMENT" ? "All shifts' swaps" : `Shift ${viewer.shiftId} swaps`} note="Pending and approved swaps, and the last 60 days of history.">
-              <SwapList swaps={order(shiftSwaps)} viewerId={viewer.id} empty="No other swaps." />
-            </Section>
-          )}
-        </div>
+            {canRequestLeave(viewer) && (
+              <Section title="My swaps">
+                <SwapList swaps={order(mine)} viewerId={viewer.id} empty="No swaps yet." />
+              </Section>
+            )}
+            {hasEditView(viewer) && (
+              <Section title={viewer.role === "MANAGEMENT" ? "All shifts' swaps" : `Shift ${viewer.shiftId} swaps`} note="Swaps with a date from today on. Past swaps drop off this list; the roster still shows who worked what.">
+                <SwapList swaps={order(shiftSwaps)} viewerId={viewer.id} empty="No other swaps." />
+              </Section>
+            )}
+          </div>
 
-        <div className="space-y-4">
-          {canRequestLeave(viewer) && (
-            <Section title="Request a swap">
-              <SwapForm mode="request" viewerId={viewer.id} firstPeople={[]} partners={partners} today={today} />
-            </Section>
-          )}
-          {hasEditView(viewer) && (
-            <Section title="Record a swap">
-              <SwapForm mode="record" viewerId={viewer.id} firstPeople={supervised} partners={people} today={today} />
-            </Section>
-          )}
+          <div className="space-y-4">
+            {canRequestLeave(viewer) && (
+              <Section title="Request a swap">
+                <SwapForm mode="request" viewerId={viewer.id} firstPeople={[]} today={today} />
+              </Section>
+            )}
+            {hasEditView(viewer) && (
+              <Section title="Record a swap">
+                <SwapForm mode="record" viewerId={viewer.id} firstPeople={supervised} today={today} />
+              </Section>
+            )}
+          </div>
         </div>
-      </div>
+      </SwapFeedbackProvider>
     </main>
   );
 }

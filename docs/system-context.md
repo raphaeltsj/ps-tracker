@@ -340,9 +340,12 @@ Swapping duties (often called shift swaps) is **in scope**. Staff request swaps 
 
 - **One date or two.** A swap has one date (a straight exchange) or two (a give-and-take: Charl covers Bravo's AM on the 3rd, and Bravo covers Charl's PM on the 7th). Each date is an exchange of that day's duties, so a two-date swap works the same way as two one-date exchanges.
 - **Any duties** can be exchanged: AM, PM, Off, V, V(SB), Off(V). The two duties must differ on each date, and Off and Off(V) count as the same day off.
+- **V(SB) stays within the shift.** The standby comes from the V person's own shift, so a V(SB) day can only be swapped with someone in the same shift.
+- **Rest after V.** V ends at 0745, so no swap may leave anyone on V followed by AM at 0745 the next morning. Swap both V nights, or pick another date.
+- **Today onwards only.** Swaps are for dates from today on. A swap can still be cancelled on its first date. Once that date has passed, the swap is part of what was worked and can no longer be cancelled. It drops off the Duty swaps page once all its dates have passed, but the roster still shows who worked what. A pending request whose first date passes before it is fully approved becomes **Expired**.
 - **Off(V) follows the V.** Whoever actually works a V earns the Off(V). A V swapped away gives the original person their PM block back. The person who takes it over gets Off(V) on their own next PM block, the first PM block after the V night. The swap form previews these knock-on days.
 - **Strength does not change.** Each crew loses one person and gains one on that duty, so Total, Not in, Working Strength, MFL and slots stay as they were. V cover (V on duty / MFL) counts the crew's own duty.
-- **Leave and Tasks do not move.** No swap on a date where either person has leave (pending or approved, including BD / BD-IL). A person can be in only one swap per date (pending or approved).
+- **Leave and Tasks do not move.** No swap on a date where either person has leave (pending or approved, including BD / BD-IL). A person can be in only one swap per date (pending or approved). A Task stays with its holder on a swapped date.
 - **DOS/FDO.** A DOS/FDO duty stays with its holder, but a DOS on a swapped date earns **no 0.5 OIL**. Approving the swap removes that OIL, and cancelling the swap restores it.
 
 **Flow.** Request → partner accepts or declines → each side's shift supervisor approves → Approved.
@@ -351,9 +354,10 @@ Swapping duties (often called shift swaps) is **in scope**. Staff request swaps 
 - Once the partner accepts, the supervisor of each person's shift approves their side. A same-shift swap needs one approval. Management can approve both sides at once. Either supervisor can reject (a reason is required) while the swap is pending.
 - A supervisor (for someone in their own shift) or Management can also **record** a swap directly. That counts as both people's agreement and approves every side the recorder supervises, so a swap with another shift still needs that shift's supervisor.
 - Every step re-checks the rules above. Duties, leave or other swaps may have changed since the request, and a pending swap that can no longer go through shows why.
-- **Once approved**, the swapped dates are held for both people. Duties (V, V(SB), Off(V), DOS/FDO) and leave cannot change on those dates, but Tasks still can. A supervisor of either shift, or Management, can cancel the swap, which restores both people's own duties.
-- Leave cannot be requested or given on a date a **pending** swap holds either.
-- Pending swaps waiting for the viewer count toward the notification bell.
+- **Once approved**, the swapped dates are held for both people. Duties (V, V(SB), Off(V), DOS/FDO) and leave cannot change on those dates, but Tasks still can. A duty change on another day that would change a swapped date is refused as well; for example, a V placed before a swapped PM would turn that PM into Off(V). A supervisor of either shift, or Management, can cancel the swap until its first date has passed, which restores both people's own duties.
+- A **pending** request never blocks leave or duties. It is re-checked when it is accepted and approved, and shows why it can no longer go through. This means nobody can block someone else's leave just by sending them a request.
+- **Finding a partner:** pick the date first. The list then shows everyone's duty that day, with the people who cannot swap (and why) set aside.
+- Swaps waiting for the viewer show as a banner on Home and My requests, and count toward the bell, which opens the Duty swaps page. The roster's date details list that day's swaps and who covers each swapped duty.
 
 ## 12. Leave management
 
@@ -554,7 +558,7 @@ For now, use placeholder staff names that are each a **single 5-character word**
 ### Open items
 
 - BD / BD-IL: whether they are given automatically or requested, whether they need an available slot, and whether the BD-IL day can be moved.
-- Duty swaps: whether staff may request a swap on a locked date (currently allowed), whether a swap needs an extra slot or MFL check (currently no, since it is one for one), and whether a V taken over in a swap should earn Off(V) on the taker's next PM block when the V did not fall on the taker's Off days (currently yes).
+- Duty swaps: whether staff may request a swap on a locked date (currently allowed), whether a swap needs an extra slot or MFL check (currently no, since it is one for one), and whether a V taken over in a swap should earn Off(V) on the taker's next PM block when the V did not fall on the taker's Off days (currently yes). When staff records can move people between shifts, decide what happens to their pending and approved swaps (a swap stores each person's shift when it was made).
 - Staff records: which details are kept (for example name, shift, role, birthday).
 - V(SB): how a standby person's own cycle looks around their standby day (for example, which days they are normally on, and whether their following block changes).
 - Whether the "extra slot needed" rule for approval also applies to leave a supervisor gives directly, to a supervisor's own leave, and to edits of existing leave.

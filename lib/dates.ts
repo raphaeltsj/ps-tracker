@@ -103,3 +103,10 @@ export function formatDateList(dates: string[]): string {
     })
     .join(", ");
 }
+
+/** A timestamp in the same style as dates elsewhere: "Sun 27 Sep, 09:49" (browser local time). */
+export function formatDateTime(iso: string): string {
+  const t = new Date(iso);
+  const date = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  return `${weekdayShort(date)} ${formatDateShort(date)}, ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+}
