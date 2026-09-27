@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Bell, LogOut } from "lucide-react";
 import { logout } from "@/app/actions";
+import { DevClearRoster } from "@/components/dev-clear-roster";
 import { Logo } from "@/components/logo";
 import { NavLinks } from "@/components/nav-links";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -39,6 +40,8 @@ export function AppHeader({
           <NavLinks links={links} />
         </nav>
         <div className="ml-auto flex items-center gap-1">
+          {/* TEMPORARY developer tool: clears the whole roster. Never shown in production. */}
+          {process.env.NODE_ENV !== "production" && viewer.role !== "STAFF" && <DevClearRoster />}
           {/* Notifications are a future feature: bell with badge as a placeholder (spec 13). */}
           <Button variant="ghost" size="icon" className="relative" aria-label={`Notifications (${badge})`} title="Notifications (coming later)">
             <Bell className="size-4" />

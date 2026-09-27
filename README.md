@@ -33,6 +33,7 @@ Pick a demo user on the login screen (Management, or a Supervisor / Regular Staf
 | `npm test` | Unit tests for the cycle, V overlay, strength and birthday rules |
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
 | `npm run db:seed` | Wipe and reseed demo data (around the current month) |
+| **Clear roster (dev)** button | TEMPORARY, top of every page for supervisors and Management, dev only. Deletes every duty, leave, Task assignment, lock, event, Ops duty and Extra; keeps staff, dayworkers, the Task list and leave types. Remove `app/dev-actions.ts` and `components/dev-clear-roster.tsx` when no longer needed |
 | `npm run db:migrate` | Create and apply a migration after changing `prisma/schema.prisma` |
 
 ## Where things live
