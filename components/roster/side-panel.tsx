@@ -21,7 +21,7 @@ import {
   setSpecialEvent,
   unlockDate,
 } from "@/app/actions";
-import { DosTag, DutyChip, EventBadge, ExtraChip, LeaveChip, LockBadge, OpsChip, StatusBadge, TaskTag } from "@/components/roster/chips";
+import { DosTag, DutyChip, EventBadge, ExtraChip, LeaveChip, LockBadge, OpsChip, StatusBadge, SwapTag, TaskTag } from "@/components/roster/chips";
 import { MyRequests } from "@/components/roster/my-requests";
 import type { Selection, WorkspaceProps } from "@/components/roster/roster-workspace";
 import { StrengthSummary } from "@/components/roster/strength-summary";
@@ -157,6 +157,7 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
           <div className="text-xs font-medium text-muted-foreground">You on this date</div>
           <div className="flex flex-wrap items-center gap-1.5">
             <DutyChip duty={own.duty} long />
+            {own.swap && <SwapTag swap={own.swap} duty={own.duty} />}
             {own.dos && <DosTag kind={own.dos} />}
             {own.task && <TaskTag name={own.task.name} />}
             {own.absences.map((a, i) => (
@@ -165,6 +166,14 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
               </button>
             ))}
           </div>
+          {own.swap && (
+            <p className="text-[11px] text-muted-foreground">
+              Duty swap with {own.swap.partnerName} (Shift {own.swap.partnerShiftId}): you work {DUTY_LABEL[own.duty]} instead of your {DUTY_LABEL[own.swap.ownDuty]}.{" "}
+              <Link href="/swaps" className="underline underline-offset-2">
+                Duty swaps
+              </Link>
+            </p>
+          )}
           {own.absences.some((a) => a.derived) && (
             <p className="text-[11px] text-muted-foreground">BD is shown on your birthday; on an Off day it becomes BD-IL on your next working day.</p>
           )}
@@ -688,6 +697,8 @@ function EditTools(props: PanelProps) {
   // Only one type of leave per day: cells that already hold leave cannot be given more.
   const withLeave = cells.filter((c) => roster.cells[c.staffId]?.[c.date]?.absences.some(isLeaveEntry));
   const type = leaveTypes.find((t) => t.code === typeCode);
+  // An approved duty swap holds its dates: duties and leave cannot change there (Tasks can).
+  const swapped = cells.filter((c) => roster.cells[c.staffId]?.[c.date]?.swap);
 
   return (
     <Section
@@ -711,6 +722,22 @@ function EditTools(props: PanelProps) {
             ({names.length} {names.length === 1 ? "person" : "people"}: {names.slice(0, 4).join(", ")}
             {names.length > 4 ? ` +${names.length - 4}` : ""})
           </span>
+        </p>
+      )}
+
+      {swapped.length > 0 && (
+        <p className="rounded-md border border-emerald-600/40 bg-emerald-500/10 p-2 text-xs">
+          {swapped
+            .slice(0, 3)
+            .map((c) => {
+              const cell = roster.cells[c.staffId][c.date];
+              return `${roster.staff.find((s) => s.id === c.staffId)?.name} ${formatDateShort(c.date)} (with ${cell.swap!.partnerName})`;
+            })
+            .join(", ")}
+          {swapped.length > 3 ? ", ..." : ""}: a duty swap holds {swapped.length > 1 ? "these dates" : "this date"}, so duty and leave cannot change there. Tasks can still be set.{" "}
+          <Link href="/swaps" className="underline underline-offset-2">
+            Manage duty swaps
+          </Link>
         </p>
       )}
 

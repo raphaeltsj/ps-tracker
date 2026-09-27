@@ -41,8 +41,21 @@ export type EffectiveDuty = {
 };
 
 /**
- * A person's duty on a date: a supervisor override wins; otherwise the shift cycle, except that a PM
- * block directly after a 2-day V (worked on the preceding Off days) becomes "Off(V)".
+ * How approved duty swaps (spec 11.4) touch a person's own V duty. The Off(V) follows whoever
+ * actually works the V: a V swapped away no longer turns the person's PM block into Off(V), and a V
+ * taken over from a swap partner turns the taker's next PM block into Off(V).
+ */
+export type VSwaps = {
+  /** The person's own V on this date was swapped to their partner. */
+  swappedAway: (date: string) => boolean;
+  /** The person works their partner's V on this date. */
+  takenOver: (date: string) => boolean;
+};
+
+/**
+ * A person's own duty on a date (before any swap exchange): a supervisor override wins; otherwise
+ * the shift cycle, except that a PM block directly after a 2-day V (worked on the preceding Off
+ * days) becomes "Off(V)".
  * An Off set by a supervisor is also an Off(V): it is the rest day awarded for V duty, for example
  * to a V(SB) who was activated. Cancelling the V duty restores the PM block by itself, because
  * nothing about it is stored.
@@ -51,6 +64,7 @@ export function effectiveDuty(
   anchor: number,
   date: string,
   overrides: ReadonlyMap<string, AssignableDuty>,
+  vSwaps?: VSwaps,
 ): EffectiveDuty {
   const override = overrides.get(date);
   if (override) return { duty: override === "OFF" ? "OFF_V" : override, source: "override" };
@@ -59,8 +73,16 @@ export function effectiveDuty(
   const base = CYCLE[pos];
   if (base === "PM") {
     const blockStart = addDays(date, -pos);
-    if (overrides.get(addDays(blockStart, -1)) === "V" || overrides.get(addDays(blockStart, -2)) === "V") {
+    const ownV = (d: string) => overrides.get(d) === "V" && !vSwaps?.swappedAway(d);
+    if (ownV(addDays(blockStart, -1)) || ownV(addDays(blockStart, -2))) {
       return { duty: "OFF_V", source: "postV" };
+    }
+    // A V taken over in a swap earns the Off(V) on the taker's first PM block after it. The block
+    // starts every 6 days, so that V fell on one of the 6 days before this block.
+    if (vSwaps) {
+      for (let k = 1; k <= 6; k++) {
+        if (vSwaps.takenOver(addDays(blockStart, -k))) return { duty: "OFF_V", source: "postV" };
+      }
     }
   }
   return { duty: base, source: "cycle" };

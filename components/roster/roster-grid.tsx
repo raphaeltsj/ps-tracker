@@ -1,7 +1,7 @@
 "use client";
 import { memo } from "react";
 import { CalendarClock, Lock } from "lucide-react";
-import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, LABELLED_DUTIES, LeaveChip, SLOT_BG, SLOT_STYLE, TaskTag } from "@/components/roster/chips";
+import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, LABELLED_DUTIES, LeaveChip, SLOT_BG, SLOT_STYLE, SwapTag, swapTitle, TaskTag } from "@/components/roster/chips";
 import { BottomRows } from "@/components/roster/bottom-rows";
 import { cellKey, type Selection, type WorkspaceProps } from "@/components/roster/roster-workspace";
 import { isWeekend, weekdayShort } from "@/lib/dates";
@@ -156,7 +156,7 @@ const GridCell = memo(function GridCell({
   return (
     <td
       onClick={(e) => onClick(e.shiftKey)}
-      title={dutyTitle(cell.duty)}
+      title={cell.swap ? swapTitle(cell.swap, cell.duty) : dutyTitle(cell.duty)}
       className={cn(
         // Vertically centered: a cell with just a duty (no leave/DOS/Task chip below) isn't pinned to the top.
         "h-12 cursor-pointer select-none border-b border-r border-background/60 p-0.5 align-middle",
@@ -183,6 +183,7 @@ const GridCell = memo(function GridCell({
             <LeaveChip absence={a} />
           </button>
         ))}
+        {cell.swap && <SwapTag swap={cell.swap} duty={cell.duty} />}
         {cell.dos && <DosTag kind={cell.dos} />}
         {cell.task && <TaskTag name={cell.task.name} />}
       </div>

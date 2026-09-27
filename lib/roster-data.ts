@@ -1,6 +1,6 @@
 import "server-only";
 import { birthdayEvents } from "@/lib/birthday";
-import { effectiveDuty, shiftDutyOn } from "@/lib/cycle";
+import { shiftDutyOn } from "@/lib/cycle";
 import { addDays, dateRange } from "@/lib/dates";
 import { db } from "@/lib/db";
 import type { AssignableDuty, DosKind, Half, LeaveStatus, Role } from "@/lib/domain";
@@ -8,6 +8,8 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import { canEditShift, type Viewer } from "@/lib/permissions";
 import type { CellAbsence, LeaveSummary, RosterCell, RosterData, RosterDay } from "@/lib/roster-types";
 import { computeStrength, mflFor, V_MFL } from "@/lib/strength";
+import { loadDutyContext } from "@/lib/swap-data";
+import type { PersonCycle } from "@/lib/swaps";
 
 const leaveInclude = {
   type: true,
@@ -101,21 +103,35 @@ export async function buildRoster(shiftId: string, from: string, to: string, vie
     overridesByStaff.get(o.staffId)!.set(o.date, o.duty as AssignableDuty);
   }
 
+  // Approved duty swaps (spec 11.4): partners may come from other shifts, so load their cycles too.
+  const known = new Map<string, PersonCycle>(
+    staff.map((s) => [s.id, { anchor: shift.cycleAnchor, overrides: overridesByStaff.get(s.id) ?? new Map<string, AssignableDuty>() }]),
+  );
+  const duties = await loadDutyContext(staffIds, loadFrom, loadTo, { known });
+
   const cells: RosterData["cells"] = {};
   const notIn = new Map<string, number>(dates.map((d) => [d, 0]));
   const vOnDuty = new Map<string, number>(dates.map((d) => [d, 0]));
   const dateSet = new Set(dates);
 
   for (const person of staff) {
-    const personOverrides = overridesByStaff.get(person.id) ?? new Map<string, AssignableDuty>();
-    const dutyOn = (date: string) => effectiveDuty(shift.cycleAnchor, date, personOverrides);
+    const dutyOn = (date: string) => duties.resolve(person.id, date);
     // All approved/pending leave days (visible or not), so BD / BD-IL land the same for every viewer.
     const leaveDates = new Set(leaves.filter((l) => l.staffId === person.id).flatMap((l) => l.days.map((d) => d.date)));
     const row: Record<string, RosterCell> = {};
     for (const date of dates) {
-      const { duty, source } = dutyOn(date);
-      row[date] = { duty, dutySource: source, dos: null, task: null, absences: [] };
-      if (duty === "V") vOnDuty.set(date, vOnDuty.get(date)! + 1);
+      const { duty, source, swap } = dutyOn(date);
+      const partner = swap ? duties.byId.get(swap.partnerId) : undefined;
+      row[date] = {
+        duty,
+        dutySource: source,
+        dos: null,
+        task: null,
+        absences: [],
+        swap: swap && partner ? { swapId: swap.swapId, partnerId: partner.id, partnerName: partner.name, partnerShiftId: partner.shiftId ?? "", ownDuty: swap.ownDuty } : null,
+      };
+      // A swap is one for one, so V cover is counted on the crew's own duties.
+      if ((swap?.ownDuty ?? duty) === "V") vOnDuty.set(date, vOnDuty.get(date)! + 1);
     }
 
     for (const leave of visibleLeaves.filter((l) => l.staffId === person.id)) {

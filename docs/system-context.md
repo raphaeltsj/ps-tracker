@@ -269,7 +269,9 @@ There are three user roles. **Everyone can view the roster of every shift.** The
 | **Lock dates for events (with remarks)**  | No                | Own shift only          | All shifts, or all at once |
 | **Assign duties (AM, PM, V, V(SB), Off)** | No                | Own shift only          | All shifts                 |
 | **Assign Tasks (optional)**               | No                | Own shift only          | All shifts                 |
-| **Swap duties between staff**             | No                | Own shift only          | All shifts                 |
+| **Request a duty swap (partner accepts)** | Yes               | Yes                     | Not needed                 |
+| **Approve / reject / cancel duty swaps**  | No                | Own shift's side only   | All shifts, both sides     |
+| **Record a duty swap directly**           | No                | For own shift's staff   | All shifts                 |
 | **Manage staff records**                  | No                | No                      | Yes                        |
 | **Set special events**               | No                | Own shift only          | All shifts                 |
 | **Add custom leave type**                 | No                | Yes                     | Yes                        |
@@ -332,14 +334,26 @@ Management can do everything a supervisor can do across **all shifts**, but does
 
 ### 11.4 Duty swaps between staff
 
-Swapping duties between staff (often called shift swaps) is **in scope** and is **handled by supervisors**.
+Swapping duties (often called shift swaps) is **in scope**. Staff request swaps in the app, and supervisors approve them. The Duty swaps page (`/swaps`) holds the request form, the partner's answer, and the supervisors' approvals.
 
-- In Edit view, a supervisor picks two staff members and the date(s), and swaps their duties (for example one person's PM for another person's AM).
-- The form previews both people's duties after the swap and checks MFL before confirming.
-- The roster then shows the swapped duties.
-- Supervisors handle swaps for their own shift; Management can handle swaps for all shifts.
+**What a swap is.** A **one-for-one exchange** of duties between two people, usually from different shifts. On each swapped date, each person works the other's duty. For example, if A's Bravo is on AM and C's Charl is on PM, then after the swap Bravo works PM and Charl works AM. On A's roster, Bravo's cell shows PM with a "⇄ Charl·C" tag, and C's roster shows the reverse.
 
-> To confirm: whether swaps can be across different shifts (and how strength is counted), and whether staff can request a swap in the app or only supervisors record it.
+- **One date or two.** A swap has one date (a straight exchange) or two (a give-and-take: Charl covers Bravo's AM on the 3rd, and Bravo covers Charl's PM on the 7th). Each date is an exchange of that day's duties, so a two-date swap works the same way as two one-date exchanges.
+- **Any duties** can be exchanged: AM, PM, Off, V, V(SB), Off(V). The two duties must differ on each date, and Off and Off(V) count as the same day off.
+- **Off(V) follows the V.** Whoever actually works a V earns the Off(V). A V swapped away gives the original person their PM block back. The person who takes it over gets Off(V) on their own next PM block, the first PM block after the V night. The swap form previews these knock-on days.
+- **Strength does not change.** Each crew loses one person and gains one on that duty, so Total, Not in, Working Strength, MFL and slots stay as they were. V cover (V on duty / MFL) counts the crew's own duty.
+- **Leave and Tasks do not move.** No swap on a date where either person has leave (pending or approved, including BD / BD-IL). A person can be in only one swap per date (pending or approved).
+- **DOS/FDO.** A DOS/FDO duty stays with its holder, but a DOS on a swapped date earns **no 0.5 OIL**. Approving the swap removes that OIL, and cancelling the swap restores it.
+
+**Flow.** Request → partner accepts or declines → each side's shift supervisor approves → Approved.
+
+- Staff (and supervisors in their own name) request a swap for today or later, with an optional note. The requester can withdraw it until it is approved.
+- Once the partner accepts, the supervisor of each person's shift approves their side. A same-shift swap needs one approval. Management can approve both sides at once. Either supervisor can reject (a reason is required) while the swap is pending.
+- A supervisor (for someone in their own shift) or Management can also **record** a swap directly. That counts as both people's agreement and approves every side the recorder supervises, so a swap with another shift still needs that shift's supervisor.
+- Every step re-checks the rules above. Duties, leave or other swaps may have changed since the request, and a pending swap that can no longer go through shows why.
+- **Once approved**, the swapped dates are held for both people. Duties (V, V(SB), Off(V), DOS/FDO) and leave cannot change on those dates, but Tasks still can. A supervisor of either shift, or Management, can cancel the swap, which restores both people's own duties.
+- Leave cannot be requested or given on a date a **pending** swap holds either.
+- Pending swaps waiting for the viewer count toward the notification bell.
 
 ## 12. Leave management
 
@@ -540,7 +554,7 @@ For now, use placeholder staff names that are each a **single 5-character word**
 ### Open items
 
 - BD / BD-IL: whether they are given automatically or requested, whether they need an available slot, and whether the BD-IL day can be moved.
-- Duty swaps: whether swaps can be across different shifts (and how strength is counted), and whether staff can request a swap in the app.
+- Duty swaps: whether staff may request a swap on a locked date (currently allowed), whether a swap needs an extra slot or MFL check (currently no, since it is one for one), and whether a V taken over in a swap should earn Off(V) on the taker's next PM block when the V did not fall on the taker's Off days (currently yes).
 - Staff records: which details are kept (for example name, shift, role, birthday).
 - V(SB): how a standby person's own cycle looks around their standby day (for example, which days they are normally on, and whether their following block changes).
 - Whether the "extra slot needed" rule for approval also applies to leave a supervisor gives directly, to a supervisor's own leave, and to edits of existing leave.
@@ -599,16 +613,21 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
                             (lock, special event) and the Edit view
                             (Edit / Staff is a switch on this page: ?mode=edit)
   /(app)/requests           my requests (mobile Requests tab)
+  /(app)/swaps              duty swaps: request, record, accept, approve, cancel (section 11.4)
   /(app)/task-report        Task report (supervisor / management), section 9.2
   /(app)/dayworkers         dayworkers and their Ops duty counts (supervisor / management), section 5.3
   /(app)/tasks              Task management (management only)
   /(app)/profile            profile, theme, links to Tasks and the Task report on mobile
   actions.ts                all Server Actions: requestLeave, approveLeave, giveLeave, assignDuty, assignTask, ...
+  swap-actions.ts           duty swap Server Actions
 /components/ui              shadcn/ui components
 /components/roster          RosterGrid, CalendarView, MobileRoster, SidePanel, chips and legend
 /components/tasks           Task manager, Task report filters and table
+/components/swaps           swap request / record form (with preview) and swap list
 /lib
   cycle.ts                  duty cycle, cycle position, V overlay and Off (post-V)
+  swaps.ts                  duty swap exchange and preview (pure); swap-data.ts loads and checks swaps
+  dos-oil.ts                the automatic 0.5 OIL after a DOS/FDO duty
   strength.ts               Total / Not in / Working / MFL / Available Slot(s)
   birthday.ts               BD / BD-IL placement
   leave-rules.ts            one type of leave per person per day
@@ -637,9 +656,9 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
 
 ### 17.5 Build priority
 
-Done: Roster view and same-page leave request (staff), Calendar view, Edit view roster grid (supervisor), give / edit / cancel leave, approve / reject from the leave detail panel, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and special events, Task management (management), the Task report, dayworkers with Ops duty and their count, Extra shift duty, and the Support and Recall placeholder rows.
+Done: Roster view and same-page leave request (staff), Calendar view, Edit view roster grid (supervisor), give / edit / cancel leave, approve / reject from the leave detail panel, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and special events, Task management (management), the Task report, dayworkers with Ops duty and their count, Extra shift duty, the Support and Recall placeholder rows, and duty swaps.
 
-Next: the leave inbox page, all-shift overview, duty swaps, staff records, and custom leave types. See section 14.4 for the full hero-screen list.
+Next: the leave inbox page, all-shift overview, staff records, and custom leave types. See section 14.4 for the full hero-screen list.
 
 ## Appendix: Claude Design prompt
 

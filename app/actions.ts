@@ -8,7 +8,8 @@ import { dosEarnsOil } from "@/lib/cycle";
 import { addDays, formatDate, isValidDate } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { normalizeDayworkerName, normalizeUsername } from "@/lib/dayworkers";
-import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_OIL_HALF, NAME_MAX, type Half } from "@/lib/domain";
+import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, NAME_MAX, type Half } from "@/lib/domain";
+import { createDosOil } from "@/lib/dos-oil";
 import {
   canDecideLeave,
   canEditShift,
@@ -22,6 +23,7 @@ import { buildRoster } from "@/lib/roster-data";
 import { findLeaveConflict } from "@/lib/leave-rules";
 import { datesWithoutSlot } from "@/lib/slots";
 import { formatFigure } from "@/lib/strength";
+import { swapLockMessage } from "@/lib/swap-data";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 
@@ -64,6 +66,18 @@ async function firstCellOnLeave(cells: CellRef[]): Promise<string | null> {
       const staff = await db.staff.findUnique({ where: { id: staffId } });
       return `${staff?.name ?? "This person"} has ${clash.code} on ${formatDate(clash.date)}, so no duty can be assigned that day.`;
     }
+  }
+  return null;
+}
+
+/** Duties cannot change on a date an approved duty swap holds (spec 11.4). Tasks still can. */
+async function firstCellSwapped(cells: CellRef[]): Promise<string | null> {
+  const byStaff = new Map<string, string[]>();
+  for (const { staffId, date } of cells) byStaff.set(staffId, [...(byStaff.get(staffId) ?? []), date]);
+  for (const [staffId, dates] of byStaff) {
+    const staff = await db.staff.findUnique({ where: { id: staffId } });
+    const message = await swapLockMessage(staffId, staff?.name ?? "This person", dates, "duties", ["APPROVED"]);
+    if (message) return message;
   }
   return null;
 }
@@ -116,6 +130,8 @@ export async function requestLeave(input: { typeCode: string; dates: string[]; h
   }
   const clash = await leaveClashMessage(viewer.id, "You", dates);
   if (clash) return fail(clash);
+  const swapped = await swapLockMessage(viewer.id, "You", dates, "leave");
+  if (swapped) return fail(swapped);
 
   await db.leave.create({
     data: {
@@ -204,6 +220,8 @@ export async function giveLeave(input: {
     if (staff.role === "MANAGEMENT") return fail("Management does not take leave.");
     const clash = await leaveClashMessage(staffId, staffId === viewer.id ? "You" : staff.name, dates);
     if (clash) return fail(clash);
+    const swapped = await swapLockMessage(staffId, staffId === viewer.id ? "You" : staff.name, dates, "leave");
+    if (swapped) return fail(swapped);
     plan.push({ staffId, dates });
   }
 
@@ -254,6 +272,9 @@ export async function editLeave(input: {
     if (!next) return fail("Invalid dates.");
     const clash = await leaveClashMessage(leave.staffId, leave.staff.name, next, leave.id);
     if (clash) return fail(clash);
+    const added = next.filter((d) => !leave.days.some((x) => x.date === d));
+    const swapped = await swapLockMessage(leave.staffId, leave.staff.name, added, "leave");
+    if (swapped) return fail(swapped);
     dates = next;
   }
 
@@ -317,6 +338,8 @@ export async function assignDuty(input: { cells: CellRef[]; duty: string }): Pro
     const onLeave = await firstCellOnLeave(input.cells);
     if (onLeave) return fail(onLeave);
   }
+  const swapped = await firstCellSwapped(input.cells);
+  if (swapped) return fail(swapped);
 
   await db.$transaction(
     input.cells.map(({ staffId, date }) =>
@@ -341,6 +364,8 @@ export async function assignExtraDuty(input: { cells: CellRef[]; kind: string | 
   const viewer = await requireViewer();
   const error = await checkCells(viewer, input.cells);
   if (error) return fail(error);
+  const swapped = await firstCellSwapped(input.cells);
+  if (swapped) return fail(swapped);
 
   if (input.kind === null) {
     const removed = await db.extraDuty.findMany({ where: { OR: input.cells.map(({ staffId, date }) => ({ staffId, date })) } });
@@ -381,20 +406,7 @@ export async function assignExtraDuty(input: { cells: CellRef[]; kind: string | 
     });
     if (!dosEarnsOil(byId.get(staffId)!.shift!.cycleAnchor, date)) continue;
     withOil++;
-    await db.leave.create({
-      data: {
-        staffId,
-        typeCode: DOS_OIL_CODE,
-        half: DOS_OIL_HALF,
-        status: "APPROVED",
-        remarks: `Automatic after ${input.kind} duty on ${formatDate(date)}.`,
-        givenById: viewer.id,
-        decidedById: viewer.id,
-        decidedAt: new Date(),
-        autoFor: duty.id,
-        days: { create: [{ date: addDays(date, 1) }] },
-      },
-    });
+    await createDosOil(duty, viewer.id);
   }
   return done(
     withOil === input.cells.length

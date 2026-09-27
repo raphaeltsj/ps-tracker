@@ -25,6 +25,8 @@ Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, n
 
 **V duty.** A temporary overlay, not a separate team. Exactly 1 person covers V each night. The person works 2 days of V on what would have been their 2 Off days after AM; their next 2-day PM block becomes 2 Off (label it "Off(V)"); then AM, AM, Off, Off and back to normal. Nothing about that is stored, so cancelling the V duty restores the PM block. Each of the 2 V days has a standby on V(SB), a different person each day, from the same shift. V(SB) never affects Total Strength, Not in Strength, Working Strength, MFL, or leave slots.
 
+**Duty swaps.** A one-for-one exchange of duties between two people (usually across shifts) on one date, or two for a give-and-take: each works the other's duty that day, and the roster shows the worked duty with a "⇄ Name·Shift" tag. Any duties can be exchanged if they differ. The Off(V) follows whoever works the V. Strength, leave and Tasks never change. There is no swap on a leave day, and one swap per person per date. Flow: request, then the partner accepts, then each side's shift supervisor approves (Management can approve both). Supervisors (own shift) and Management can record a swap directly with their side pre-approved. Once approved, duties and leave on those dates are locked until a supervisor or Management cancels. A DOS/FDO on a swapped date earns no 0.5 OIL (removed on approval, restored on cancel).
+
 **Special events.** A note on a date for the whole shift, with no reporting time. Show "Special Event" and the note on the day header, day view, mobile day card, and affected cells. They do not change MFL or leave slots. Public holidays change nothing.
 
 **MFL (minimum headcount).** Weekday: AM 13, PM 12, V 1. Weekend (Sat, Sun): AM 14, PM 11, V 1. V MFL is always 1. On a shift's Off days it is a "Rest day" and MFL is blank.
@@ -51,7 +53,7 @@ Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, n
 
 **Roles.**
 - Regular Staff: view all shifts, Calendar/Roster switch, see strength, request and withdraw own leave. No edit controls.
-- Supervisor: staff view plus Edit view for their own shift only (other shifts read-only). Assign duties and Tasks, swap duties, give/edit/cancel leave (including their own, no approval needed), approve/reject requests, lock dates, set special events, add custom leave types, add dayworkers, assign Ops duty and Extra for their own shift. In Staff view they can request leave and approve their own request.
+- Supervisor: staff view plus Edit view for their own shift only (other shifts read-only). Assign duties and Tasks, approve / record / cancel duty swaps for their own shift's side, give/edit/cancel leave (including their own, no approval needed), approve/reject requests, lock dates, set special events, add custom leave types, add dayworkers, assign Ops duty and Extra for their own shift. In Staff view they can request leave and approve their own request.
 - Management: everything a supervisor can do across all shifts (including Ops duty and Extra for any shift), plus lock all shifts at once, manage Tasks, and manage staff records. Management never requests or takes leave.
 
 **UI.**

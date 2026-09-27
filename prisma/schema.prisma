@@ -12,7 +12,7 @@ datasource db {
 }
 
 model Shift {
-  id          String         @id // "A" | "B" | "C"
+  id          String           @id // "A" | "B" | "C"
   name        String
   // Day index (days since 1970-01-01) on which this shift starts PM Day 1. See lib/cycle.ts.
   cycleAnchor Int
@@ -24,25 +24,27 @@ model Shift {
 }
 
 model Staff {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   name      String
   // "STAFF" | "SUPERVISOR" | "MANAGEMENT". Management has no shift and never takes leave.
   role      String
   shiftId   String?
-  shift     Shift?  @relation(fields: [shiftId], references: [id])
+  shift     Shift?   @relation(fields: [shiftId], references: [id])
   // "YYYY-MM-DD". Drives BD / BD-IL.
   birthday  String?
-  active    Boolean @default(true)
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  dutyOverrides   DutyOverride[]
-  extraDuties     ExtraDuty[]
+  dutyOverrides    DutyOverride[]
+  extraDuties      ExtraDuty[]
   extraShiftDuties ExtraShiftDuty[]
-  leaves          Leave[]           @relation("LeaveStaff")
-  leavesGiven     Leave[]           @relation("LeaveGivenBy")
-  leavesDecided   Leave[]           @relation("LeaveDecidedBy")
-  taskAssignments TaskAssignment[]
-  sessions        Session[]
+  leaves           Leave[]          @relation("LeaveStaff")
+  leavesGiven      Leave[]          @relation("LeaveGivenBy")
+  leavesDecided    Leave[]          @relation("LeaveDecidedBy")
+  taskAssignments  TaskAssignment[]
+  sessions         Session[]
+  swapsRequested   DutySwap[]       @relation("SwapRequester")
+  swapsPartnered   DutySwap[]       @relation("SwapPartner")
 }
 
 model Session {
@@ -157,8 +159,6 @@ model SpecialEvent {
   @@unique([shiftId, date])
 }
 
-
-
 // A dayworker: office staff (8-5) who are not part of any shift crew but clock shift duty as Ops duty
 // (spec 5.3). Never deleted, only deactivated, so the duty history behind the report is kept.
 model Dayworker {
@@ -195,4 +195,45 @@ model ExtraShiftDuty {
 
   @@unique([staffId, date])
   @@index([hostShiftId, date])
+}
+
+// A duty swap between two people (spec 11.4), usually across shifts. On each of its dates (one, or two
+// for a give-and-take) the two exchange their duties for that day. Nothing else is stored: the roster
+// derives the exchanged duties, so cancelling a swap restores both people's normal days.
+// Flow: requested -> partner accepts -> each side's shift supervisor approves (Management can approve
+// both). A supervisor or Management can also record one directly with their side pre-approved.
+model DutySwap {
+  id                 String        @id @default(cuid())
+  requesterId        String
+  requester          Staff         @relation("SwapRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  partnerId          String
+  partner            Staff         @relation("SwapPartner", fields: [partnerId], references: [id], onDelete: Cascade)
+  // Each person's shift when the swap was made: that shift's supervisor approves their side.
+  requesterShiftId   String
+  partnerShiftId     String
+  // "PENDING_PARTNER" | "PENDING_APPROVAL" | "APPROVED" | "DECLINED" | "REJECTED" | "WITHDRAWN" | "CANCELLED"
+  status             String
+  notes              String?
+  rejectReason       String?
+  createdById        String // the requester, or the supervisor / Management who recorded it
+  partnerRespondedAt DateTime?
+  // Who approved each side. A same-shift swap needs one approval for both.
+  requesterSideById  String?
+  partnerSideById    String?
+  submittedAt        DateTime      @default(now())
+  decidedById        String? // who approved the last side, rejected or cancelled
+  decidedAt          DateTime?
+  days               DutySwapDay[]
+
+  @@index([status])
+}
+
+model DutySwapDay {
+  id     String   @id @default(cuid())
+  swapId String
+  swap   DutySwap @relation(fields: [swapId], references: [id], onDelete: Cascade)
+  date   String
+
+  @@unique([swapId, date])
+  @@index([date])
 }

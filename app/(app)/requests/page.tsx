@@ -20,9 +20,14 @@ export default async function RequestsPage() {
     <main className="mx-auto w-full max-w-2xl space-y-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">My requests</h1>
-        <Link href="/roster" className="text-sm underline underline-offset-4">
-          Request leave
-        </Link>
+        <span className="flex gap-4">
+          <Link href="/swaps" className="text-sm underline underline-offset-4">
+            Duty swaps
+          </Link>
+          <Link href="/roster" className="text-sm underline underline-offset-4">
+            Request leave
+          </Link>
+        </span>
       </div>
       <MyRequests leaves={leaves} viewer={viewer} />
     </main>

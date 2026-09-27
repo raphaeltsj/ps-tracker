@@ -1,8 +1,8 @@
-import { CalendarClock, Lock } from "lucide-react";
+import { ArrowLeftRight, CalendarClock, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DOS_LABEL, DOS_REPORT_TIME, DUTY_LABEL, DUTY_TIMES, STATUS_LABEL, type DosKind, type Duty, type LeaveStatus } from "@/lib/domain";
-import type { CellAbsence, ExtraEntry, OpsEntry } from "@/lib/roster-types";
+import type { CellAbsence, CellSwap, ExtraEntry, OpsEntry } from "@/lib/roster-types";
 import { formatFigure, slotLabel, type Strength } from "@/lib/strength";
 
 // Colours always come with a text label (spec 14.2).
@@ -63,6 +63,12 @@ export function DutyLegend({ className }: { className?: string }) {
           DOS
         </span>
         {DOS_LABEL}
+      </li>
+      <li className="flex items-center gap-1.5">
+        <span className="grid h-3.5 w-5 place-items-center rounded-sm border border-emerald-600 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200" aria-hidden>
+          <ArrowLeftRight className="size-2.5" />
+        </span>
+        Duty swap
       </li>
       <li className="flex items-center gap-1.5">
         <span className="h-3.5 w-5 rounded-sm border bg-hatch" aria-hidden />
@@ -181,6 +187,32 @@ export function ExtraChip({ entry, className }: { entry: ExtraEntry; className?:
         {entry.name}, from Shift {entry.fromShiftId}, serving extra duty
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+/** Explains a swapped cell: who the person swapped with and what they would have worked. */
+export function swapTitle(swap: CellSwap, duty: Duty): string {
+  return `Duty swap with ${swap.partnerName} (Shift ${swap.partnerShiftId}): working ${dutyTitle(duty)} instead of ${DUTY_LABEL[swap.ownDuty]}`;
+}
+
+/**
+ * Approved duty swap (spec 11.4): the cell colour is the duty actually worked, and this tag names the
+ * swap partner. Sized to fit a roster column.
+ */
+export function SwapTag({ swap, duty, className }: { swap: CellSwap; duty: Duty; className?: string }) {
+  return (
+    <span
+      title={swapTitle(swap, duty)}
+      className={cn(
+        "inline-flex max-w-full items-center gap-0.5 truncate rounded-sm border border-emerald-600 bg-emerald-500/15 px-0.5 text-[9px] font-bold leading-4 tracking-tight text-emerald-900 dark:text-emerald-100",
+        className,
+      )}
+    >
+      <ArrowLeftRight className="size-2.5 shrink-0" aria-hidden />
+      <span className="sr-only">Swapped with </span>
+      {swap.partnerName}
+      <span className="opacity-60">·{swap.partnerShiftId}</span>
+    </span>
   );
 }
 
