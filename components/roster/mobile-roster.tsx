@@ -30,7 +30,7 @@ export function MobileRoster({
   selection: Selection;
   compact: boolean;
   onDate: (date: string, shiftKey: boolean) => void;
-  onFocusDate: (date: string) => void;
+  onFocusDate: (date: string, openSheet?: boolean) => void;
   onCell: (staffId: string, date: string, shiftKey: boolean) => void;
   onPerson: (staffId: string, date: string) => void;
   onLeave: (leaveId: string | null, date: string) => void;
@@ -48,7 +48,10 @@ export function MobileRoster({
         <Button variant="ghost" size="icon" aria-label="Previous week" disabled={weekStart === 0} onClick={() => setWeekStart((w) => Math.max(0, w - 7))}>
           <ChevronLeft className="size-4" />
         </Button>
-        <div className="grid flex-1 grid-cols-7 gap-1">
+        {/* Fixed-width columns would leave dead space when a month's last week is short (e.g. 2
+            days), since every month but a 28-day one ends on a partial week. Sizing columns to the
+            actual day count keeps that row filling the strip like every other week. */}
+        <div className="grid flex-1 gap-1" style={{ gridTemplateColumns: `repeat(${week.length}, minmax(0, 1fr))` }}>
           {week.map((d) => {
             const dd = roster.days[d];
             return (
@@ -56,7 +59,9 @@ export function MobileRoster({
                 key={d}
                 onClick={() => {
                   setDay(d);
-                  onFocusDate(d);
+                  // Just browsing the strip: the day card below already shows this date's event,
+                  // lock and strength inline, so don't pop the sheet open over the person list.
+                  onFocusDate(d, false);
                 }}
                 className={cn(
                   "flex flex-col items-center rounded-lg py-1 text-xs",

@@ -134,9 +134,13 @@ export function RosterWorkspace(props: WorkspaceProps) {
    * Date header, calendar cell, or mobile week strip: show that date's details. For editors this
    * replaces the normal duty / Task / leave tools with the date's lock and special-event settings.
    * Clicking the same date again (or the panel's close button, via closeDateSettings) goes back.
+   *
+   * The mobile week strip passes `openSheet: false`: it already shows the day's read-only details
+   * (event, lock, strength) inline above the list, so forcing the sheet open there would just bury
+   * that list under the lock/event editor the moment you browse to a day.
    */
   const focusDateOnly = useCallback(
-    (date: string) => {
+    (date: string, openSheet = true) => {
       if (focusDate === date && dateSettingsOpen) {
         setFocusDate(null);
         setDateSettingsOpen(false);
@@ -146,7 +150,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
       setDateSettingsOpen(true);
       setFocusLeaveId(null);
       setFocusStaffId(null);
-      setSheetOpen(true);
+      if (openSheet) setSheetOpen(true);
     },
     [focusDate, dateSettingsOpen],
   );
