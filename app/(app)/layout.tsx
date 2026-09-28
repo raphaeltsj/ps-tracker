@@ -27,6 +27,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         showTaskReport={canViewTaskReport(viewer)}
         showDayworkers={canManageDayworkers(viewer)}
         showManageRequests={showManageRequests}
+        showStaff={hasEditView(viewer)}
         badge={badge}
         bellHref={bellHref}
         notifications={notifications}

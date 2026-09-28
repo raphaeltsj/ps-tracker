@@ -102,7 +102,7 @@ export function SidePanel(props: PanelProps) {
       )}
       {mode === "staff" && canRequest && staffTool === "swap" && (
         <Section title="Request a swap">
-          <SwapForm mode="request" viewerId={viewer.id} firstPeople={[]} today={props.today} />
+          <SwapForm mode="request" viewerId={viewer.id} firstPeople={[]} today={props.today} prefillDates={[...selection.dates]} />
         </Section>
       )}
       {mode === "staff" && canRequest && staffTool === "leave" && <RequestForm {...props} />}
@@ -747,6 +747,11 @@ function EditTools(props: PanelProps) {
   const type = leaveTypes.find((t) => t.code === typeCode);
   // An approved duty swap holds its dates: duties and leave cannot change there (Tasks can).
   const swapped = cells.filter((c) => roster.cells[c.staffId]?.[c.date]?.swap);
+  // Swap tab: prefill from the selection when it is exactly one person (a swap is one person and a
+  // partner, so a multi-person selection has nothing sensible to prefill).
+  const swapStaffIds = Object.keys(byStaff);
+  const swapPrefillAId = swapStaffIds.length === 1 ? swapStaffIds[0] : undefined;
+  const swapPrefillDates = swapPrefillAId ? byStaff[swapPrefillAId] : [];
 
   return (
     <Section
@@ -794,7 +799,7 @@ function EditTools(props: PanelProps) {
           [
             ["duty", "Duty"],
             ["task", "Task"],
-            ["leave", "Give leave"],
+            ["leave", "Leave"],
             ["swap", "Swap"],
           ] as const
         ).map(([key, label]) => (
@@ -941,7 +946,9 @@ function EditTools(props: PanelProps) {
         </div>
       )}
 
-      {tab === "swap" && <SwapForm mode="record" viewerId={viewer.id} firstPeople={swapFirstPeople} today={today} />}
+      {tab === "swap" && (
+        <SwapForm mode="record" viewerId={viewer.id} firstPeople={swapFirstPeople} today={today} prefillAId={swapPrefillAId} prefillDates={swapPrefillDates} />
+      )}
 
       <ResultMessage result={result} />
     </Section>

@@ -17,6 +17,7 @@ export function AppHeader({
   showTaskReport,
   showDayworkers,
   showManageRequests,
+  showStaff,
   badge,
   bellHref,
   notifications,
@@ -27,6 +28,7 @@ export function AppHeader({
   showTaskReport: boolean;
   showDayworkers: boolean;
   showManageRequests: boolean;
+  showStaff: boolean;
   badge: number;
   bellHref: string;
   notifications: NotificationSummary[];
@@ -38,6 +40,7 @@ export function AppHeader({
     ...(showManageRequests ? [{ href: "/manage-requests", label: "Manage requests" }] : []),
     ...(showTaskReport ? [{ href: "/task-report", label: "Task report" }] : []),
     ...(showDayworkers ? [{ href: "/dayworkers", label: "Dayworkers" }] : []),
+    ...(showStaff ? [{ href: "/staff", label: "Staff" }] : []),
     ...(showTasks ? [{ href: "/tasks", label: "Tasks" }] : []),
   ];
   return (

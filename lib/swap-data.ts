@@ -219,6 +219,8 @@ function evaluateSwap(f: SwapFacts, { a: aId, b: bId, dates, excludeSwapId }: Pr
   for (const p of [a, b]) {
     if (!p.active || p.role === "MANAGEMENT" || !p.shiftId) return fail(`${p.name} is not on a shift roster, so cannot swap duties.`);
   }
+  // Staff swap with staff, supervisors swap with supervisors: never across the two.
+  if (a.role !== b.role) return fail(`${a.name} is ${a.role === "SUPERVISOR" ? "a supervisor" : "regular staff"} and ${b.name} is ${b.role === "SUPERVISOR" ? "a supervisor" : "regular staff"}. Duty swaps are only between people with the same role.`);
 
   const clash = f.active.find((d) => d.swapId !== excludeSwapId && dates.includes(d.date) && [aId, bId].some((id) => id === d.swap.requesterId || id === d.swap.partnerId));
   if (clash) {
@@ -480,7 +482,8 @@ export async function swapCandidates(aId: string, dates: string[]): Promise<{ aD
     .map((s) => {
       const duties = sorted.map((d) => ctx.resolve(s.id, d).duty);
       let blocked: string | null = null;
-      if (onLeave.has(s.id)) blocked = "On leave";
+      if (s.role !== a.role) blocked = a.role === "SUPERVISOR" ? "Not a supervisor" : "Supervisor";
+      else if (onLeave.has(s.id)) blocked = "On leave";
       else if (inSwap.has(s.id)) blocked = "Already in a swap";
       else if (onExtra.has(s.id)) blocked = "On Extra duty";
       else if (duties.some((d, i) => !dutiesDiffer(d, aDuties[i]))) blocked = "Same duty";

@@ -25,12 +25,19 @@ export function SwapForm({
   viewerId,
   firstPeople,
   today,
+  prefillAId,
+  prefillDates = [],
 }: {
   mode: "request" | "record";
   viewerId: string;
   /** Record mode: people the recorder supervises (person 1). */
   firstPeople: SwapCandidate[];
   today: string;
+  /** Record mode: pre-select "Person 1" from a cell picked on the roster. */
+  prefillAId?: string;
+  /** Pre-fill the date(s) from a date or cell picked on the roster. The date picker below still
+   *  works normally, so a date can always be typed or changed by hand instead. */
+  prefillDates?: string[];
 }) {
   const [aId, setAId] = useState(mode === "request" ? viewerId : "");
   const [bId, setBId] = useState("");
@@ -52,6 +59,23 @@ export function SwapForm({
     const typed = date1Ref.current?.value;
     if (typed) setDate1(typed);
   }, []);
+
+  // Picking a date (or a cell) on the roster fills the date(s) in here instead of typing them again;
+  // the date picker below still works, so a date can still be typed or changed by hand. Only reacts
+  // when the roster selection actually changes (a fresh pick), not on every render.
+  const [fromRoster, setFromRoster] = useState(false);
+  const prefillKey = `${prefillAId ?? ""}|${[...prefillDates].filter((d) => d >= today).sort().join(",")}`;
+  useEffect(() => {
+    const [first, second] = prefillKey.split("|")[1].split(",").filter(Boolean);
+    if (!first) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDate1(first);
+    setTwoDates(Boolean(second));
+    setDate2(second ?? "");
+    if (mode === "record" && prefillAId) setAId(prefillAId);
+    setFromRoster(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillKey]);
 
   const dates = useMemo(() => [date1, twoDates ? date2 : ""].filter(Boolean).sort(), [date1, date2, twoDates]);
   const datesReady = Boolean(aId && date1 && (!twoDates || date2));
@@ -125,33 +149,44 @@ export function SwapForm({
       </p>
 
       {mode === "record" && (
-        <label className="block space-y-1" htmlFor="swap-a">
-          <span className="text-xs font-medium">1. Person (your shift)</span>
-          <select id="swap-a" value={aId} onChange={(e) => setAId(e.target.value)} className="h-9 w-full rounded-md border bg-background px-2 text-sm">
-            <option value="">Choose a person</option>
-            {firstPeople.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} (Shift {p.shiftId})
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="space-y-1.5 rounded-md border p-2">
+          <label className="block space-y-1" htmlFor="swap-a">
+            <span className="text-xs font-medium text-muted-foreground">1. Person (your shift)</span>
+            <select id="swap-a" value={aId} onChange={(e) => setAId(e.target.value)} className="h-9 w-full rounded-md border bg-background px-2 text-sm">
+              <option value="">Choose a person</option>
+              {firstPeople.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} (Shift {p.shiftId})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       )}
 
-      <div className="space-y-1.5">
-        <span className="text-xs font-medium">{mode === "record" ? "2. " : "1. "}Date</span>
+      <div className="space-y-1.5 rounded-md border p-2">
+        <span className="text-xs font-medium text-muted-foreground">{mode === "record" ? "2. " : "1. "}Date</span>
         <div className="grid gap-2 sm:grid-cols-2">
-          <Input ref={date1Ref} type="date" aria-label={twoDates ? "First date" : "Date"} value={date1} min={today} onChange={(e) => setDate1(e.target.value)} />
-          {twoDates && <Input type="date" aria-label="Second date" value={date2} min={today} onChange={(e) => setDate2(e.target.value)} />}
+          <Input ref={date1Ref} type="date" aria-label={twoDates ? "First date" : "Date"} value={date1} min={today} onChange={(e) => { setDate1(e.target.value); setFromRoster(false); }} />
+          {twoDates && <Input type="date" aria-label="Second date" value={date2} min={today} onChange={(e) => { setDate2(e.target.value); setFromRoster(false); }} />}
         </div>
-        <label className="flex items-center gap-2 text-xs">
-          <input type="checkbox" checked={twoDates} onChange={(e) => setTwoDates(e.target.checked)} className="size-4" />
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={twoDates}
+            onChange={(e) => {
+              setTwoDates(e.target.checked);
+              setFromRoster(false);
+            }}
+            className="size-4"
+          />
           Add a second date (a give-and-take, or both V nights)
         </label>
+        {fromRoster && date1 && <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">Picked from your roster selection. Change the date above if needed.</p>}
       </div>
 
-      <div className="space-y-1.5">
-        <span className="text-xs font-medium">{mode === "record" ? "3. " : "2. "}Swap with</span>
+      <div className="space-y-1.5 rounded-md border p-2">
+        <span className="text-xs font-medium text-muted-foreground">{mode === "record" ? "3. " : "2. "}Swap with</span>
         {!datesReady ? (
           <p className="rounded-md border border-dashed p-2 text-xs text-muted-foreground">
             {mode === "record" && !aId ? "Choose the person first, then the date." : "Pick the date first to see everyone's duty that day."}
