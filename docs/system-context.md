@@ -1,6 +1,6 @@
 # PS Tracker: System Context Document
 
-*Duty roster management for a shift-based team | Version 1.17 | Draft for editing*
+*Duty roster management for a shift-based team | Version 1.18 | Draft for editing*
 
 ## 1. Purpose of this document
 
@@ -12,6 +12,8 @@ It has two parts:
 - **Part B: Build framework** (section 17): the tech stack, project structure, and build conventions. Read both before implementing any feature.
 
 > **How to edit:** items in [square brackets] are still undecided. Section 16 lists assumptions and open questions. Update this document whenever a rule changes so it stays the single source of truth.
+
+**Changes in 1.18:** the desktop Roster view opens scrolled to today's column instead of the 1st of the month, so picking a date for a swap or leave request no longer starts on a page of unusable past dates (14.3.1); the right-hand side panel can be collapsed and reopened on desktop, for every role (14.3); two new leave types, **GRW** and **0.5 GRW** (Growth Day) (12.1); the leave-type dropdown shows a uniform code chip + name for every type, including in its own closed state, instead of a plain "CODE - Name" string that varied in shape per type.
 
 **Changes in 1.17:** locking dates or setting a special event can now also raise a dismissible **announcement banner** at the top of the app, several combining into one, plus a bell notification either way (6, 12.5, 13.1); the Staff records page adds **Task proficiency** (not trained / understudy / proficient per person, per Task, never shown to staff), compared on Manage requests when reviewing a duty swap (9.3, 11.6); Manage requests is redesigned with leave on the left and swaps on the right (11.5); Tasks are seeded 12 at a time instead of 5 (14.6).
 
@@ -443,6 +445,8 @@ Common leave types and their full names:
 | **BD-IL**   | Birthday off in lieu      | Used when the birthday falls on an Off day. Placed on the next closest working day.                                          |
 | **0.5 OIL** | Half-day off in lieu      | Requester chooses the first half or second half of the duty timing (for example PM first half: 1445 to 1800). Counts as 0.5. |
 | **1 OIL**   | Off in lieu (full day)    |                                                                                                                              |
+| **GRW**     | Growth Day                |                                                                                                                              |
+| **0.5 GRW** | Half-day growth day       | Requester chooses the first half or second half of the duty timing; the UI shows the actual hours. Counts as 0.5.            |
 
 - Each type appears as a short-code chip on the roster. Half-day types (0.5 AL and 0.5 OIL) look visually different (for example half-filled) from full-day leave.
 
@@ -564,10 +568,12 @@ Other screens (Calendar view, side panel, Home, forms) keep text labels for duti
 
 - **Calendar view / Roster view** switch: available to every role, always visible near the top of the roster area.
 - **Edit view / Staff view** switch: Supervisors and Management only, clearly distinct from the calendar/roster switch so the two are not confused. Edit controls appear only in Edit view.
+- **Side panel collapse**: on desktop, a small button at the panel's edge hides it (and shows it again), for every role, so the roster can use the full width. On mobile the panel is already a bottom sheet, so this button is desktop-only.
 
 ### 14.3.1 Navigation, loading and error states
 
 - The requests page is called **My Requests** everywhere (desktop menu, mobile tab, page heading); the review page for supervisors and Management is **Manage requests**.
+- The desktop Roster view opens **scrolled to today's column**, not the 1st of the month, so the dates a leave request or duty swap can actually use (today onwards) are visible without scrolling first. The mobile week strip already opens on the week containing today.
 - On phones and tablets (where the top menu is hidden), Profile links to every page the role can open.
 - Changing month, shift or view shows a thin progress bar and dims the roster until the new data arrives; moving between pages shows a loading indicator.
 - A mistyped address shows "Page not found", and a page the role cannot open (for example Tasks for staff) shows "This page isn't available", both with a link back to the roster. If a page fails to load, an error screen offers "Try again".

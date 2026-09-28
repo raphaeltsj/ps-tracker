@@ -48,7 +48,7 @@ Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, n
 - Worked example: weekday PM, total 26, 4 full leave + 1 x 0.5 OIL gives Not in 4.5, Working 21.5, Slots 9.5.
 
 **Leave.**
-- Types: AL, 0.5 AL, OL, MWO, OML (ordinary medical leave: MC without a medical certificate), MC, HL, FCL, CSE, BD, BD-IL, 0.5 OIL, 1 OIL. Half-day types ask first or second half, show actual hours, and look half-filled.
+- Types: AL, 0.5 AL, OL, MWO, OML (ordinary medical leave: MC without a medical certificate), MC, HL, FCL, CSE, BD, BD-IL, 0.5 OIL, 1 OIL, GRW (Growth Day), 0.5 GRW. Half-day types ask first or second half, show actual hours, and look half-filled.
 - Custom leave types: name max 6 characters including spaces, with a live counter and chip preview. They count toward Not in Strength.
 - One type of leave per person per day (pending, approved, given, half-day, BD / BD-IL all count). Block the request or grant and show the clashing date.
 - Birthday: BD shows on the birthday even on an Off day; then the leave is BD-IL on the next closest working day without other leave. BD on an Off day is a marker only.
@@ -68,7 +68,7 @@ Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, n
 **UI.**
 - Calendar/Roster switch (all roles) is separate from the Edit/Staff switch (supervisors and Management).
 - Strength rows are sticky directly below the date header, with a "Compact" toggle that shows only Available Slot(s). The other rows (Support, Extra, Recall, Ops duty) sit at the bottom of the roster.
-- The request form sits on the same page as the calendar/roster (right panel on desktop, bottom sheet on mobile).
+- The request form sits on the same page as the calendar/roster (right panel on desktop, bottom sheet on mobile). On desktop the panel can be collapsed and reopened (a small edge button), for everyone, to see the full roster; the roster grid opens scrolled to today, not the 1st of the month, so today-onwards dates for a request or swap are visible without scrolling first.
 - Clicking a date (header, calendar cell, or mobile week strip) shows that date's details. It never selects every person on that day. For supervisors and Management it replaces the normal duty / Task / leave tools with that date's lock and special-event settings; clicking the date again, or Close, returns to the normal tools. Staff see read-only details only.
 - Selecting a person's date (a roster cell) opens the normal duty / Task / leave tools, defaulting to the **Task** tab.
 - Mobile uses bottom tabs (Roster, Requests, Manage for supervisors and Management, Profile). Include a notification bell placeholder.

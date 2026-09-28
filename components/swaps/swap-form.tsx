@@ -65,6 +65,9 @@ export function SwapForm({
   // when the roster selection actually changes (a fresh pick), not on every render.
   const [fromRoster, setFromRoster] = useState(false);
   const prefillKey = `${prefillAId ?? ""}|${[...prefillDates].filter((d) => d >= today).sort().join(",")}`;
+  // Picked a date on the roster that's already in the past: nothing to prefill (swaps are for today
+  // onwards), but say so instead of silently doing nothing, which otherwise looks like it didn't work.
+  const pickedOnlyPast = prefillDates.length > 0 && prefillDates.every((d) => d < today);
   useEffect(() => {
     const [first, second] = prefillKey.split("|")[1].split(",").filter(Boolean);
     if (!first) return;
@@ -183,6 +186,11 @@ export function SwapForm({
           Add a second date (a give-and-take, or both V nights)
         </label>
         {fromRoster && date1 && <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">Picked from your roster selection. Change the date above if needed.</p>}
+        {!date1 && pickedOnlyPast && (
+          <p className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+            The date you picked on the roster has already passed. Swaps are for today onwards: pick a date from today or later, above or on the roster.
+          </p>
+        )}
       </div>
 
       <div className="space-y-1.5 rounded-md border p-2">

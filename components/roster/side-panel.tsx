@@ -28,6 +28,7 @@ import { ResultMessage, useAction } from "@/components/roster/use-action";
 import { SwapForm } from "@/components/swaps/swap-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cycleDayLabel, cyclePositionLabel } from "@/lib/cycle";
 import { formatDate, formatDateList, formatDateShort, formatDateTime } from "@/lib/dates";
@@ -573,22 +574,32 @@ function AnnounceFields({
 
 // ---------------- Staff: request leave ----------------
 
+/** A leave type's short-code chip (same style as the roster's LeaveChip) plus its name: every row and
+ * the trigger's own closed-state display share this exact layout, so every type looks uniform. */
+function LeaveTypeRow({ t }: { t: LeaveTypeOption }) {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <LeaveChip absence={{ code: t.code, half: t.halfDay ? "FIRST" : null, status: "APPROVED", counts: t.halfDay ? 0.5 : 1, derived: false }} className="w-16 shrink-0 justify-center" />
+      <span className="truncate">{t.name}</span>
+      {t.custom && <span className="ml-auto shrink-0 rounded bg-muted px-1 text-[9px] font-medium text-muted-foreground">Custom</span>}
+    </span>
+  );
+}
+
 function LeaveTypeSelect({ types, value, onChange, id }: { types: LeaveTypeOption[]; value: string; onChange: (v: string) => void; id: string }) {
   return (
-    <select
-      id={id}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-    >
-      <option value="">Choose a leave type</option>
-      {types.map((t) => (
-        <option key={t.code} value={t.code}>
-          {t.code} - {t.name}
-          {t.custom ? " (custom)" : ""}
-        </option>
-      ))}
-    </select>
+    <Select value={value || undefined} onValueChange={onChange}>
+      <SelectTrigger id={id} className="h-9 w-full">
+        <SelectValue placeholder="Choose a leave type" />
+      </SelectTrigger>
+      <SelectContent>
+        {types.map((t) => (
+          <SelectItem key={t.code} value={t.code}>
+            <LeaveTypeRow t={t} />
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
