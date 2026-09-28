@@ -113,6 +113,27 @@ function SwapCard({ swap: s, viewerId }: { swap: SwapSummary; viewerId: string }
             </span>
           </div>
         ))}
+        {/* A V swap's follow-on days: the PM block after the V, where the Off(V) moves with it. */}
+        {s.linkedRows.map((r) => (
+          <div key={r.date} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <span className="w-14 shrink-0 text-muted-foreground">{formatDateShort(r.date)}</span>
+            {(
+              [
+                [s.requester, r.requester],
+                [s.partner, r.partner],
+              ] as const
+            )
+              .filter(([, d]) => d.before !== d.after)
+              .map(([p, d]) => (
+                <span key={p.id} className="inline-flex items-center gap-1">
+                  <span className="text-muted-foreground">{me(p.id, p.name)}:</span>
+                  <DutyChip duty={d.after} />
+                  <span className="text-muted-foreground line-through decoration-1">{DUTY_LABEL[d.before]}</span>
+                </span>
+              ))}
+            <span className="text-[11px] text-muted-foreground">(follows the V)</span>
+          </div>
+        ))}
       </div>
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">

@@ -192,6 +192,9 @@ export function ExtraChip({ entry, className }: { entry: ExtraEntry; className?:
 
 /** Explains a swapped cell: who the person swapped with and what they would have worked. */
 export function swapTitle(swap: CellSwap, duty: Duty): string {
+  if (swap.linked) {
+    return `Follows the V swap with ${swap.partnerName} (Shift ${swap.partnerShiftId}): ${dutyTitle(duty)} instead of ${DUTY_LABEL[swap.ownDuty]} (the Off(V) moves with the V)`;
+  }
   return `Duty swap with ${swap.partnerName} (Shift ${swap.partnerShiftId}): working ${dutyTitle(duty)} instead of ${DUTY_LABEL[swap.ownDuty]}`;
 }
 

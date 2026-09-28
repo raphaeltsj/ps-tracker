@@ -16,10 +16,12 @@ import {
   type SwapPreviewRow,
   type SwapRipple,
   type SwapStatus,
+  isVDuty,
+  linkedDates,
   vThenAm,
 } from "@/lib/swaps";
 
-// A V taken over in a swap earns Off(V) up to 6 days later, and post-V looks back 2 more days.
+// A V earns Off(V) on the PM block right after it (post-V looks back 2 days); 8 days is ample.
 const LOOK_BACK = 8;
 
 export type SwapPerson = { id: string; name: string; shiftId: string | null };
@@ -56,6 +58,7 @@ export async function loadDutyContext(
     b: d.swap.partnerId,
     anchors: { a: anchorOf.get(d.swap.requesterShiftId)!, b: anchorOf.get(d.swap.partnerShiftId)! },
     shifts: { a: d.swap.requesterShiftId, b: d.swap.partnerShiftId },
+    linked: d.linked,
   }));
 
   const people = new Map<string, PersonCycle>(opts.known);
@@ -166,7 +169,15 @@ export async function swapAffectedByDutyChange(changes: { staffId: string; date:
 }
 
 export type SwapCheck =
-  | { ok: true; rows: SwapPreviewRow[]; ripples: SwapRipple[]; names: Record<string, string>; warnings: string[] }
+  | {
+      ok: true;
+      rows: SwapPreviewRow[];
+      ripples: SwapRipple[];
+      names: Record<string, string>;
+      warnings: string[];
+      /** Follow-on days of a V swap (the PM block after it), stored with the swap and locked like it. */
+      linked: string[];
+    }
   | { ok: false; error: string };
 
 type Proposal = { a: string; b: string; dates: string[]; excludeSwapId?: string };
@@ -180,15 +191,17 @@ async function loadSwapFacts(proposals: Proposal[]) {
   const allDates = [...new Set(proposals.flatMap((p) => p.dates))].sort();
   const from = allDates[0];
   const to = allDates[allDates.length - 1];
+  // The swap dates plus the week after them, where a V swap's follow-on (Off(V)) days fall.
+  const span = dateRange(from, addDays(to, 7));
   const [staff, active, leaveDays, extras, dos, ctx] = await Promise.all([
     db.staff.findMany({ where: { id: { in: ids } } }),
     db.dutySwapDay.findMany({
-      where: { date: { in: allDates }, swap: { status: { in: ACTIVE_SWAP_STATUSES }, OR: [{ requesterId: { in: ids } }, { partnerId: { in: ids } }] } },
+      where: { date: { in: span }, swap: { status: { in: ACTIVE_SWAP_STATUSES }, OR: [{ requesterId: { in: ids } }, { partnerId: { in: ids } }] } },
       include: { swap: { select: { requesterId: true, partnerId: true } } },
       orderBy: { date: "asc" },
     }),
-    db.leaveDay.findMany({ where: { date: { in: allDates }, leave: { staffId: { in: ids }, status: { in: ["PENDING", "APPROVED"] } } }, include: { leave: true }, orderBy: { date: "asc" } }),
-    db.extraShiftDuty.findMany({ where: { staffId: { in: ids }, date: { in: allDates } }, orderBy: { date: "asc" } }),
+    db.leaveDay.findMany({ where: { date: { in: span }, leave: { staffId: { in: ids }, status: { in: ["PENDING", "APPROVED"] } } }, include: { leave: true }, orderBy: { date: "asc" } }),
+    db.extraShiftDuty.findMany({ where: { staffId: { in: ids }, date: { in: span } }, orderBy: { date: "asc" } }),
     db.extraDuty.findMany({ where: { staffId: { in: ids }, date: { in: allDates } }, orderBy: { date: "asc" } }),
     loadDutyContext(ids, from, addDays(to, 7)),
   ]);
@@ -196,9 +209,9 @@ async function loadSwapFacts(proposals: Proposal[]) {
   const addLeave = (staffId: string, entry: { date: string; code: string; status: string }) => leave.set(staffId, [...(leave.get(staffId) ?? []), entry]);
   for (const d of leaveDays) addLeave(d.leave.staffId, { date: d.date, code: d.leave.typeCode, status: d.leave.status });
   // BD / BD-IL are derived from the birthday: only worth building for birthdays near these dates.
-  for (const person of staff.filter((p) => p.birthday && p.shiftId && birthdayNear(p.birthday, allDates))) {
-    const roster = await buildRoster(person.shiftId!, from, to, null, { staffIds: [person.id] });
-    for (const date of allDates) {
+  for (const person of staff.filter((p) => p.birthday && p.shiftId && birthdayNear(p.birthday, span))) {
+    const roster = await buildRoster(person.shiftId!, from, span[span.length - 1], null, { staffIds: [person.id] });
+    for (const date of span) {
       const derived = roster.cells[person.id]?.[date]?.absences.find((x) => x.derived && x.counts > 0);
       if (derived) addLeave(person.id, { date, code: derived.code, status: "APPROVED" });
     }
@@ -219,8 +232,12 @@ function evaluateSwap(f: SwapFacts, { a: aId, b: bId, dates, excludeSwapId }: Pr
   for (const p of [a, b]) {
     if (!p.active || p.role === "MANAGEMENT" || !p.shiftId) return fail(`${p.name} is not on a shift roster, so cannot swap duties.`);
   }
-  // Staff swap with staff, supervisors swap with supervisors: never across the two.
-  if (a.role !== b.role) return fail(`${a.name} is ${a.role === "SUPERVISOR" ? "a supervisor" : "regular staff"} and ${b.name} is ${b.role === "SUPERVISOR" ? "a supervisor" : "regular staff"}. Duty swaps are only between people with the same role.`);
+  // Supervisors swap only with supervisors, and regular staff only with regular staff.
+  if (a.role !== b.role) {
+    const sup = a.role === "SUPERVISOR" ? a : b;
+    const staff = sup === a ? b : a;
+    return fail(`${sup.name} is a supervisor and ${staff.name} is regular staff. Supervisors can only swap with supervisors, and staff with staff.`);
+  }
 
   const clash = f.active.find((d) => d.swapId !== excludeSwapId && dates.includes(d.date) && [aId, bId].some((id) => id === d.swap.requesterId || id === d.swap.partnerId));
   if (clash) {
@@ -249,10 +266,33 @@ function evaluateSwap(f: SwapFacts, { a: aId, b: bId, dates, excludeSwapId }: Pr
     if (!dutiesDiffer(r.aBefore, r.bBefore)) {
       return fail(`${a.name} and ${b.name} both have ${dutyWord(r.aBefore)} on ${formatDate(r.date)}, so there is nothing to swap that day.`);
     }
-    // V(SB) standbys come from the V person's own shift, so a V(SB) only swaps within the shift.
-    if ((r.aBefore === "VSB" || r.bBefore === "VSB") && a.shiftId !== b.shiftId) {
-      return fail(`V(SB) on ${formatDate(r.date)} can only be swapped with someone in the same shift (the standby comes from the V person's shift).`);
+    // Within a shift, only a V or V(SB) day can be swapped (everyone else there shares the shift's
+    // duty). V and V(SB) never go to another shift: the standby and the V person's Off(V) belong to it.
+    const vDay = [r.aBefore, r.bBefore].some(isVDuty);
+    if (a.shiftId === b.shiftId && !vDay) {
+      return fail(`Within a shift, only a V or V(SB) day can be swapped. On ${formatDate(r.date)} neither ${a.name} nor ${b.name} is on V or V(SB): swap with someone from another shift instead.`);
     }
+    if (a.shiftId !== b.shiftId && vDay) {
+      return fail(`V and V(SB) on ${formatDate(r.date)} can only be swapped with someone in the same shift (Shift ${[r.aBefore].some(isVDuty) ? a.shiftId : b.shiftId}).`);
+    }
+  }
+
+  // A V swap takes the PM block after it with it (the taker gets the Off(V), the giver works PM):
+  // those follow-on days are part of the swap, so they must be free the same way as the swap dates.
+  const linked = linkedDates(ripples);
+  for (const p of [a, b]) {
+    const onLeave = (f.leave.get(p.id) ?? []).find((l) => linked.includes(l.date));
+    if (onLeave) return fail(`${p.name} has ${onLeave.status === "PENDING" ? "pending " : ""}${onLeave.code} on ${formatDate(onLeave.date)}, a follow-on day of this V swap (the Off(V) moves with the V). Sort out that leave first.`);
+  }
+  const linkedClash = f.active.find((d) => d.swapId !== excludeSwapId && linked.includes(d.date) && [aId, bId].some((id) => id === d.swap.requesterId || id === d.swap.partnerId));
+  if (linkedClash) {
+    const who = [linkedClash.swap.requesterId, linkedClash.swap.partnerId].includes(aId) ? a.name : b.name;
+    return fail(`${who} is already in another duty swap on ${formatDate(linkedClash.date)}, a follow-on day of this V swap. One swap per person per day.`);
+  }
+  const linkedExtra = f.extras.find((e) => (e.staffId === aId || e.staffId === bId) && linked.includes(e.date));
+  if (linkedExtra) {
+    const who = linkedExtra.staffId === aId ? a : b;
+    return fail(`${who.name} is on Extra duty for Shift ${linkedExtra.hostShiftId} on ${formatDate(linkedExtra.date)}, a follow-on day of this V swap. Remove the Extra duty first.`);
   }
   // No V night straight into an AM at 0745 the next morning.
   const after = makeDutyResolver(f.ctx.people, [...existing, ...dates.map((date) => ({ swapId: "new", date, a: aId, b: bId }))]);
@@ -276,7 +316,7 @@ function evaluateSwap(f: SwapFacts, { a: aId, b: bId, dates, excludeSwapId }: Pr
       `${who.name} keeps the ${d.kind} on ${formatDate(d.date)} (24 hours from 0800) on top of the swapped duty (${dutyWord(newDuty)}), and gets no 0.5 OIL for it. To avoid this, move the ${d.kind} to someone on AM first.`,
     );
   }
-  return { ok: true, rows, ripples, names: { [aId]: `${a.name} (${a.shiftId})`, [bId]: `${b.name} (${b.shiftId})` }, warnings };
+  return { ok: true, rows, ripples, names: { [aId]: `${a.name} (${a.shiftId})`, [bId]: `${b.name} (${b.shiftId})` }, warnings, linked };
 }
 
 /**
@@ -315,6 +355,8 @@ export type SwapSummary = {
   partnerSideBy: string | null;
   /** Each date before the swap: what each person would have worked. */
   rows: { date: string; requesterDuty: Duty; partnerDuty: Duty }[];
+  /** Follow-on days of a V swap (the PM block after it): each person's duty before and after. */
+  linkedRows: { date: string; requester: { before: Duty; after: Duty }; partner: { before: Duty; after: Duty } }[];
   /** What the viewer can do now. */
   can: { respond: boolean; withdraw: boolean; approve: boolean; reject: boolean; cancel: boolean };
   /** For a pending swap: why it cannot go through as things stand (checked when shown). */
@@ -365,7 +407,7 @@ export async function getSwapsFor(viewer: Viewer): Promise<SwapSummary[]> {
   if (swaps.length === 0) return [];
   // One batch of data for every listed swap, then each is summarised without further queries.
   const [facts, names] = await Promise.all([
-    loadSwapFacts(swaps.map((s) => ({ a: s.requesterId, b: s.partnerId, dates: s.days.map((d) => d.date), excludeSwapId: s.id }))),
+    loadSwapFacts(swaps.map((s) => ({ a: s.requesterId, b: s.partnerId, dates: exchangeDates(s.days), excludeSwapId: s.id }))),
     db.staff.findMany({
       where: { id: { in: [...new Set(swaps.flatMap((s) => [s.createdById, s.requesterSideById, s.partnerSideById]).filter((x): x is string => Boolean(x)))] } },
       select: { id: true, name: true },
@@ -375,17 +417,34 @@ export async function getSwapsFor(viewer: Viewer): Promise<SwapSummary[]> {
   return swaps.map((s) => summarize(viewer, s, facts, nameOf));
 }
 
+/** The dates two people exchange duties on (a V swap's follow-on days are stored too, flagged linked). */
+export function exchangeDates(days: { date: string; linked: boolean }[]): string[] {
+  return days.filter((d) => !d.linked).map((d) => d.date);
+}
+
 export async function loadSwap(id: string) {
   return db.dutySwap.findUnique({ where: { id }, include: swapInclude });
 }
 
 function summarize(viewer: Viewer, s: NonNullable<Awaited<ReturnType<typeof loadSwap>>>, facts: SwapFacts, names: Map<string, string>): SwapSummary {
   const status = s.status as SwapStatus;
-  const dates = s.days.map((d) => d.date);
+  const dates = exchangeDates(s.days);
 
   // Before-swap duties on each date (this swap left out, so an approved one shows what it replaced).
   const before = makeDutyResolver(facts.ctx.people, facts.ctx.swaps.filter((x) => x.swapId !== s.id));
   const rows = dates.map((date) => ({ date, requesterDuty: before(s.requesterId, date).duty, partnerDuty: before(s.partnerId, date).duty }));
+  // Follow-on days of a V swap: each person's duty there before and after the swap.
+  const after = makeDutyResolver(facts.ctx.people, [
+    ...facts.ctx.swaps.filter((x) => x.swapId !== s.id),
+    ...dates.map((date) => ({ swapId: s.id, date, a: s.requesterId, b: s.partnerId })),
+  ]);
+  const linkedRows = s.days
+    .filter((d) => d.linked)
+    .map(({ date }) => ({
+      date,
+      requester: { before: before(s.requesterId, date).duty, after: after(s.requesterId, date).duty },
+      partner: { before: before(s.partnerId, date).duty, after: after(s.partnerId, date).duty },
+    }));
 
   const editsA = canApproveSide(viewer, s.requesterShiftId);
   const editsB = canApproveSide(viewer, s.partnerShiftId);
@@ -422,6 +481,7 @@ function summarize(viewer: Viewer, s: NonNullable<Awaited<ReturnType<typeof load
     requesterSideBy: s.requesterSideById ? (names.get(s.requesterSideById) ?? "") : null,
     partnerSideBy: s.partnerSideById ? (names.get(s.partnerSideById) ?? "") : null,
     rows,
+    linkedRows,
     can,
     problem,
     warnings,
@@ -477,17 +537,18 @@ export async function swapCandidates(aId: string, dates: string[]): Promise<{ aD
   const inSwap = new Set(swapDays.flatMap((d) => [d.swap.requesterId, d.swap.partnerId]));
   const aDuties = sorted.map((d) => ctx.resolve(aId, d).duty);
 
+  // Supervisors swap only with supervisors, and staff with staff: the other role never appears.
   const people = staff
-    .filter((s) => s.id !== aId)
+    .filter((s) => s.id !== aId && s.role === a.role)
     .map((s) => {
       const duties = sorted.map((d) => ctx.resolve(s.id, d).duty);
       let blocked: string | null = null;
-      if (s.role !== a.role) blocked = a.role === "SUPERVISOR" ? "Not a supervisor" : "Supervisor";
-      else if (onLeave.has(s.id)) blocked = "On leave";
+      if (onLeave.has(s.id)) blocked = "On leave";
       else if (inSwap.has(s.id)) blocked = "Already in a swap";
       else if (onExtra.has(s.id)) blocked = "On Extra duty";
       else if (duties.some((d, i) => !dutiesDiffer(d, aDuties[i]))) blocked = "Same duty";
-      else if (s.shiftId !== a.shiftId && [...duties, ...aDuties].includes("VSB")) blocked = "V(SB): same shift only";
+      else if (s.shiftId === a.shiftId && !duties.every((d, i) => isVDuty(d) || isVDuty(aDuties[i]))) blocked = "Same shift: V or V(SB) days only";
+      else if (s.shiftId !== a.shiftId && [...duties, ...aDuties].some(isVDuty)) blocked = "V / V(SB): same shift only";
       return { id: s.id, name: s.name, shiftId: s.shiftId!, duties, blocked, birthday: s.birthday };
     });
 

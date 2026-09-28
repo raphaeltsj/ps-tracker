@@ -77,12 +77,11 @@ export function effectiveDuty(
     if (ownV(addDays(blockStart, -1)) || ownV(addDays(blockStart, -2))) {
       return { duty: "OFF_V", source: "postV" };
     }
-    // A V taken over in a swap earns the Off(V) on the taker's first PM block after it. The block
-    // starts every 6 days, so that V fell on one of the 6 days before this block.
-    if (vSwaps) {
-      for (let k = 1; k <= 6; k++) {
-        if (vSwaps.takenOver(addDays(blockStart, -k))) return { duty: "OFF_V", source: "postV" };
-      }
+    // A V taken over in a swap earns the Off(V) exactly as the giver's would have: only a V on the 2
+    // days right before this PM block. (V is only swapped within a shift, so both people share the
+    // block; a V put on another day earns no Off(V) for the giver, so none for the taker either.)
+    if (vSwaps && (vSwaps.takenOver(addDays(blockStart, -1)) || vSwaps.takenOver(addDays(blockStart, -2)))) {
+      return { duty: "OFF_V", source: "postV" };
     }
   }
   return { duty: base, source: "cycle" };
