@@ -7,10 +7,11 @@ import { formatFigure, slotLabel, type Strength } from "@/lib/strength";
 
 // Colours always come with a text label (spec 14.2).
 const DUTY_STYLE: Record<Duty, string> = {
-  AM: "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-400/15 dark:text-amber-200 dark:border-amber-400/40",
-  PM: "bg-indigo-100 text-indigo-900 border-indigo-300 dark:bg-indigo-400/20 dark:text-indigo-200 dark:border-indigo-400/40",
-  V: "bg-violet-900 text-violet-50 border-violet-900 dark:bg-violet-500/40 dark:text-violet-50 dark:border-violet-400/60",
-  VSB: "bg-transparent text-violet-800 border-violet-500 border-dashed dark:text-violet-200 dark:border-violet-400",
+  AM: "bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-400 dark:text-yellow-950 dark:border-yellow-400",
+  PM: "bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-400/20 dark:text-blue-200 dark:border-blue-400/40",
+  V: "bg-purple-900 text-purple-50 border-purple-900 dark:bg-purple-500/40 dark:text-purple-50 dark:border-purple-400/60",
+  // Standby only, not on duty: a neutral dashed outline rather than V's purple.
+  VSB: "bg-transparent text-slate-700 border-slate-400 border-dashed dark:text-slate-300 dark:border-slate-500",
   OFF: "bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:border-neutral-700",
   OFF_V: "bg-neutral-100 text-violet-700 border-violet-400 border-dashed dark:bg-neutral-800 dark:text-violet-300 dark:border-violet-500/60",
 };
@@ -22,10 +23,11 @@ const DUTY_SHORT: Record<Duty, string> = { ...DUTY_LABEL };
  * their text chip. The legend and cell tooltips / screen-reader labels carry the names.
  */
 export const DUTY_CELL: Record<Duty, string> = {
-  AM: "bg-amber-200/80 dark:bg-amber-500/30",
-  PM: "bg-indigo-200/80 dark:bg-indigo-500/35",
-  V: "bg-violet-300/70 dark:bg-violet-600/40",
-  VSB: "bg-violet-100 dark:bg-violet-500/15",
+  // Solid in dark mode too: a translucent yellow over the dark background reads as olive/brown.
+  AM: "bg-yellow-300 dark:bg-yellow-400",
+  PM: "bg-blue-200/80 dark:bg-blue-500/35",
+  V: "bg-purple-300/70 dark:bg-purple-600/40",
+  VSB: "bg-slate-100 dark:bg-slate-500/15",
   OFF: "bg-neutral-100 dark:bg-neutral-800/70",
   // A light tint plus the "Off(V)" text chip (LABELLED_DUTIES below); no border overlay needed.
   OFF_V: "bg-violet-50 dark:bg-violet-500/10",
@@ -134,7 +136,7 @@ export function DosTag({ kind, className }: { kind: DosKind; className?: string 
     <span
       title={`${kind}: 24-hour duty, report at ${DOS_REPORT_TIME}. The shift duty and any Task still apply.`}
       className={cn(
-        "inline-flex h-4 items-center rounded-sm border border-rose-500 bg-rose-500/15 px-1 text-[10px] font-bold leading-none text-rose-800 whitespace-nowrap dark:text-rose-200",
+        "inline-flex h-4 items-center rounded-sm border border-rose-500 bg-rose-500/15 px-1 text-[10px] font-bold leading-none text-rose-800 whitespace-nowrap dark:bg-rose-950/90 dark:text-rose-200",
         className,
       )}
     >
@@ -224,7 +226,8 @@ export function TaskTag({ name, className }: { name: string; className?: string 
     <span
       title={`Task: ${name}`}
       className={cn(
-        "inline-flex h-4 items-center rounded-sm bg-foreground/8 px-1 text-[10px] font-medium leading-none text-foreground/80 whitespace-nowrap",
+        // Mostly opaque, so it stays readable on any duty colour (light text on the dark-mode AM yellow washed out).
+        "inline-flex h-4 items-center rounded-sm bg-background/85 px-1 text-[10px] font-medium leading-none text-foreground/80 ring-1 ring-foreground/10 whitespace-nowrap",
         className,
       )}
     >

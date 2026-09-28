@@ -44,7 +44,7 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, ca
         <table className="border-separate border-spacing-0 text-xs">
           <thead className="sticky top-0 z-20 bg-background">
             <tr>
-              <th className="sticky left-0 z-30 min-w-40 border-b border-r bg-background px-3 py-1.5 text-left font-semibold">
+              <th className="sticky left-0 z-30 min-w-28 border-b border-r bg-background px-3 py-1.5 text-left font-semibold lg:min-w-40">
                 {roster.shiftName}
                 <span className="block font-normal text-muted-foreground">{roster.staff.length} staff</span>
               </th>
