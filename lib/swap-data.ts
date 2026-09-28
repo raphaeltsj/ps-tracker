@@ -21,7 +21,7 @@ import {
   vThenAm,
 } from "@/lib/swaps";
 
-// A V taken over in a swap earns Off(V) up to 6 days later, and post-V looks back 2 more days.
+// A V earns Off(V) on the PM block right after it (post-V looks back 2 days); 8 days is ample.
 const LOOK_BACK = 8;
 
 export type SwapPerson = { id: string; name: string; shiftId: string | null };
