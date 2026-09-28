@@ -11,7 +11,7 @@ import { DOS_OIL_CODE } from "@/lib/domain";
 import { createDosOil } from "@/lib/dos-oil";
 import { findLeaveConflict } from "@/lib/leave-rules";
 import { canEditShift, canRequestLeave, type Viewer } from "@/lib/permissions";
-import { canApproveSide, checkSwap, findSwapClash, loadSwap, swapCandidates, type SwapCheck } from "@/lib/swap-data";
+import { canApproveSide, checkSwap, exchangeDates, findSwapClash, loadSwap, swapCandidates, type SwapCheck } from "@/lib/swap-data";
 import { PENDING_SWAP_STATUSES, SWAP_MAX_DATES } from "@/lib/swaps";
 
 const fail = (error: string): ActionResult => ({ ok: false, error });
@@ -25,6 +25,20 @@ function cleanSwapDates(dates: unknown): string[] | null {
   if (!Array.isArray(dates) || dates.length === 0 || dates.length > SWAP_MAX_DATES) return null;
   if (!dates.every((d) => typeof d === "string" && isValidDate(d))) return null;
   return [...new Set(dates as string[])].sort();
+}
+
+/** A swap's stored days: the exchange dates, plus a V swap's follow-on days (flagged linked). */
+function swapDays(dates: string[], linked: string[]) {
+  return [...dates.map((date) => ({ date })), ...linked.filter((d) => !dates.includes(d)).map((date) => ({ date, linked: true }))];
+}
+
+async function refreshLinkedDays(swapId: string, linked: string[]) {
+  const exchange = await db.dutySwapDay.findMany({ where: { swapId, linked: false }, select: { date: true } });
+  const dates = exchange.map((d) => d.date);
+  await db.$transaction([
+    db.dutySwapDay.deleteMany({ where: { swapId, linked: true } }),
+    db.dutySwapDay.createMany({ data: linked.filter((d) => !dates.includes(d)).map((date) => ({ swapId, date, linked: true })) }),
+  ]);
 }
 
 function cleanText(text: unknown, max = 500): string | null {
@@ -87,7 +101,7 @@ export async function requestSwap(input: { partnerId: string; dates: string[]; n
       status: "PENDING_PARTNER",
       notes: cleanText(input.notes),
       createdById: viewer.id,
-      days: { create: dates.map((date) => ({ date })) },
+      days: { create: swapDays(dates, check.linked) },
     },
   });
   return done(`Swap request sent to ${partner.name} (${partner.shiftId}). Once they accept, it goes to the supervisors.`);
@@ -127,7 +141,7 @@ export async function recordSwap(input: { aId: string; bId: string; dates: strin
       partnerSideById: bSide,
       decidedById: approved ? viewer.id : null,
       decidedAt: approved ? new Date() : null,
-      days: { create: dates.map((date) => ({ date })) },
+      days: { create: swapDays(dates, check.linked) },
     },
   });
   if (!approved) return done(`Swap recorded. It now needs the Shift ${b.shiftId} supervisor's approval.`);
@@ -144,9 +158,10 @@ export async function respondSwap(swapId: string, accept: boolean): Promise<Acti
     await db.dutySwap.update({ where: { id: swapId }, data: { status: "DECLINED", partnerRespondedAt: new Date() } });
     return done("Swap declined.");
   }
-  const check = await checkSwap(swap.requesterId, swap.partnerId, swap.days.map((d) => d.date), swap.id);
+  const check = await checkSwap(swap.requesterId, swap.partnerId, exchangeDates(swap.days), swap.id);
   if (!check.ok) return fail(check.error);
   await db.dutySwap.update({ where: { id: swapId }, data: { status: "PENDING_APPROVAL", partnerRespondedAt: new Date() } });
+  await refreshLinkedDays(swapId, check.linked);
   return done("Swap accepted. It now goes to the supervisors for approval.");
 }
 
@@ -170,9 +185,11 @@ export async function approveSwap(swapId: string): Promise<ActionResult> {
   const bSide = swap.partnerSideById ?? (canApproveSide(viewer, swap.partnerShiftId) ? viewer.id : null);
   if (aSide === swap.requesterSideById && bSide === swap.partnerSideById) return fail("There is no side of this swap left for you to approve.");
 
-  const dates = swap.days.map((d) => d.date);
+  const dates = exchangeDates(swap.days);
   const check = await checkSwap(swap.requesterId, swap.partnerId, dates, swap.id);
   if (!check.ok) return fail(check.error);
+  // Duties may have changed since the request: store the follow-on days as they are now.
+  await refreshLinkedDays(swapId, check.linked);
 
   const approved = Boolean(aSide && bSide);
   await db.dutySwap.update({
@@ -214,9 +231,9 @@ export async function cancelSwap(swapId: string): Promise<ActionResult> {
   if (!swap) return fail("Swap not found.");
   if (!canApproveSide(viewer, swap.requesterShiftId) && !canApproveSide(viewer, swap.partnerShiftId)) return fail("Only supervisors and Management can cancel an approved swap.");
   if (swap.status !== "APPROVED") return fail("Only approved swaps can be cancelled.");
-  if (swap.days[0].date < todayLocal()) return fail("This swap's first date has passed, so it stays as worked. Swaps can be cancelled up to and including their first date.");
+  if (exchangeDates(swap.days)[0] < todayLocal()) return fail("This swap's first date has passed, so it stays as worked. Swaps can be cancelled up to and including their first date.");
   await db.dutySwap.update({ where: { id: swapId }, data: { status: "CANCELLED", decidedById: viewer.id, decidedAt: new Date() } });
-  const restored = await restoreDosOil([swap.requesterId, swap.partnerId], swap.days.map((d) => d.date), viewer.id);
+  const restored = await restoreDosOil([swap.requesterId, swap.partnerId], exchangeDates(swap.days), viewer.id);
   return done(`Swap cancelled. Both people are back on their normal duties.${restored ? ` ${DOS_OIL_CODE} restored after ${restored} DOS/FDO duty.` : ""}`);
 }
 

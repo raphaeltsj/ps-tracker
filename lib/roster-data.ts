@@ -151,7 +151,7 @@ export async function buildRoster(
         dos: null,
         task: null,
         absences: [],
-        swap: swap && partner ? { swapId: swap.swapId, partnerId: partner.id, partnerName: partner.name, partnerShiftId: swap.partnerShiftId ?? partner.shiftId ?? "", ownDuty: swap.ownDuty } : null,
+        swap: swap && partner ? { swapId: swap.swapId, partnerId: partner.id, partnerName: partner.name, partnerShiftId: swap.partnerShiftId ?? partner.shiftId ?? "", ownDuty: swap.ownDuty, linked: swap.linked } : null,
       };
       // A swap is one for one, so V cover is counted on the crew's own duties.
       if ((swap?.ownDuty ?? duty) === "V") vOnDuty.set(date, vOnDuty.get(date)! + 1);

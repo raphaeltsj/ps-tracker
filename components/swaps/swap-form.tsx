@@ -216,7 +216,7 @@ export function SwapForm({
           </table>
           {preview.ripples.length > 0 && (
             <div className="space-y-0.5 text-xs">
-              <p className="font-medium text-muted-foreground">Off(V) follows the V:</p>
+              <p className="font-medium text-muted-foreground">Also part of this swap (the Off(V) moves with the V):</p>
               {preview.ripples.map((r) => (
                 <p key={`${r.staffId}-${r.date}`}>
                   {r.staffId === viewerId && mode === "request" ? "You" : preview.names[r.staffId]}, {formatDate(r.date)}: {DUTY_LABEL[r.before]} becomes {DUTY_LABEL[r.after]}

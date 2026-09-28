@@ -29,7 +29,15 @@ export type RosterCell = {
   swap: CellSwap | null;
 };
 
-export type CellSwap = { swapId: string; partnerId: string; partnerName: string; partnerShiftId: string; ownDuty: Duty };
+export type CellSwap = {
+  swapId: string;
+  partnerId: string;
+  partnerName: string;
+  partnerShiftId: string;
+  ownDuty: Duty;
+  /** A follow-on day of a V swap: the Off(V) / PM that moved with the V, not an exchange on the day. */
+  linked?: boolean;
+};
 
 export type RosterDay = {
   date: string;
