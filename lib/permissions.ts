@@ -33,8 +33,9 @@ export function canManageTasks(viewer: Viewer): boolean {
   return viewer.role === "MANAGEMENT";
 }
 
-export function canManageStaff(viewer: Viewer): boolean {
-  return viewer.role === "MANAGEMENT";
+/** Supervisors manage staff records for their own shift; Management for any shift. */
+export function canManageStaff(viewer: Viewer, shiftId: string | null): boolean {
+  return canEditShift(viewer, shiftId);
 }
 
 export function canAddCustomLeaveType(viewer: Viewer): boolean {
