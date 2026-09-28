@@ -148,3 +148,9 @@
   from { transform: translateX(-100%); }
   to { transform: translateX(300%); }
 }
+
+/* Announcement banner: the combined message slides left to right, slowly enough to read. */
+@keyframes banner-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}

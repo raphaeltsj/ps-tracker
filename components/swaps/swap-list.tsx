@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useState } from "react";
-import { ArrowLeftRight, Check, Clock } from "lucide-react";
+import { ArrowLeftRight, Check, ClipboardList, Clock } from "lucide-react";
 import { approveSwap, cancelSwap, rejectSwap, respondSwap, withdrawSwap } from "@/app/swap-actions";
 import { DutyChip } from "@/components/roster/chips";
 import { ResultMessage, useAction } from "@/components/roster/use-action";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateList, formatDateShort, formatDateTime } from "@/lib/dates";
 import { DUTY_LABEL } from "@/lib/domain";
+import type { ProficiencyEntry } from "@/lib/proficiency";
 import type { SwapSummary } from "@/lib/swap-data";
 import { SWAP_STATUS_LABEL, type SwapStatus } from "@/lib/swaps";
 import { cn } from "@/lib/utils";
@@ -51,18 +52,30 @@ export function SwapFeedbackProvider({ children }: { children: React.ReactNode }
   );
 }
 
-export function SwapList({ swaps, viewerId, empty }: { swaps: SwapSummary[]; viewerId: string; empty: string }) {
+export function SwapList({
+  swaps,
+  viewerId,
+  empty,
+  proficiencyByStaff,
+}: {
+  swaps: SwapSummary[];
+  viewerId: string;
+  empty: string;
+  /** Only passed by Manage requests, so supervisors can compare proficiency before approving; omitted
+   * elsewhere (My Requests), where it would not be useful. */
+  proficiencyByStaff?: Record<string, ProficiencyEntry[]>;
+}) {
   if (swaps.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
   return (
     <ul className="space-y-2">
       {swaps.map((s) => (
-        <SwapCard key={s.id} swap={s} viewerId={viewerId} />
+        <SwapCard key={s.id} swap={s} viewerId={viewerId} proficiencyByStaff={proficiencyByStaff} />
       ))}
     </ul>
   );
 }
 
-function SwapCard({ swap: s, viewerId }: { swap: SwapSummary; viewerId: string }) {
+function SwapCard({ swap: s, viewerId, proficiencyByStaff }: { swap: SwapSummary; viewerId: string; proficiencyByStaff?: Record<string, ProficiencyEntry[]> }) {
   const { pending, result: cardResult, run: runAction } = useAction();
   const announce = useContext(Feedback);
   // Successes go to the page banner (the card may move); errors stay on the card.
@@ -135,6 +148,8 @@ function SwapCard({ swap: s, viewerId }: { swap: SwapSummary; viewerId: string }
           </div>
         ))}
       </div>
+
+      {proficiencyByStaff && <ProficiencyCompare a={s.requester} b={s.partner} proficiencyByStaff={proficiencyByStaff} />}
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
         {s.recorded ? <span>Recorded by {s.createdByName}</span> : <span>Requested {formatDateTime(s.submittedAt)}</span>}
@@ -224,6 +239,58 @@ function SwapCard({ swap: s, viewerId }: { swap: SwapSummary; viewerId: string }
       )}
       <ResultMessage result={result} />
     </li>
+  );
+}
+
+/** Lets a supervisor compare who is trained for what before approving a swap (spec: staff proficiency).
+ * Collapsed by default since most swaps don't need it. */
+function ProficiencyCompare({ a, b, proficiencyByStaff }: { a: { id: string; name: string }; b: { id: string; name: string }; proficiencyByStaff: Record<string, ProficiencyEntry[]> }) {
+  const [open, setOpen] = useState(false);
+  const aTasks = proficiencyByStaff[a.id] ?? [];
+  const bTasks = proficiencyByStaff[b.id] ?? [];
+
+  return (
+    <div className="rounded-md border p-2">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <ClipboardList className="size-3.5" aria-hidden />
+        Compare proficiency
+        <span className="ml-auto">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {[
+            [a, aTasks],
+            [b, bTasks],
+          ].map(([p, list], i) => {
+            const person = p as { id: string; name: string };
+            const tasks = list as ProficiencyEntry[];
+            return (
+              <div key={person.id} className={cn("space-y-1 rounded-md bg-muted/40 p-2", i === 1 && "sm:border-l")}>
+                <div className="text-xs font-semibold">{person.name}</div>
+                {tasks.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">No Task proficiency on record.</p>
+                ) : (
+                  <ul className="flex flex-wrap gap-1">
+                    {tasks.map((t) => (
+                      <li
+                        key={t.taskName}
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                          t.understudy ? "bg-amber-100 text-amber-900 dark:bg-amber-400/20 dark:text-amber-200" : "bg-emerald-100 text-emerald-900 dark:bg-emerald-400/20 dark:text-emerald-200",
+                        )}
+                      >
+                        {t.taskName}
+                        {t.understudy ? " (U/S)" : ""}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

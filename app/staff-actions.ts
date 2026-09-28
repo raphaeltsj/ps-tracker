@@ -66,3 +66,30 @@ export async function setStaffActive(id: string, active: boolean): Promise<Actio
   await db.staff.update({ where: { id }, data: { active } });
   return done(active ? `${existing.name} is active again.` : `${existing.name} deactivated. Their leave, duty and Task history is kept.`);
 }
+
+// ---------- Task proficiency: who is trained for which Task, kept by supervisors/Management only ----------
+
+/**
+ * Never shown to staff and never affects the roster: a record of who can do a Task, and who is
+ * currently training for it ("(U/S)", an understudy). "NONE" removes the record entirely.
+ */
+export async function setStaffProficiency(input: { staffId: string; taskId: string; level: "NONE" | "PROFICIENT" | "UNDERSTUDY" }): Promise<ActionResult> {
+  const viewer = await requireViewer();
+  const staff = await db.staff.findUnique({ where: { id: input.staffId } });
+  if (!staff) return fail("Staff member not found.");
+  if (!canManageStaff(viewer, staff.shiftId)) return fail("You can only set proficiency for staff in a shift you manage.");
+  const task = await db.task.findUnique({ where: { id: input.taskId } });
+  if (!task) return fail("Task not found.");
+
+  if (input.level === "NONE") {
+    await db.staffTaskProficiency.deleteMany({ where: { staffId: input.staffId, taskId: input.taskId } });
+    return done(`${staff.name}: ${task.name} marked not trained.`);
+  }
+  if (input.level !== "PROFICIENT" && input.level !== "UNDERSTUDY") return fail("Invalid level.");
+  await db.staffTaskProficiency.upsert({
+    where: { staffId_taskId: { staffId: input.staffId, taskId: input.taskId } },
+    create: { staffId: input.staffId, taskId: input.taskId, understudy: input.level === "UNDERSTUDY" },
+    update: { understudy: input.level === "UNDERSTUDY" },
+  });
+  return done(`${staff.name}: ${task.name} ${input.level === "UNDERSTUDY" ? "marked as understudy (U/S)." : "marked proficient."}`);
+}

@@ -40,6 +40,9 @@ async function main() {
   // Wipe in dependency order.
   await db.session.deleteMany();
   await db.dutySwap.deleteMany(); // days cascade
+  await db.announcementDismissal.deleteMany();
+  await db.announcement.deleteMany();
+  await db.staffTaskProficiency.deleteMany();
   await db.taskAssignment.deleteMany();
   await db.task.deleteMany();
   await db.leaveDay.deleteMany();
@@ -60,7 +63,7 @@ async function main() {
   });
 
   const tasks = [];
-  for (let i = 1; i <= 5; i++) tasks.push(await db.task.create({ data: { name: `Task ${i}` } }));
+  for (let i = 1; i <= 12; i++) tasks.push(await db.task.create({ data: { name: `Task ${i}` } }));
 
   // Dayworkers: office staff who clock shift duty as Ops duty. One username uses the full 7 characters,
   // and one is inactive, so both show in the demo.
@@ -231,11 +234,40 @@ async function main() {
     }
     await db.taskAssignment.createMany({ data: assignments });
 
-    // Locked date, special event and a raised V headcount this month.
+    // Task proficiency: who is trained for which Task, kept by supervisors only (never shown to
+    // staff, never affects the roster). Most people are proficient in a handful, understudying a couple.
+    const proficiencyRows: { staffId: string; taskId: string; understudy: boolean }[] = [];
+    for (const m of members) {
+      for (const t of tasks) {
+        const r = rand();
+        if (r < 0.35) proficiencyRows.push({ staffId: m.id, taskId: t.id, understudy: false });
+        else if (r < 0.45) proficiencyRows.push({ staffId: m.id, taskId: t.id, understudy: true });
+      }
+    }
+    await db.staffTaskProficiency.createMany({ data: proficiencyRows });
+
+    // Locked date, special event and a raised V headcount this month. Pick future dates where possible
+    // so the banner that comes with them (below) actually shows up live in the demo.
     const working = monthDays.filter((d) => shiftDutyOn(s.cycleAnchor, d) !== "OFF");
-    await db.lockedDate.create({ data: { shiftId: s.id, date: working[Math.min(8, working.length - 1)], remarks: "Important meeting: all hands on deck." } });
-    await db.specialEvent.create({ data: { shiftId: s.id, date: working[Math.min(12, working.length - 1)], note: "Ceremony: the whole shift attends." } });
+    const workingFuture = working.filter((d) => d > todayLocal());
+    const lockDate = workingFuture[Math.min(3, workingFuture.length - 1)] ?? working[Math.min(8, working.length - 1)];
+    const eventDate = workingFuture[Math.min(7, workingFuture.length - 1)] ?? working[Math.min(12, working.length - 1)];
+    await db.lockedDate.create({ data: { shiftId: s.id, date: lockDate, remarks: "Important meeting: all hands on deck." } });
+    await db.specialEvent.create({ data: { shiftId: s.id, date: eventDate, note: "Ceremony: the whole shift attends." } });
+    // The optional banner a supervisor can add alongside a lock or event (spec 8.4).
+    await db.announcement.create({
+      data: { shiftId: s.id, message: `Locked ${lockDate}: important meeting, all hands on deck.`, showFrom: todayLocal(), activeUntil: lockDate, createdById: sup.id },
+    });
     // V MFL is always 1, so there is no per-date V headcount to seed.
+  }
+
+  // A Management-wide announcement, so every viewer sees it combined with their own shift's banner
+  // above into one (spec 8.4: several announcements combine into one banner).
+  const management = await db.staff.findFirst({ where: { role: "MANAGEMENT" } });
+  if (management) {
+    await db.announcement.create({
+      data: { shiftId: null, message: "Reminder: submit training records by month end.", showFrom: todayLocal(), activeUntil: addDays(todayLocal(), 21), createdById: management.id },
+    });
   }
 
   // Ops duty: dayworkers clocking shift duty on AM and PM days. Some days have two dayworkers and some

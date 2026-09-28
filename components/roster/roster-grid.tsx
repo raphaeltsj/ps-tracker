@@ -124,7 +124,10 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, ca
                     key={date}
                     cell={roster.cells[person.id][date]}
                     day={days[date]}
-                    selected={mode === "edit" ? selection.cells.has(cellKey(person.id, date)) : person.id === viewer.id && selection.dates.has(date)}
+                    selected={
+                      (selection.focusStaffId === person.id && selection.focusDate === date) ||
+                      (mode === "edit" ? selection.cells.has(cellKey(person.id, date)) : person.id === viewer.id && selection.dates.has(date))
+                    }
                     onClick={(shiftKey) => onCell(person.id, date, shiftKey)}
                     onLeave={(leaveId) => onLeave(leaveId, date)}
                   />

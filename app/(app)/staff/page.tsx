@@ -4,6 +4,7 @@ import { StaffManager } from "@/components/staff/staff-manager";
 import { requireViewer } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hasEditView } from "@/lib/permissions";
+import { getProficiencyMap } from "@/lib/proficiency";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Staff | PS Tracker" };
@@ -18,10 +19,14 @@ export default async function StaffPage({ searchParams }: PageProps<"/staff">) {
   const requested = typeof params.shift === "string" ? params.shift : undefined;
   const shiftId = viewer.role === "SUPERVISOR" ? viewer.shiftId! : SHIFT_IDS.includes(requested ?? "") ? requested! : "A";
 
-  const staff = await db.staff.findMany({
-    where: { shiftId, role: { not: "MANAGEMENT" } },
-    orderBy: [{ active: "desc" }, { role: "desc" }, { name: "asc" }],
-  });
+  const [staff, tasks] = await Promise.all([
+    db.staff.findMany({
+      where: { shiftId, role: { not: "MANAGEMENT" } },
+      orderBy: [{ active: "desc" }, { role: "desc" }, { name: "asc" }],
+    }),
+    db.task.findMany({ orderBy: { createdAt: "asc" } }),
+  ]);
+  const proficiency = await getProficiencyMap(staff.map((s) => s.id));
 
   return (
     <main className="mx-auto w-full max-w-4xl space-y-4 p-4 pb-24 lg:pb-6">
@@ -53,6 +58,8 @@ export default async function StaffPage({ searchParams }: PageProps<"/staff">) {
         viewerId={viewer.id}
         canChangeRoleOrShift={viewer.role === "MANAGEMENT"}
         staff={staff.map((s) => ({ id: s.id, name: s.name, role: s.role as "STAFF" | "SUPERVISOR", shiftId: s.shiftId!, birthday: s.birthday, active: s.active }))}
+        tasks={tasks.map((t) => ({ id: t.id, name: t.name }))}
+        proficiency={proficiency}
       />
     </main>
   );

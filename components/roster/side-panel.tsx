@@ -33,7 +33,7 @@ import { cycleDayLabel, cyclePositionLabel } from "@/lib/cycle";
 import { formatDate, formatDateList, formatDateShort, formatDateTime } from "@/lib/dates";
 import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_REPORT_TIME, DUTY_LABEL, HALF_DAY_TIMES, type Duty, type Half } from "@/lib/domain";
 import { canDecideLeave } from "@/lib/permissions";
-import { isLeaveEntry, ROW_EXTRA, ROW_OPS, type LeaveSummary, type LeaveTypeOption } from "@/lib/roster-types";
+import { isLeaveEntry, ROW_EXTRA, ROW_OPS, type LeaveSummary, type LeaveTypeOption, type RosterCell } from "@/lib/roster-types";
 import { formatFigure } from "@/lib/strength";
 import { cn } from "@/lib/utils";
 
@@ -72,12 +72,21 @@ export function SidePanel(props: PanelProps) {
   // Clicking a date (not a person's cell) opens its lock and special-event settings in place of the
   // normal duty / Task / leave tools. Clicking the date again, or the panel's close button, returns.
   const showDateSettings = mode === "edit" && canEdit && !focusLeave && selection.dateSettingsOpen && selection.focusDate;
+  // Someone else's cell clicked read-only (Staff view, or a shift the viewer can't edit): shown first,
+  // so it isn't buried under the request form.
+  const other = selection.focusStaffId && selection.focusStaffId !== viewer.id ? roster.staff.find((s) => s.id === selection.focusStaffId) : undefined;
+  const otherCell = other && selection.focusDate ? roster.cells[other.id]?.[selection.focusDate] : undefined;
 
   return (
     <div className="text-sm">
+      {!focusLeave && other && otherCell && (
+        <div className="border-b px-4 py-4">
+          <PersonOnDate title={`${other.name}, ${formatDateShort(selection.focusDate!)}`} cell={otherCell} anchor={roster.anchor} date={selection.focusDate!} onFocusLeave={props.onFocusLeave} />
+        </div>
+      )}
       {focusLeave && <LeaveDetail {...props} leave={focusLeave} />}
       {!focusLeave && showDateSettings && (
-        <DateSettingsPanel roster={roster} date={selection.focusDate!} isManagement={viewer.role === "MANAGEMENT"} onClose={onCloseDateSettings} />
+        <DateSettingsPanel roster={roster} date={selection.focusDate!} today={props.today} isManagement={viewer.role === "MANAGEMENT"} onClose={onCloseDateSettings} />
       )}
       {!focusLeave && !showDateSettings && mode === "edit" && canEdit && (rowKind ? <RowEditor key={rowKind} {...props} kind={rowKind} /> : <EditTools {...props} />)}
       {mode === "staff" && canRequest && (
@@ -188,35 +197,59 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
           )}
         </div>
       )}
-      {own && (
-        <div className="space-y-1.5 rounded-md border p-2">
-          <div className="text-xs font-medium text-muted-foreground">You on this date</div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <DutyChip duty={own.duty} long />
-            {own.swap && <SwapTag swap={own.swap} duty={own.duty} />}
-            {own.dos && <DosTag kind={own.dos} />}
-            {own.task && <TaskTag name={own.task.name} />}
-            {own.absences.map((a, i) => (
-              <button key={i} onClick={() => onFocusLeave(a.leaveId)}>
-                <LeaveChip absence={a} />
-              </button>
-            ))}
-          </div>
-          {own.swap && (
-            <p className="text-[11px] text-muted-foreground">
-              Duty swap with {own.swap.partnerName} (Shift {own.swap.partnerShiftId}): you work {DUTY_LABEL[own.duty]} instead of your {DUTY_LABEL[own.swap.ownDuty]}.{" "}
+      {own && <PersonOnDate title="You on this date" cell={own} anchor={roster.anchor} date={date} onFocusLeave={onFocusLeave} isViewer />}
+    </Section>
+  );
+}
+
+/** One person's duty, swap, DOS/FDO, Task and leave on a date, read-only. */
+function PersonOnDate({
+  title,
+  cell,
+  anchor,
+  date,
+  isViewer = false,
+  onFocusLeave,
+}: {
+  title: string;
+  cell: RosterCell;
+  anchor: PanelProps["roster"]["anchor"];
+  date: string;
+  isViewer?: boolean;
+  onFocusLeave: (id: string | null) => void;
+}) {
+  return (
+    <div className="space-y-1.5 rounded-md border p-2">
+      <div className="text-xs font-medium text-muted-foreground">{title}</div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <DutyChip duty={cell.duty} long />
+        {cell.swap && <SwapTag swap={cell.swap} duty={cell.duty} />}
+        {cell.dos && <DosTag kind={cell.dos} />}
+        {cell.task && <TaskTag name={cell.task.name} />}
+        {cell.absences.map((a, i) => (
+          <button key={i} onClick={() => onFocusLeave(a.leaveId)}>
+            <LeaveChip absence={a} />
+          </button>
+        ))}
+      </div>
+      {cell.swap && (
+        <p className="text-[11px] text-muted-foreground">
+          Duty swap with {cell.swap.partnerName} (Shift {cell.swap.partnerShiftId}): {isViewer ? "you work" : "works"} {DUTY_LABEL[cell.duty]} instead of {isViewer ? "your" : "their"} {DUTY_LABEL[cell.swap.ownDuty]}.
+          {isViewer && (
+            <>
+              {" "}
               <Link href="/requests" className="underline underline-offset-2">
                 My Requests
               </Link>
-            </p>
+            </>
           )}
-          {own.absences.some((a) => a.derived) && (
-            <p className="text-[11px] text-muted-foreground">BD is shown on your birthday; on an Off day it becomes BD-IL on your next working day.</p>
-          )}
-          <p className="text-[11px] text-muted-foreground">{cyclePositionLabel(roster.anchor, date)}</p>
-        </div>
+        </p>
       )}
-    </Section>
+      {isViewer && cell.absences.some((a) => a.derived) && (
+        <p className="text-[11px] text-muted-foreground">BD is shown on your birthday; on an Off day it becomes BD-IL on your next working day.</p>
+      )}
+      <p className="text-[11px] text-muted-foreground">{cyclePositionLabel(anchor, date)}</p>
+    </div>
   );
 }
 
@@ -349,7 +382,19 @@ function RowEditor(props: PanelProps & { kind: "ops" | "extra" }) {
  * lock the date and set its special event, in place of the normal duty / Task / leave tools. Clicking
  * the date again, or Close here, goes back (spec 8.1).
  */
-function DateSettingsPanel({ roster, date, isManagement, onClose }: { roster: PanelProps["roster"]; date: string; isManagement: boolean; onClose: () => void }) {
+function DateSettingsPanel({
+  roster,
+  date,
+  today,
+  isManagement,
+  onClose,
+}: {
+  roster: PanelProps["roster"];
+  date: string;
+  today: string;
+  isManagement: boolean;
+  onClose: () => void;
+}) {
   const day = roster.days[date];
   const { pending, result, run } = useAction();
   const [remarks, setRemarks] = useState(day.locked ?? "");
@@ -357,6 +402,12 @@ function DateSettingsPanel({ roster, date, isManagement, onClose }: { roster: Pa
   const [note, setNote] = useState(day.event?.note ?? "");
   const [open, setOpen] = useState<"lock" | "event" | null>(day.locked ? "lock" : day.event ? "event" : null);
   const shiftId = roster.shiftId;
+  const [lockAnnounce, setLockAnnounce] = useState(false);
+  const [lockAnnounceMsg, setLockAnnounceMsg] = useState("");
+  const [lockAnnounceFrom, setLockAnnounceFrom] = useState(today);
+  const [eventAnnounce, setEventAnnounce] = useState(false);
+  const [eventAnnounceMsg, setEventAnnounceMsg] = useState("");
+  const [eventAnnounceFrom, setEventAnnounceFrom] = useState(today);
 
   return (
     <Section
@@ -397,8 +448,27 @@ function DateSettingsPanel({ roster, date, isManagement, onClose }: { roster: Pa
               Lock on all shifts
             </label>
           )}
+          <AnnounceFields
+            on={lockAnnounce}
+            setOn={setLockAnnounce}
+            message={lockAnnounceMsg}
+            setMessage={setLockAnnounceMsg}
+            showFrom={lockAnnounceFrom}
+            setShowFrom={setLockAnnounceFrom}
+            today={today}
+            maxDate={date}
+            defaultMessage={`Locked: ${formatDate(date)}${remarks ? ` — ${remarks}` : ""}`}
+          />
           <div className="flex gap-2">
-            <Button size="sm" disabled={pending || !remarks.trim()} onClick={() => run(() => lockDates({ shiftId, dates: [date], remarks, allShifts }))}>
+            <Button
+              size="sm"
+              disabled={pending || !remarks.trim()}
+              onClick={() =>
+                run(() =>
+                  lockDates({ shiftId, dates: [date], remarks, allShifts, announce: lockAnnounce ? { message: lockAnnounceMsg || `Locked: ${formatDate(date)} — ${remarks}`, showFrom: lockAnnounceFrom } : undefined }),
+                )
+              }
+            >
               {day.locked ? "Save lock" : "Lock date"}
             </Button>
             {day.locked && (
@@ -414,8 +484,27 @@ function DateSettingsPanel({ roster, date, isManagement, onClose }: { roster: Pa
         <div className="space-y-2">
           <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="What is the event?" />
           <p className="text-[11px] text-muted-foreground">Special events are a marker for the whole shift: MFL and slots stay the same.</p>
+          <AnnounceFields
+            on={eventAnnounce}
+            setOn={setEventAnnounce}
+            message={eventAnnounceMsg}
+            setMessage={setEventAnnounceMsg}
+            showFrom={eventAnnounceFrom}
+            setShowFrom={setEventAnnounceFrom}
+            today={today}
+            maxDate={date}
+            defaultMessage={`Special event on ${formatDate(date)}${note ? `: ${note}` : ""}`}
+          />
           <div className="flex gap-2">
-            <Button size="sm" disabled={pending || !note.trim()} onClick={() => run(() => setSpecialEvent({ shiftId, date, note }))}>
+            <Button
+              size="sm"
+              disabled={pending || !note.trim()}
+              onClick={() =>
+                run(() =>
+                  setSpecialEvent({ shiftId, date, note, announce: eventAnnounce ? { message: eventAnnounceMsg || `Special event on ${formatDate(date)}: ${note}`, showFrom: eventAnnounceFrom } : undefined }),
+                )
+              }
+            >
               {day.event ? "Save event" : "Set event"}
             </Button>
             {day.event && (
@@ -428,6 +517,57 @@ function DateSettingsPanel({ roster, date, isManagement, onClose }: { roster: Pa
       )}
       <ResultMessage result={result} />
     </Section>
+  );
+}
+
+/** The optional banner shown alongside a lock or special event (spec 8.4): a toggle, message and start
+ * date. Staff on the shift already get a bell notification either way; this additionally puts a
+ * dismissible banner at the top of the app from the chosen start date up to the locked/event date. */
+function AnnounceFields({
+  on,
+  setOn,
+  message,
+  setMessage,
+  showFrom,
+  setShowFrom,
+  today,
+  maxDate,
+  defaultMessage,
+}: {
+  on: boolean;
+  setOn: (v: boolean) => void;
+  message: string;
+  setMessage: (v: string) => void;
+  showFrom: string;
+  setShowFrom: (v: string) => void;
+  today: string;
+  maxDate: string;
+  defaultMessage: string;
+}) {
+  return (
+    <div className="space-y-2 rounded-md border border-cyan-600/30 p-2">
+      <label className="flex items-center gap-2 text-xs font-medium">
+        <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} className="size-4" />
+        Also tell staff with a banner
+      </label>
+      {on && (
+        <div className="space-y-2">
+          <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={2} maxLength={200} placeholder={defaultMessage} />
+          <label className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Start showing from</span>
+            <input
+              type="date"
+              value={showFrom}
+              min={today}
+              max={maxDate}
+              onChange={(e) => setShowFrom(e.target.value)}
+              className="h-8 rounded-md border bg-background px-1.5"
+            />
+          </label>
+          <p className="text-[11px] text-muted-foreground">Shown at the top of the app until {formatDate(maxDate)}. Staff can close it; several banners combine into one.</p>
+        </div>
+      )}
+    </div>
   );
 }
 
