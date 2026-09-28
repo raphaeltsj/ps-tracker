@@ -92,6 +92,8 @@ export const COMMON_LEAVE_TYPES: { code: string; name: string; halfDay?: boolean
   { code: "BD-IL", name: "Birthday off in lieu" },
   { code: "0.5 OIL", name: "Half-day off in lieu", halfDay: true },
   { code: "1 OIL", name: "Off in lieu (full day)" },
+  { code: "GRW", name: "Growth Day" },
+  { code: "0.5 GRW", name: "Half-day growth day", halfDay: true },
 ];
 
 /**

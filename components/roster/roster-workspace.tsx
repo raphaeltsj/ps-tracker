@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, ChevronUp, Eye, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronUp, Eye, PanelRightClose, PanelRightOpen, Pencil } from "lucide-react";
 import { CalendarView } from "@/components/roster/calendar-view";
 import { MobileRoster } from "@/components/roster/mobile-roster";
 import { RosterGrid } from "@/components/roster/roster-grid";
@@ -87,6 +87,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
   const [anchor, setAnchor] = useState<{ staffId: string | null; date: string } | null>(null);
   const [compact, setCompact] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
   const isDesktop = useIsDesktop();
   // Month, shift and view changes reload the page data: show that something is happening.
   const [navPending, startNav] = useTransition();
@@ -96,12 +97,36 @@ export function RosterWorkspace(props: WorkspaceProps) {
       // Per-viewer convenience only.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setCompact(localStorage.getItem("ps-compact") === "1");
+      setPanelCollapsed(localStorage.getItem("ps-panel-collapsed") === "1");
     } catch {}
   }, []);
   const toggleCompact = (v: boolean) => {
     setCompact(v);
     try {
       localStorage.setItem("ps-compact", v ? "1" : "0");
+    } catch {}
+  };
+  const togglePanel = () => {
+    setPanelCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("ps-panel-collapsed", next ? "1" : "0");
+      } catch {}
+      return next;
+    });
+  };
+  // Phones show one day at a time by default; "Grid" shows the desktop month grid, scrolled sideways.
+  const [phoneGrid, setPhoneGrid] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPhoneGrid(localStorage.getItem("ps-phone-grid") === "1");
+    } catch {}
+  }, []);
+  const togglePhoneGrid = (v: boolean) => {
+    setPhoneGrid(v);
+    try {
+      localStorage.setItem("ps-phone-grid", v ? "1" : "0");
     } catch {}
   };
 
@@ -312,6 +337,25 @@ export function RosterWorkspace(props: WorkspaceProps) {
             ))}
           </div>
 
+          {/* Phones only: one day at a time, or the full month grid scrolled sideways */}
+          {!isDesktop && view === "roster" && (
+            <div className="flex rounded-full border p-0.5 text-sm" role="group" aria-label="Phone layout">
+              {([
+                [false, "Day"],
+                [true, "Grid"],
+              ] as const).map(([grid, label]) => (
+                <button
+                  key={label}
+                  aria-pressed={phoneGrid === grid}
+                  onClick={() => togglePhoneGrid(grid)}
+                  className={cn("rounded-full px-3 py-1", phoneGrid === grid ? "bg-foreground text-background font-medium" : "text-muted-foreground hover:bg-accent")}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             <Switch checked={compact} onCheckedChange={toggleCompact} aria-label="Compact strength rows" />
             Compact
@@ -352,8 +396,13 @@ export function RosterWorkspace(props: WorkspaceProps) {
         <div className={cn("min-h-0 flex-1 transition-opacity", navPending && "pointer-events-none opacity-50")}>
           {view === "calendar" ? (
             <CalendarView {...props} selection={selection} compact={compact} onDate={clickDate} />
-          ) : isDesktop ? (
-            <RosterGrid {...props} selection={selection} compact={compact} onDate={focusDateOnly} onCell={clickCell} onLeave={clickLeave} />
+          ) : isDesktop || phoneGrid ? (
+            // On a phone the grid gets its own box, one screen tall minus the bottom sheet header and tab bar
+            // (about 8rem): scroll the page to bring it into view, then it scrolls both ways inside with the
+            // date header and name column pinned.
+            <div className={isDesktop ? "h-full" : "h-[calc(100dvh-8rem)] min-h-80"}>
+              <RosterGrid {...props} selection={selection} compact={compact} onDate={focusDateOnly} onCell={clickCell} onLeave={clickLeave} />
+            </div>
           ) : (
             <MobileRoster {...props} selection={selection} compact={compact} onDate={clickDate} onFocusDate={focusDateOnly} onCell={clickCell} onPerson={showPerson} onLeave={clickLeave} />
           )}
@@ -361,8 +410,19 @@ export function RosterWorkspace(props: WorkspaceProps) {
       </section>
 
       {isDesktop ? (
-        // Right-hand panel on desktop
-        <aside className="w-[23rem] shrink-0 overflow-y-auto border-l">{panel}</aside>
+        // Right-hand panel on desktop, collapsible so the roster can take the full width.
+        <div className="relative flex shrink-0">
+          <button
+            type="button"
+            onClick={togglePanel}
+            aria-label={panelCollapsed ? "Show the side panel" : "Hide the side panel"}
+            title={panelCollapsed ? "Show panel" : "Hide panel, see the full roster"}
+            className="absolute -left-3.5 top-3 z-30 flex size-7 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground"
+          >
+            {panelCollapsed ? <PanelRightOpen className="size-3.5" /> : <PanelRightClose className="size-3.5" />}
+          </button>
+          {!panelCollapsed && <aside className="w-[23rem] overflow-y-auto border-l">{panel}</aside>}
+        </div>
       ) : (
         // Half-height bottom sheet on mobile, so the calendar stays visible
         <div className="fixed inset-x-0 bottom-16 z-30 rounded-t-2xl border border-b-0 bg-background shadow-[0_-8px_24px_rgba(0,0,0,0.15)]">

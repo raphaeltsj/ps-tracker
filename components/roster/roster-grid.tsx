@@ -1,5 +1,5 @@
 "use client";
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import { CalendarClock, Lock } from "lucide-react";
 import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, LABELLED_DUTIES, LeaveChip, SLOT_BG, SLOT_STYLE, SwapTag, swapTitle, TaskTag } from "@/components/roster/chips";
 import { BottomRows } from "@/components/roster/bottom-rows";
@@ -23,6 +23,13 @@ const SHIFT_DUTY_LABEL = { AM: "AM", PM: "PM", OFF: "Rest day" } as const;
 export function RosterGrid({ roster, selection, compact, today, viewer, mode, canEdit, onDate, onCell, onLeave }: GridProps) {
   const { dates, days } = roster;
 
+  // Land on today's column (not the 1st of the month) so picking a date for a swap or leave request
+  // doesn't start by showing only past, unselectable days.
+  const todayRef = useRef<HTMLTableCellElement>(null);
+  useEffect(() => {
+    todayRef.current?.scrollIntoView({ inline: "start", block: "nearest" });
+  }, [roster.shiftId, roster.dates]);
+
   const strengthRows: { label: string; value: (d: RosterDay) => React.ReactNode; cls?: (d: RosterDay) => string }[] = [
     { label: "Total Strength", value: (d) => d.strength.total },
     { label: "Not in Strength", value: (d) => formatFigure(d.strength.notIn) },
@@ -37,7 +44,7 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, ca
         <table className="border-separate border-spacing-0 text-xs">
           <thead className="sticky top-0 z-20 bg-background">
             <tr>
-              <th className="sticky left-0 z-30 min-w-40 border-b border-r bg-background px-3 py-1.5 text-left font-semibold">
+              <th className="sticky left-0 z-30 min-w-28 border-b border-r bg-background px-3 py-1.5 text-left font-semibold lg:min-w-40">
                 {roster.shiftName}
                 <span className="block font-normal text-muted-foreground">{roster.staff.length} staff</span>
               </th>
@@ -47,6 +54,7 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, ca
                 return (
                   <th
                     key={date}
+                    ref={date === today ? todayRef : undefined}
                     onClick={() => onDate(date)}
                     title={`Open the details for ${date}`}
                     className={cn(

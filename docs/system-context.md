@@ -1,6 +1,6 @@
 # PS Tracker: System Context Document
 
-*Duty roster management for a shift-based team | Version 1.17 | Draft for editing*
+*Duty roster management for a shift-based team | Version 1.19 | Draft for editing*
 
 ## 1. Purpose of this document
 
@@ -12,6 +12,10 @@ It has two parts:
 - **Part B: Build framework** (section 17): the tech stack, project structure, and build conventions. Read both before implementing any feature.
 
 > **How to edit:** items in [square brackets] are still undecided. Section 16 lists assumptions and open questions. Update this document whenever a rule changes so it stays the single source of truth.
+
+**Changes in 1.19:** in Staff view (and on a shift the viewer can't edit), clicking someone else's cell highlights it and shows that person's duty, Task, swap, DOS/FDO and visible leave for the date, read-only, at the top of the side panel; only the viewer's own cells pick leave dates (11.1); duty colours are now AM yellow, PM blue, V purple, and V(SB) a neutral grey dashed outline, since it is standby rather than duty (14.2); Task and DOS/FDO tags have a near-solid background so they stay readable on any duty colour, including the solid dark-mode AM yellow (14.2); on phones a **Day / Grid** switch shows the full month grid, scrolled sideways with names and dates pinned, as an alternative to the one-day list (14.1, 14.3); phones on the local network can use the dev server (17.2).
+
+**Changes in 1.18:** the desktop Roster view opens scrolled to today's column instead of the 1st of the month, so picking a date for a swap or leave request no longer starts on a page of unusable past dates (14.3.1); the right-hand side panel can be collapsed and reopened on desktop, for every role (14.3); two new leave types, **GRW** and **0.5 GRW** (Growth Day) (12.1); the leave-type dropdown shows a uniform code chip + name for every type, including in its own closed state, instead of a plain "CODE - Name" string that varied in shape per type.
 
 **Changes in 1.17:** locking dates or setting a special event can now also raise a dismissible **announcement banner** at the top of the app, several combining into one, plus a bell notification either way (6, 12.5, 13.1); the Staff records page adds **Task proficiency** (not trained / understudy / proficient per person, per Task, never shown to staff), compared on Manage requests when reviewing a duty swap (9.3, 11.6); Manage requests is redesigned with leave on the left and swaps on the right (11.5); Tasks are seeded 12 at a time instead of 5 (14.6).
 
@@ -320,6 +324,7 @@ Regular staff can see the roster of **all shifts**, which helps them plan their 
 
 - **Two views with an easy switch:** a **Calendar view** and a **Roster view**, toggled with a clearly visible switch button.
 - **Date details panel:** selecting a date shows a **side panel** with that date's duty, strength figures, remarks, lock and special event, plus the staff member's own leave for the date. Clicking the date header of the roster shows these details only; it never selects anything.
+- **Seeing a colleague's day:** clicking (or on mobile, tapping) **someone else's** cell highlights that cell and shows their duty, Task, duty swap, DOS/FDO, leave and cycle position for the date, **read-only**, at the top of the side panel, above the request form. It shows only what the roster already shows: other people's pending leave and leave notes stay hidden. Only the viewer's **own** cells pick dates for a leave request (as do the Calendar view and the mobile "Select for leave" button). The same read-only card appears for supervisors in Edit view on a shift they cannot edit.
 - **Request leave on the same page:** the request leave form sits on the **same page as the Calendar view and Roster view**, in the right-hand panel (on mobile, a bottom sheet over the page). While booking, staff can see the dates they want, whether each date is **AM, PM, or Off**, and what has already been planned (other leave, locked dates, Available Slot(s)).
 - **Selecting dates:** staff pick a **date range or specific (individual) dates** directly on the calendar or roster. Selected dates are highlighted and appear in the form.
 - **Request details:** choose a leave type and add **additional notes** so the supervisor understands the request. Half-day types ask for first or second half. Leave can be requested on **Off days** too. Staff can still submit a request when no slots are left, and the supervisor decides.
@@ -443,6 +448,8 @@ Common leave types and their full names:
 | **BD-IL**   | Birthday off in lieu      | Used when the birthday falls on an Off day. Placed on the next closest working day.                                          |
 | **0.5 OIL** | Half-day off in lieu      | Requester chooses the first half or second half of the duty timing (for example PM first half: 1445 to 1800). Counts as 0.5. |
 | **1 OIL**   | Off in lieu (full day)    |                                                                                                                              |
+| **GRW**     | Growth Day                |                                                                                                                              |
+| **0.5 GRW** | Half-day growth day       | Requester chooses the first half or second half of the duty timing; the UI shows the actual hours. Counts as 0.5.            |
 
 - Each type appears as a short-code chip on the roster. Half-day types (0.5 AL and 0.5 OIL) look visually different (for example half-filled) from full-day leave.
 
@@ -531,7 +538,7 @@ When locking dates or setting a special event (sections 6, 12.5), a supervisor o
 ### 14.1 Platforms
 
 - **Desktop-first** web app, with a **full mobile view**.
-- Mobile uses bottom tab navigation (Roster, Requests, Manage for supervisors and Management, Profile). The Roster tab holds the Calendar and Roster views with the leave request / duty swap form as a bottom sheet over the page, so the dates stay visible while picking; the Requests tab is My Requests (status only, section 11.5), and Manage is Manage requests. Forms use bottom sheets and should work one-handed. The mobile calendar view and roster view are switchable in the same way as on desktop, and the mobile roster is a day-by-day agenda or week-strip view with a shift switcher, not a shrunken desktop table.
+- Mobile uses bottom tab navigation (Roster, Requests, Manage for supervisors and Management, Profile). The Roster tab holds the Calendar and Roster views with the leave request / duty swap form as a bottom sheet over the page, so the dates stay visible while picking; the Requests tab is My Requests (status only, section 11.5), and Manage is Manage requests. Forms use bottom sheets and should work one-handed. The mobile calendar view and roster view are switchable in the same way as on desktop, and the mobile roster is a day-by-day agenda or week-strip view with a shift switcher, not a shrunken desktop table. A **Day / Grid** switch (phones only, Roster view) offers the full month grid as an alternative: it sits in its own screen-high box that scrolls sideways and down, with the date header and name column pinned. The choice is remembered per browser.
 
 ### 14.2 Visual style
 
@@ -542,21 +549,21 @@ When locking dates or setting a special event (sections 6, 12.5), a supervisor o
 
 | **Item**          | **Suggested colour**                      |
 |-------------------|-------------------------------------------|
-| **AM**            | Amber                                     |
-| **PM**            | Indigo                                    |
-| **V (night)**     | Deep navy / purple                        |
+| **AM**            | Yellow (solid in dark mode too: a see-through yellow on a dark background reads as brown) |
+| **PM**            | Blue                                      |
+| **V (night)**     | Purple                                    |
 | **Off**           | Soft grey                                 |
 | **Leave**         | Teal                                      |
 | **Special event** | Magenta accent                            |
-| **V(SB) standby** | Lighter, outlined version of the V colour |
+| **V(SB) standby** | Neutral grey dashed outline: standby only, so not the V colour |
 | **Locked date**   | Neutral hatch pattern with a lock icon    |
 | **Announcement banner** | Cyan accent, with a megaphone icon  |
 
-**Roster view colour coding.** On the Roster view (desktop grid and mobile day list), **AM, PM, and Off are not written as text**. Each cell is filled with its duty colour instead: AM amber, PM indigo, Off grey. The date header shows the shift's duty as a small colour bar. **V, V(SB) and Off(V) keep a text label** on top of their colour, because they are exceptions to the cycle (Off(V) is a light violet tint with the "Off(V)" chip, not a border). DOS/FDO duties show their name as a small tag. To stay accessible without text:
+**Roster view colour coding.** On the Roster view (desktop grid and mobile day list), **AM, PM, and Off are not written as text**. Each cell is filled with its duty colour instead: AM yellow, PM blue, Off grey. The date header shows the shift's duty as a small colour bar. **V, V(SB) and Off(V) keep a text label** on top of their colour, because they are exceptions to the cycle (Off(V) is a light violet tint with the "Off(V)" chip, not a border). DOS/FDO duties show their name as a small tag. To stay accessible without text:
 
 - A **colour legend** sits above the roster grid (and on the mobile day card) naming every colour **by name only**: AM, PM, V and DOS/FDO are written as just "AM", "PM", "V" and "DOS/FDO", with no timings and no report time. Times stay in the cell tooltips.
 - Each cell has a hover tooltip and a screen-reader label with the duty name and times.
-- Leave chips, Task tags, lock icons, and special-event markers still appear on top of the colour.
+- Leave chips, Task tags, lock icons, and special-event markers still appear on top of the colour. Task and DOS/FDO tags have a near-solid background so they stay readable on every duty colour.
 
 Other screens (Calendar view, side panel, Home, forms) keep text labels for duties.
 
@@ -564,10 +571,13 @@ Other screens (Calendar view, side panel, Home, forms) keep text labels for duti
 
 - **Calendar view / Roster view** switch: available to every role, always visible near the top of the roster area.
 - **Edit view / Staff view** switch: Supervisors and Management only, clearly distinct from the calendar/roster switch so the two are not confused. Edit controls appear only in Edit view.
+- **Side panel collapse**: on desktop, a small button at the panel's edge hides it (and shows it again), for every role, so the roster can use the full width. On mobile the panel is already a bottom sheet, so this button is desktop-only.
+- **Day / Grid** switch: phones only, on the Roster view. Day is the one-day list (the default); Grid is the full month grid, scrolled sideways (section 14.1).
 
 ### 14.3.1 Navigation, loading and error states
 
 - The requests page is called **My Requests** everywhere (desktop menu, mobile tab, page heading); the review page for supervisors and Management is **Manage requests**.
+- The desktop Roster view opens **scrolled to today's column**, not the 1st of the month, so the dates a leave request or duty swap can actually use (today onwards) are visible without scrolling first. The mobile week strip already opens on the week containing today.
 - On phones and tablets (where the top menu is hidden), Profile links to every page the role can open.
 - Changing month, shift or view shows a thin progress bar and dims the roster until the new data arrives; moving between pages shows a loading indicator.
 - A mistyped address shows "Page not found", and a page the role cannot open (for example Tasks for staff) shows "This page isn't available", both with a link back to the roster. If a page fails to load, an error screen offers "Try again".
@@ -698,7 +708,7 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
 |---|---|
 | `npm install` | Install dependencies and generate the Prisma client |
 | `npm run setup` | Create `prisma/dev.db` and seed demo data |
-| `npm run dev` | Start the dev server on http://localhost:3000 |
+| `npm run dev` | Start the dev server on http://localhost:3000. A phone on the same network opens the "Network" address it prints; that network must be listed in `allowedDevOrigins` in `next.config.ts` (a phone hotspot `172.20.10.*` and `10.130.1.*` are), or the page loads without working buttons or live updates. Restart after changing it |
 | `npm test` | Unit tests for the cycle, V overlay, strength, and birthday rules |
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
 | `npm run db:seed` | Wipe and reseed demo data around the current month |
@@ -821,7 +831,7 @@ Design polished **hero screens** for a responsive web app (desktop and mobile) c
 
 **Navigation and notifications:** Mobile uses bottom tabs (Roster, Requests, Manage for supervisors and Management, Profile); the Roster tab holds the Calendar and Roster views with the request sheet, Requests is My Requests, and Manage is Manage requests. The notification bell (desktop header and mobile top bar) opens a panel of the viewer's own notifications (section 13); on mobile, Profile links to every other page the role can open, including Staff.
 
-**Style and theme:** Simple, calm, easy on the eyes, highly readable for dense data. Provide a light and dark mode toggle and show key screens in both. Neutral base, one restrained accent colour, generous spacing, no clutter. Suggested colours: AM amber, PM indigo, V deep navy/purple, V(SB) as a lighter outlined version of the V colour, Off soft grey, Leave teal, Special Event magenta, locked dates with a hatch pattern and lock icon. On the Roster view, show AM, PM and Off by cell colour only (no text) with a colour legend above the grid; V and V(SB) keep their text labels. Elsewhere pair colours with text labels. Use a neutral placeholder logo with the name "PS Tracker".
+**Style and theme:** Simple, calm, easy on the eyes, highly readable for dense data. Provide a light and dark mode toggle and show key screens in both. Neutral base, one restrained accent colour, generous spacing, no clutter. Suggested colours: AM yellow, PM blue, V purple, V(SB) a neutral grey dashed outline (standby, not duty), Off soft grey, Leave teal, Special Event magenta, locked dates with a hatch pattern and lock icon. On the Roster view, show AM, PM and Off by cell colour only (no text) with a colour legend above the grid; V and V(SB) keep their text labels. Elsewhere pair colours with text labels. Use a neutral placeholder logo with the name "PS Tracker".
 
 **States to show:** slots at zero, a duty below MFL, pending/approved/rejected leave, supervisor-given leave (already approved), special-event day, V block with two V(SB) standby people and post-V Off, locked dates (a selected locked date showing a "Locked date" badge and remarks in the right side panel, disabled in the staff picker, allowed for supervisors), the request form open beside the roster or calendar with dates selected, strength rows in full and Compact mode, Approve disabled when no slot is available, a pending request with a Withdraw action, Off-day leave on a Rest day with MFL blank, a supervisor editing or cancelling leave, Calendar vs Roster view, Edit vs Staff view, a person with no Task, a Task shared by several people, a person on full-day leave with no Task, a person on half-day leave who keeps their Task, a birthday on an Off day (BD on the birthday, BD-IL on the next working day), a duty swap before and after, another shift viewed read-only, the Task delete warning, and the Task management screen visible to Management only.
 
