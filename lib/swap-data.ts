@@ -232,6 +232,12 @@ function evaluateSwap(f: SwapFacts, { a: aId, b: bId, dates, excludeSwapId }: Pr
   for (const p of [a, b]) {
     if (!p.active || p.role === "MANAGEMENT" || !p.shiftId) return fail(`${p.name} is not on a shift roster, so cannot swap duties.`);
   }
+  // Supervisors swap only with supervisors, and regular staff only with regular staff.
+  if (a.role !== b.role) {
+    const sup = a.role === "SUPERVISOR" ? a : b;
+    const staff = sup === a ? b : a;
+    return fail(`${sup.name} is a supervisor and ${staff.name} is regular staff. Supervisors can only swap with supervisors, and staff with staff.`);
+  }
 
   const clash = f.active.find((d) => d.swapId !== excludeSwapId && dates.includes(d.date) && [aId, bId].some((id) => id === d.swap.requesterId || id === d.swap.partnerId));
   if (clash) {
@@ -531,8 +537,9 @@ export async function swapCandidates(aId: string, dates: string[]): Promise<{ aD
   const inSwap = new Set(swapDays.flatMap((d) => [d.swap.requesterId, d.swap.partnerId]));
   const aDuties = sorted.map((d) => ctx.resolve(aId, d).duty);
 
+  // Supervisors swap only with supervisors, and staff with staff: the other role never appears.
   const people = staff
-    .filter((s) => s.id !== aId)
+    .filter((s) => s.id !== aId && s.role === a.role)
     .map((s) => {
       const duties = sorted.map((d) => ctx.resolve(s.id, d).duty);
       let blocked: string | null = null;

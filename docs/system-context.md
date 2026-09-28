@@ -13,6 +13,8 @@ It has two parts:
 
 > **How to edit:** items in [square brackets] are still undecided. Section 16 lists assumptions and open questions. Update this document whenever a rule changes so it stays the single source of truth.
 
+**Changes in 1.15:** supervisors can only swap with supervisors, and regular staff only with regular staff (11.4).
+
 **Changes in 1.14:** who can swap is settled: **within a shift only V or V(SB) days**, and V / V(SB) **never across shifts**; across shifts, AM, PM and Off only. A V swap now **includes the 2 PM days after it** (the taker gets the Off(V), the giver works PM): they are tagged, shown on the swap and locked like the V nights (11.4). This replaces the 1.12 wording "only ever between two different shifts".
 
 **Changes in 1.13:** a duty swap is picked on the **roster** again (a Request swap / Swap tab alongside the other roster tools), not on My Requests / Manage requests: the roster stays in view while picking it (11.4). My Requests and Manage requests hold **no creation form**: they are status and review only. My Requests' "Your requests" now shows every leave request and swap with its status (Pending, Approved, Rejected, ...), not only pending ones (11.5).
@@ -350,6 +352,7 @@ Swapping duties (often called shift swaps) is **in scope**. Staff request swaps 
 **Who can swap with whom.**
 
 - **Across shifts:** AM, PM and Off (including Off(V)) only.
+- **Same role only:** supervisors swap only with supervisors, and regular staff only with regular staff (checked at every step; the partner list only shows people of the same role).
 - **Within a shift:** only a **V or V(SB)** day, since everyone else in the shift shares the same duty that day. For example, Bravo takes Alpha's V night, or Delta covers Frost's standby.
 - **V and V(SB) never go to another shift:** the standby comes from the V person's shift, and the Off(V) falls on that shift's PM block.
 

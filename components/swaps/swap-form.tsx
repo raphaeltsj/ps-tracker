@@ -120,8 +120,8 @@ export function SwapForm({
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
         {mode === "request"
-          ? "Pick the date, then who to swap with: on that date you work their duty and they work yours. For a give-and-take, add a second date. Your partner accepts first, then both shifts' supervisors approve."
-          : "Record a swap for someone in your shift. It counts as agreed by both people and approved for your shift; a swap with another shift still needs that shift's supervisor."}
+          ? "Pick the date, then who to swap with: on that date you work their duty and they work yours. For a give-and-take, add a second date. Supervisors swap with supervisors, and staff with staff. Your partner accepts first, then both shifts' supervisors approve."
+          : "Record a swap for someone in your shift (supervisors swap with supervisors, staff with staff). It counts as agreed by both people and approved for your shift; a swap with another shift still needs that shift's supervisor."}
       </p>
 
       {mode === "record" && (
