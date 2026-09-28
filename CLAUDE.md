@@ -48,6 +48,7 @@ Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, n
 - Custom leave types: name max 6 characters including spaces, with a live counter and chip preview. They count toward Not in Strength.
 - One type of leave per person per day (pending, approved, given, half-day, BD / BD-IL all count). Block the request or grant and show the clashing date.
 - Birthday: BD shows on the birthday even on an Off day; then the leave is BD-IL on the next closest working day without other leave. BD on an Off day is a marker only.
+- Annual limits, shown on My Requests: AL and OL combined, 18; MC, 14; OML, 3; BD and BD-IL combined, always 1. Every other type (MWO, HL, FCL, CSE, OIL, custom types) has no limit and just keeps a running total, as before. A limit is checked against the whole year regardless of which period (month or year) the "Leave taken" list is showing.
 - Staff requests: leave type, dates (range or specific), notes; may be on Off days; may be submitted with no slots left. Statuses: Pending, Approved, Rejected, Withdrawn. Staff can withdraw pending only.
 - Supervisor review: inbox sorted earliest submitted first (name, type, dates, time submitted only; no priority badges). Reject needs a reason and is always available. Approve is disabled with "No slot available on [date]" unless an extra slot exists on every requested date (half-day needs at least 0.5).
 - Only supervisors and Management cancel leave, whether approved or pending. Leave they give is already approved and may be set on locked dates and Off days.

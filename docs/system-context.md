@@ -374,10 +374,10 @@ Swapping duties (often called shift swaps) is **in scope**. Staff request swaps 
 
 Two pages replace the old separate Home, My requests, and Duty swaps pages. Neither holds a form to create a request: that stays on the **roster** (section 11.4), next to the shift it is for. These two pages are for **status and review**.
 
-**My Requests** (`/requests`), for staff and supervisors (not Management, who never requests):
+**My Requests** (`/requests`), for staff and supervisors (not Management, who never requests). Desktop shows **Leave taken** on the left and **Your requests** on the right, side by side; both stack on mobile.
 
-- **Leave taken**: how many days of each leave type (approved only), for the current month or the current year. Every type shows, even at zero.
-- **Your requests**: every leave request and duty swap the viewer has made, whatever its status (Pending, Approved, Rejected, Withdrawn, Declined, Cancelled), in one place. Pending items keep their actions here: withdraw a leave request, accept or decline a swap as partner, and a supervisor can still self-approve their own pending leave.
+- **Leave taken**: a list, one line per leave type (or combined limit group; section 12.6), for the current month or the current year. Every type shows, even at zero.
+- **Your requests**: every leave request and duty swap the viewer has made, in one place, with a shared **Pending / Approved / Rejected / All** filter. Withdrawn ones never show: once withdrawn there is nothing left to track. Pending items keep their actions here: withdraw a leave request, accept or decline a swap as partner, and a supervisor can still self-approve their own pending leave.
 
 **Manage requests** (`/manage-requests`), for supervisors (their own shift) and Management (every shift):
 
@@ -462,11 +462,22 @@ Supervisors can add a new leave type. The name is limited to **6 characters maxi
 
 ### 12.6 Leave taken
 
-On the **My Requests** page (section 11.5), staff and supervisors see how many days of **each** leave type they have taken (approved only), for the current month or the current year. **Every** leave type shows, even one taken zero times, not only the ones actually used. The source of leave entitlements (how many days each type allows) is still to be decided.
+On the **My Requests** page (section 11.5), staff and supervisors see how many days of **each** leave type they have taken (approved only), for the current month or the current year, as a **list** (not a grid of tiles). **Every** leave type shows, even one taken zero times, not only the ones actually used. Half/full-day variants of the same type combine into one line (0.5 AL + AL, 0.5 OIL + 1 OIL).
 
-## 13. Notifications (future feature)
+Some types are tracked together against a combined **annual limit**, shown as a progress bar and how many days are left:
 
-Notifications will be added later and will be tailored to each user (for example staff see leave decisions and roster changes; supervisors see new requests and low-slot alerts). For now the UI should include a **notification bell with a badge** in the desktop header and mobile top bar, and a placeholder inbox screen.
+| **Group**   | **Codes**  | **Limit** |
+|-------------|------------|-----------|
+| AL/OL       | AL, OL     | 18        |
+| MC          | MC         | 14        |
+| OML         | OML        | 3         |
+| BD/BD-IL    | BD, BD-IL  | 1 (always, since there is one birthday a year) |
+
+Everything else (MWO, HL, FCL, CSE, OIL, custom types) has **no limit**: it just keeps a running total, as before. A limit is always checked against the **whole year**, whichever period (month or year) the list is currently showing, so switching to "This month" changes the counts shown but never the "left" figure. Colour the remaining figure the same way as Available Slot(s) (section 6): green above 2 left, amber at 1-2, red at 0 or below (over the limit, for example leave given beyond it).
+
+## 13. Notifications
+
+The bell (desktop header and mobile top bar) opens a panel of the viewer's own notifications. So far: a staff member is told when their leave is **approved** or **rejected** (with the reason), and clicking one marks it read and opens **My Requests**. The badge combines unread notifications with the existing "needs your action" count (pending approvals to review, duty swaps waiting for an answer or approval). Further notification types (roster changes, low-slot alerts, and so on) are a future feature.
 
 ## 14. Platform and UI requirements
 
@@ -508,10 +519,10 @@ Other screens (Calendar view, side panel, Home, forms) keep text labels for duti
 
 ### 14.3.1 Navigation, loading and error states
 
-- The requests page is called **Requests** everywhere (desktop menu, mobile tab, page heading).
-- On phones and tablets (where the top menu is hidden), Profile links to every page the role can open, including **Duty swaps**.
+- The requests page is called **My Requests** everywhere (desktop menu, mobile tab, page heading); the review page for supervisors and Management is **Manage requests**.
+- On phones and tablets (where the top menu is hidden), Profile links to every page the role can open.
 - Changing month, shift or view shows a thin progress bar and dims the roster until the new data arrives; moving between pages shows a loading indicator.
-- A mistyped address shows "Page not found", and a page the role cannot open (for example Tasks for staff) shows "This page isn't available", both with links back to Home and the roster. If a page fails to load, an error screen offers "Try again".
+- A mistyped address shows "Page not found", and a page the role cannot open (for example Tasks for staff) shows "This page isn't available", both with a link back to the roster. If a page fails to load, an error screen offers "Try again".
 - Every page has one heading for screen readers, and text colours meet WCAG AA contrast (4.5:1) in light and dark mode.
 
 ### 14.4 Hero screens (first design pass)
@@ -519,7 +530,7 @@ Other screens (Calendar view, side panel, Home, forms) keep text labels for duti
 | **#** | **Screen**                       | **Role / platform**              | **Key content**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 |--------|----------------------------------|----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 1      | Roster view with request panel   | Staff, desktop                   | Shift tabs A/B/C, prominent Calendar / Roster switch, month grid with sticky name column and header. Strength rows directly below the date header (Total, Not in Strength, Working, MFL, Available Slot(s)) with a Compact toggle showing only Available Slot(s). AM / PM / V / V(SB) / Off cells, Task tags, leave chips, locked-date markers; Rest days show MFL blank. Right-hand panel with Request leave / Request swap tabs (dates picked on the grid, or a partner and dates for a swap), and date details. Full request history and leave taken live on My Requests (section 11.5). |
-| 2      | Calendar view with request panel | Staff, desktop                   | Month calendar showing each date's duty (AM / PM / Off) and Available Slot(s) at a glance, dots on dates with remarks, lock icons on locked dates. Selecting a range or specific dates highlights them and fills the Request leave form in the right-hand panel; selecting a single date shows leave details and the remark, and for a locked date a "Locked date" badge with its remarks. "Leave taken this month" placeholder card.                                                                                                          |
+| 2      | Calendar view with request panel | Staff, desktop                   | Month calendar showing each date's duty (AM / PM / Off) and Available Slot(s) at a glance, dots on dates with remarks, lock icons on locked dates. Selecting a range or specific dates highlights them and fills the Request leave form in the right-hand panel; selecting a single date shows leave details and the remark, and for a locked date a "Locked date" badge with its remarks. Leave taken and its limits live on My Requests, not here.                                                                                                          |
 | 3      | Calendar with bottom sheet       | Staff, mobile                    | Calendar view with the Calendar / Roster switch and the duty on each date; a half-height bottom sheet (so the calendar stays visible) for the request leave form and date details, including the locked-date badge and remarks.                                                                                                                                                                                                                                                                                                                |
 | 4      | Roster view                      | Staff, mobile                    | Week strip or agenda with a shift switcher, strength figures directly under the dates with a Compact toggle, and the request leave bottom sheet.                                                                                                                                                                                                                                                                                                                                                                                               |
 | 5      | Edit view roster grid            | Supervisor, desktop              | Edit view / Staff view switch, own shift editable and other shifts "View only", strength rows below the date header with Compact toggle, cells with V, V(SB), Task tags and leave chips, locked dates, special-event markers, right-hand side panel with Edit / Cancel actions for leave. In Staff view the same page shows the request leave form.                                                                                                                                                                                            |
@@ -534,7 +545,7 @@ Other screens (Calendar view, side panel, Home, forms) keep text labels for duti
 | 14     | Staff records                    | Management, desktop              | List of staff with shift, role, and birthday; add staff, edit details, move a person between shifts. Not visible to other roles.                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 15     | Task report                      | Supervisor / Management          | Filter by year, month, or date range, and by shift. Summary card per Task (days, people), staff-by-Task table with totals, expandable dates per person, "include scheduled" and "hide staff with no Tasks" options. See section 9.2. |
 | 16     | Dayworkers                       | Supervisor / Management          | Add a dayworker (name, username with a live 7-character counter), a year / month / date-range filter, and a table of username, name, Ops duty days per shift and in total, with Edit and Deactivate. Opening a row shows the dates. See section 5.3. |
-| 17     | My Requests                      | Staff / Supervisor               | Leave taken this month or this year, by type (every type shown, even at zero); every leave request and duty swap the viewer has made, whatever its status. No creation form: request from the Roster. See section 11.5. |
+| 17     | My Requests                      | Staff / Supervisor               | Leave taken this month or this year, as a list (every type shown, even at zero; AL/OL, MC, OML and BD/BD-IL show a combined annual limit); every leave request and duty swap the viewer has made, filterable by status. No creation form: request from the Roster. See sections 11.5 and 12.6. |
 | 18     | Manage requests                  | Supervisor / Management          | Pending leave, earliest submitted first, with Approve / Reject; duty swaps needing approval and the shift's full swap history. No creation form: record a swap from the Roster. See section 11.5. |
 
 If the first generation must be limited, start with screens 1, 2, 3, 5, 6, 7, and 11, then add the rest.
