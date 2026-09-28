@@ -12,16 +12,44 @@ import type { LeaveSummary } from "@/lib/roster-types";
 
 export function LeaveInbox({ leaves, empty }: { leaves: LeaveSummary[]; empty: string }) {
   if (leaves.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
+
+  // Management sees every shift's requests in one inbox; group them by shift so one shift's
+  // backlog doesn't bury another's, while keeping each group in the earliest-submitted-first
+  // order already applied to the full list. A supervisor's own shift never has more than one
+  // shiftId, so their inbox renders exactly as before.
+  const shiftIds = [...new Set(leaves.map((l) => l.shiftId).filter((v): v is string => v !== null))].sort();
+  if (shiftIds.length <= 1) {
+    return (
+      <ul className="space-y-2">
+        {leaves.map((l) => (
+          <LeaveInboxRow key={l.id} leave={l} />
+        ))}
+      </ul>
+    );
+  }
+
   return (
-    <ul className="space-y-2">
-      {leaves.map((l) => (
-        <LeaveInboxRow key={l.id} leave={l} />
-      ))}
-    </ul>
+    <div className="space-y-4">
+      {shiftIds.map((shiftId) => {
+        const items = leaves.filter((l) => l.shiftId === shiftId);
+        return (
+          <div key={shiftId} className="space-y-2">
+            <h3 className="text-xs font-semibold text-muted-foreground">
+              Shift {shiftId} <span className="font-normal">({items.length})</span>
+            </h3>
+            <ul className="space-y-2">
+              {items.map((l) => (
+                <LeaveInboxRow key={l.id} leave={l} showShift={false} />
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
-function LeaveInboxRow({ leave }: { leave: LeaveSummary }) {
+function LeaveInboxRow({ leave, showShift = true }: { leave: LeaveSummary; showShift?: boolean }) {
   const { pending, result, run } = useAction();
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
@@ -30,7 +58,7 @@ function LeaveInboxRow({ leave }: { leave: LeaveSummary }) {
     <li className="space-y-2 rounded-lg border p-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold">{leave.staffName}</span>
-        {leave.shiftId && <span className="text-xs text-muted-foreground">Shift {leave.shiftId}</span>}
+        {showShift && leave.shiftId && <span className="text-xs text-muted-foreground">Shift {leave.shiftId}</span>}
         <LeaveChip absence={{ code: leave.typeCode, half: leave.half, status: leave.status, counts: 1, derived: false }} />
         <span className="font-medium">{leave.typeName}</span>
         <span className="ml-auto text-xs text-muted-foreground">{formatDateTime(leave.submittedAt)}</span>
