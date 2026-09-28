@@ -248,6 +248,10 @@ model DutySwapDay {
   swapId String
   swap   DutySwap @relation(fields: [swapId], references: [id], onDelete: Cascade)
   date   String
+  // false: the two exchange duties on this date. true: a follow-on day of a V swap (the PM block
+  // after the V, where the taker gets the Off(V) and the giver works PM again). Nothing is exchanged
+  // on it (that follows from the V), but it is part of the swap: tagged, shown and locked.
+  linked Boolean  @default(false)
 
   @@unique([swapId, date])
   @@index([date])
