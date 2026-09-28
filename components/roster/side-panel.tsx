@@ -77,7 +77,7 @@ export function SidePanel(props: PanelProps) {
     <div className="text-sm">
       {focusLeave && <LeaveDetail {...props} leave={focusLeave} />}
       {!focusLeave && showDateSettings && (
-        <DateSettingsPanel roster={roster} date={selection.focusDate!} isManagement={viewer.role === "MANAGEMENT"} onClose={onCloseDateSettings} />
+        <DateSettingsPanel roster={roster} date={selection.focusDate!} today={props.today} isManagement={viewer.role === "MANAGEMENT"} onClose={onCloseDateSettings} />
       )}
       {!focusLeave && !showDateSettings && mode === "edit" && canEdit && (rowKind ? <RowEditor key={rowKind} {...props} kind={rowKind} /> : <EditTools {...props} />)}
       {mode === "staff" && canRequest && (
@@ -349,7 +349,19 @@ function RowEditor(props: PanelProps & { kind: "ops" | "extra" }) {
  * lock the date and set its special event, in place of the normal duty / Task / leave tools. Clicking
  * the date again, or Close here, goes back (spec 8.1).
  */
-function DateSettingsPanel({ roster, date, isManagement, onClose }: { roster: PanelProps["roster"]; date: string; isManagement: boolean; onClose: () => void }) {
+function DateSettingsPanel({
+  roster,
+  date,
+  today,
+  isManagement,
+  onClose,
+}: {
+  roster: PanelProps["roster"];
+  date: string;
+  today: string;
+  isManagement: boolean;
+  onClose: () => void;
+}) {
   const day = roster.days[date];
   const { pending, result, run } = useAction();
   const [remarks, setRemarks] = useState(day.locked ?? "");
@@ -357,6 +369,12 @@ function DateSettingsPanel({ roster, date, isManagement, onClose }: { roster: Pa
   const [note, setNote] = useState(day.event?.note ?? "");
   const [open, setOpen] = useState<"lock" | "event" | null>(day.locked ? "lock" : day.event ? "event" : null);
   const shiftId = roster.shiftId;
+  const [lockAnnounce, setLockAnnounce] = useState(false);
+  const [lockAnnounceMsg, setLockAnnounceMsg] = useState("");
+  const [lockAnnounceFrom, setLockAnnounceFrom] = useState(today);
+  const [eventAnnounce, setEventAnnounce] = useState(false);
+  const [eventAnnounceMsg, setEventAnnounceMsg] = useState("");
+  const [eventAnnounceFrom, setEventAnnounceFrom] = useState(today);
 
   return (
     <Section
@@ -397,8 +415,27 @@ function DateSettingsPanel({ roster, date, isManagement, onClose }: { roster: Pa
               Lock on all shifts
             </label>
           )}
+          <AnnounceFields
+            on={lockAnnounce}
+            setOn={setLockAnnounce}
+            message={lockAnnounceMsg}
+            setMessage={setLockAnnounceMsg}
+            showFrom={lockAnnounceFrom}
+            setShowFrom={setLockAnnounceFrom}
+            today={today}
+            maxDate={date}
+            defaultMessage={`Locked: ${formatDate(date)}${remarks ? ` — ${remarks}` : ""}`}
+          />
           <div className="flex gap-2">
-            <Button size="sm" disabled={pending || !remarks.trim()} onClick={() => run(() => lockDates({ shiftId, dates: [date], remarks, allShifts }))}>
+            <Button
+              size="sm"
+              disabled={pending || !remarks.trim()}
+              onClick={() =>
+                run(() =>
+                  lockDates({ shiftId, dates: [date], remarks, allShifts, announce: lockAnnounce ? { message: lockAnnounceMsg || `Locked: ${formatDate(date)} — ${remarks}`, showFrom: lockAnnounceFrom } : undefined }),
+                )
+              }
+            >
               {day.locked ? "Save lock" : "Lock date"}
             </Button>
             {day.locked && (
@@ -414,8 +451,27 @@ function DateSettingsPanel({ roster, date, isManagement, onClose }: { roster: Pa
         <div className="space-y-2">
           <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="What is the event?" />
           <p className="text-[11px] text-muted-foreground">Special events are a marker for the whole shift: MFL and slots stay the same.</p>
+          <AnnounceFields
+            on={eventAnnounce}
+            setOn={setEventAnnounce}
+            message={eventAnnounceMsg}
+            setMessage={setEventAnnounceMsg}
+            showFrom={eventAnnounceFrom}
+            setShowFrom={setEventAnnounceFrom}
+            today={today}
+            maxDate={date}
+            defaultMessage={`Special event on ${formatDate(date)}${note ? `: ${note}` : ""}`}
+          />
           <div className="flex gap-2">
-            <Button size="sm" disabled={pending || !note.trim()} onClick={() => run(() => setSpecialEvent({ shiftId, date, note }))}>
+            <Button
+              size="sm"
+              disabled={pending || !note.trim()}
+              onClick={() =>
+                run(() =>
+                  setSpecialEvent({ shiftId, date, note, announce: eventAnnounce ? { message: eventAnnounceMsg || `Special event on ${formatDate(date)}: ${note}`, showFrom: eventAnnounceFrom } : undefined }),
+                )
+              }
+            >
               {day.event ? "Save event" : "Set event"}
             </Button>
             {day.event && (
@@ -428,6 +484,57 @@ function DateSettingsPanel({ roster, date, isManagement, onClose }: { roster: Pa
       )}
       <ResultMessage result={result} />
     </Section>
+  );
+}
+
+/** The optional banner shown alongside a lock or special event (spec 8.4): a toggle, message and start
+ * date. Staff on the shift already get a bell notification either way; this additionally puts a
+ * dismissible banner at the top of the app from the chosen start date up to the locked/event date. */
+function AnnounceFields({
+  on,
+  setOn,
+  message,
+  setMessage,
+  showFrom,
+  setShowFrom,
+  today,
+  maxDate,
+  defaultMessage,
+}: {
+  on: boolean;
+  setOn: (v: boolean) => void;
+  message: string;
+  setMessage: (v: string) => void;
+  showFrom: string;
+  setShowFrom: (v: string) => void;
+  today: string;
+  maxDate: string;
+  defaultMessage: string;
+}) {
+  return (
+    <div className="space-y-2 rounded-md border border-cyan-600/30 p-2">
+      <label className="flex items-center gap-2 text-xs font-medium">
+        <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} className="size-4" />
+        Also tell staff with a banner
+      </label>
+      {on && (
+        <div className="space-y-2">
+          <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={2} maxLength={200} placeholder={defaultMessage} />
+          <label className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Start showing from</span>
+            <input
+              type="date"
+              value={showFrom}
+              min={today}
+              max={maxDate}
+              onChange={(e) => setShowFrom(e.target.value)}
+              className="h-8 rounded-md border bg-background px-1.5"
+            />
+          </label>
+          <p className="text-[11px] text-muted-foreground">Shown at the top of the app until {formatDate(maxDate)}. Staff can close it; several banners combine into one.</p>
+        </div>
+      )}
+    </div>
   );
 }
 

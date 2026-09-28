@@ -21,6 +21,7 @@ model Shift {
   events      SpecialEvent[]
   opsDuties   OpsDuty[]
   extraHosted ExtraShiftDuty[]
+  announcements Announcement[]
 }
 
 model Staff {
@@ -46,6 +47,9 @@ model Staff {
   swapsRequested   DutySwap[]       @relation("SwapRequester")
   swapsPartnered   DutySwap[]       @relation("SwapPartner")
   notifications    Notification[]
+  proficiencies       StaffTaskProficiency[]
+  announcementsMade   Announcement[]
+  announcementsClosed AnnouncementDismissal[]
 }
 
 model Session {
@@ -136,10 +140,27 @@ model LeaveDay {
 }
 
 model Task {
-  id          String           @id @default(cuid())
-  name        String // max 6 characters
-  createdAt   DateTime         @default(now())
-  assignments TaskAssignment[]
+  id            String                 @id @default(cuid())
+  name          String // max 6 characters
+  createdAt     DateTime               @default(now())
+  assignments   TaskAssignment[]
+  proficiencies StaffTaskProficiency[]
+}
+
+// Who is trained to do which Task, managed by supervisors/Management (staff never see this). Purely
+// informational: never affects the roster, duties, or assignment. A row's absence means not trained;
+// present with understudy true means currently training ("(U/S)"), false means fully proficient.
+model StaffTaskProficiency {
+  id         String   @id @default(cuid())
+  staffId    String
+  staff      Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  understudy Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([staffId, taskId])
+  @@index([taskId])
 }
 
 model TaskAssignment {
@@ -255,4 +276,35 @@ model DutySwapDay {
 
   @@unique([swapId, date])
   @@index([date])
+}
+
+// A banner set alongside a locked date or special event to tell staff about it (spec 8.4). Shown from
+// `showFrom` up to `activeUntil` (the locked/event date itself, or the latest date in a range), unless
+// the viewer has closed it. shiftId null = every shift (Management only). Several active announcements
+// combine into one banner: nothing here controls that, it's how the banner is read.
+model Announcement {
+  id          String   @id @default(cuid())
+  shiftId     String?
+  shift       Shift?   @relation(fields: [shiftId], references: [id])
+  message     String
+  showFrom    String // "YYYY-MM-DD"
+  activeUntil String // "YYYY-MM-DD"
+  createdById String
+  createdBy   Staff    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  dismissals  AnnouncementDismissal[]
+
+  @@index([shiftId])
+}
+
+// One viewer closing the banner: it stops showing to them, not to anyone else.
+model AnnouncementDismissal {
+  id             String       @id @default(cuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  staffId        String
+  staff          Staff        @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  dismissedAt    DateTime     @default(now())
+
+  @@unique([announcementId, staffId])
 }

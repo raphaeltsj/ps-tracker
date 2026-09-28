@@ -32,6 +32,13 @@ export async function notifyLeaveDecision(staffId: string, decidedById: string, 
   await db.notification.create({ data: { staffId, message, href: "/requests" } });
 }
 
+/** A supervisor locked dates or set a special event: tell everyone active on the affected shift(s), except who did it. */
+export async function notifyShiftEvent(shiftIds: string[], byId: string, message: string): Promise<void> {
+  const staff = await db.staff.findMany({ where: { shiftId: { in: shiftIds }, active: true, id: { not: byId } }, select: { id: true } });
+  if (staff.length === 0) return;
+  await db.notification.createMany({ data: staff.map((s) => ({ staffId: s.id, message, href: "/roster" })) });
+}
+
 export async function markNotificationRead(id: string, staffId: string): Promise<void> {
   await db.notification.updateMany({ where: { id, staffId }, data: { read: true } });
 }

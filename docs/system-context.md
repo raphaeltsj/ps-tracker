@@ -1,6 +1,6 @@
 # PS Tracker: System Context Document
 
-*Duty roster management for a shift-based team | Version 1.16 | Draft for editing*
+*Duty roster management for a shift-based team | Version 1.17 | Draft for editing*
 
 ## 1. Purpose of this document
 
@@ -12,6 +12,8 @@ It has two parts:
 - **Part B: Build framework** (section 17): the tech stack, project structure, and build conventions. Read both before implementing any feature.
 
 > **How to edit:** items in [square brackets] are still undecided. Section 16 lists assumptions and open questions. Update this document whenever a rule changes so it stays the single source of truth.
+
+**Changes in 1.17:** locking dates or setting a special event can now also raise a dismissible **announcement banner** at the top of the app, several combining into one, plus a bell notification either way (6, 12.5, 13.1); the Staff records page adds **Task proficiency** (not trained / understudy / proficient per person, per Task, never shown to staff), compared on Manage requests when reviewing a duty swap (9.3, 11.6); Manage requests is redesigned with leave on the left and swaps on the right (11.5); Tasks are seeded 12 at a time instead of 5 (14.6).
 
 **Changes in 1.16:** a duty swap's date(s) fill in from whatever is already selected on the roster, so the date picker is only needed to change them (11.4); adds a **Staff records** page (`/staff`) for supervisors (their own shift, Regular Staff only) and Management (any shift, including supervisors and shift moves), resolving the old "field list to confirm" (11.6); the Edit view's "Give leave" tab is renamed **Leave**.
 
@@ -166,6 +168,7 @@ On some dates an entire shift has something on that the roster should flag. This
 - The UI must show a clear "Special Event" indicator, with the note, on the day header, the day view, the mobile day card, and the affected staff cells.
 - Special events **do not change MFL or leave slots** for that day. They are a note for the whole shift.
 - Supervisors can set a special-event time for their own shift.
+- Like a locked date, setting a special event offers the option to **also announce it**: see section 13.1.
 
 **Public holidays** do not affect MFL or duty. The team works as usual, so they need no special handling in the roster.
 
@@ -259,6 +262,16 @@ Supervisors and Management have a **Task report** that shows which Tasks each pe
   - The table scrolls inside its own frame with the **header row, Staff column, Total column, and totals row pinned**, so names and totals stay visible while scrolling across many Task columns. A person's expanded date list is height-limited.
 - The report counts **Task assignments only**. It does not change duty, leave, strength, MFL, or slots. A deleted Task and its assignments no longer appear.
 - Regular Staff do not see the report.
+
+### 9.3 Task proficiency
+
+Separate from day-to-day Task assignment, supervisors and Management keep a record of **who is trained for which Task**, managed on the Staff records page (section 11.6).
+
+- For each person and each Task, one of three states: **not trained**, **understudy** (currently training, shown as **"(U/S)"**), or **proficient** (can do it).
+- Kept by whichever supervisor manages that person's shift, or Management for any shift — the same permission as editing the staff record itself.
+- **Never shown to Regular Staff**, anywhere. It is not on the roster, a person's own profile, or any staff-facing page.
+- **Purely a record.** It does not affect duty, leave, strength, MFL, slots, or Task assignment.
+- Used when reviewing a duty swap on Manage requests (section 11.4, 11.5): a "Compare proficiency" panel on the swap shows both people's proficient and understudy Tasks, so the approving supervisor can judge whether the swap leaves each duty adequately covered.
 
 ## 10. Users and permissions
 
@@ -393,20 +406,21 @@ Two pages replace the old separate Home, My requests, and Duty swaps pages. Neit
 - **Leave taken**: a list, one line per leave type (or combined limit group; section 12.6), for the current month or the current year. Every type shows, even at zero.
 - **Your requests**: every leave request and duty swap the viewer has made, in one place, with a shared **Pending / Approved / Rejected / All** filter. Withdrawn ones never show: once withdrawn there is nothing left to track. Pending items keep their actions here: withdraw a leave request, accept or decline a swap as partner, and a supervisor can still self-approve their own pending leave.
 
-**Manage requests** (`/manage-requests`), for supervisors (their own shift) and Management (every shift):
+**Manage requests** (`/manage-requests`), for supervisors (their own shift) and Management (every shift). On a wide screen, **leave requests sit in a column on the left** and **duty swaps in a wider column on the right**, so both are visible together without scrolling past each other; both stack on mobile.
 
 - **Leave requests**: every pending request for the shifts they edit, **earliest submitted first** (a supervisor's own request is excluded here: that is self-service on My Requests). Approve or reject (a reason is required) inline.
-- **Duty swaps needing your approval**, and the shift's swap history with a date from today on (approve, reject, or cancel an approved one; past swaps drop off the list).
+- **Duty swaps needing your approval**, and the shift's swap history with a date from today on (approve, reject, or cancel an approved one; past swaps drop off the list). Each swap can expand a **Compare proficiency** panel (section 9.3) listing both people's proficient and understudy Tasks, to help judge whether approving it leaves each duty adequately covered.
 
 The roster no longer shows the viewer's own pending requests in its side panel: that list moved to My Requests.
 
 ### 11.6 Staff records
 
-The **Staff** page (`/staff`) lets supervisors and Management add, edit and deactivate staff.
+The **Staff** page (`/staff`) lets supervisors and Management add, edit and deactivate staff, and manage Task proficiency.
 
 - Supervisors manage staff for their **own shift** only. They can add a new person (name, birthday optional; role is fixed to Regular Staff) and edit an existing one's name and birthday, but cannot add a supervisor, move anyone to another shift, or change anyone's role.
 - Management can do all of that for **any shift**, and additionally add a supervisor, move a staff member between shifts, and change their role.
 - Deactivating (never deleting, like Dayworkers) keeps a person's leave, duty and Task history intact and drops them off the active roster; they can be reactivated later. Nobody can deactivate their own account.
+- The same page also manages each person's **Task proficiency** (section 9.3): for every Task, mark them not trained, an understudy ("(U/S)"), or proficient. Never shown to staff; purely a reference for supervisors and Management.
 
 ## 12. Leave management
 
@@ -481,6 +495,7 @@ Supervisors can add a new leave type. The name is limited to **6 characters maxi
 - Staff cannot request leave on locked dates. Locked dates show a lock marker on the calendar and roster, and are disabled in the staff date picker.
 - Supervisors and Management can still give leave on locked dates. Leave that was already approved before the lock is unaffected.
 - Locks and their remarks can be edited or removed by the same roles.
+- When locking dates (or setting a special event, section 6), the same panel offers the option to **also announce it**: see section 13.1.
 
 ### 12.6 Leave taken
 
@@ -499,7 +514,17 @@ Everything else (MWO, HL, FCL, CSE, OIL, custom types) has **no limit**: it just
 
 ## 13. Notifications
 
-The bell (desktop header and mobile top bar) opens a panel of the viewer's own notifications. So far: a staff member is told when their leave is **approved** or **rejected** (with the reason), and clicking one marks it read and opens **My Requests**. The badge combines unread notifications with the existing "needs your action" count (pending approvals to review, duty swaps waiting for an answer or approval). Further notification types (roster changes, low-slot alerts, and so on) are a future feature.
+The bell (desktop header and mobile top bar) opens a panel of the viewer's own notifications. So far: a staff member is told when their leave is **approved** or **rejected** (with the reason), and when a **locked date or special event** is set on their shift (section 13.1); clicking one marks it read and opens the relevant page. The badge combines unread notifications with the existing "needs your action" count (pending approvals to review, duty swaps waiting for an answer or approval). Further notification types (roster changes, low-slot alerts, and so on) are a future feature.
+
+### 13.1 Announcements (banner)
+
+When locking dates or setting a special event (sections 6, 12.5), a supervisor or Management can additionally raise it as a **banner** shown at the top of the app.
+
+- **Two independent things happen when a lock or event is set:** every active staff member on the affected shift(s) always gets a **bell notification**; the **banner** is an extra, optional step the person setting it chooses.
+- The banner has a **message** and a **start date**: it shows from that date up to and including the locked/event date, then stops on its own. It defaults to today's date and the same wording as the lock's remarks or the event's note, but either can be changed.
+- Scope matches who set it: a single shift for a supervisor's lock/event, or **every shift** for a Management lock made with "Lock on all shifts".
+- Shown to everyone it applies to, at the **top of the app**, above the header. **Several active announcements combine into one banner** rather than stacking several banners; the combined text **slides left to right**, slowly enough to read in full before it repeats.
+- **Closing the banner is per-viewer**: an "X" dismisses it for that person only, and does not remove it for anyone else or for a later viewer whose banner hasn't shown yet.
 
 ## 14. Platform and UI requirements
 
@@ -525,6 +550,7 @@ The bell (desktop header and mobile top bar) opens a panel of the viewer's own n
 | **Special event** | Magenta accent                            |
 | **V(SB) standby** | Lighter, outlined version of the V colour |
 | **Locked date**   | Neutral hatch pattern with a lock icon    |
+| **Announcement banner** | Cyan accent, with a megaphone icon  |
 
 **Roster view colour coding.** On the Roster view (desktop grid and mobile day list), **AM, PM, and Off are not written as text**. Each cell is filled with its duty colour instead: AM amber, PM indigo, Off grey. The date header shows the shift's duty as a small colour bar. **V, V(SB) and Off(V) keep a text label** on top of their colour, because they are exceptions to the cycle (Off(V) is a light violet tint with the "Off(V)" chip, not a border). DOS/FDO duties show their name as a small tag. To stay accessible without text:
 
@@ -558,17 +584,17 @@ Other screens (Calendar view, side panel, Home, forms) keep text labels for duti
 | 5      | Edit view roster grid            | Supervisor, desktop              | Edit view / Staff view switch, own shift editable and other shifts "View only", strength rows below the date header with Compact toggle, cells with V, V(SB), Task tags and leave chips, locked dates, special-event markers, right-hand side panel with Edit / Cancel actions for leave. In Staff view the same page shows the request leave form.                                                                                                                                                                                            |
 | 6      | Give and edit leave              | Supervisor, desktop              | Drawer or modal: select staff (including themselves), specific dates or date range (Off days allowed), leave type, remarks. Edit mode changes the type, dates, and remarks of existing leave and offers Cancel leave. Shows that the leave is already approved and that locked dates are allowed.                                                                                                                                                                                                                                              |
 | 7      | Assign duties and Tasks          | Supervisor, desktop              | Drawer with two parts: duty assignment from one picker (AM, PM, V, V(SB), Off) for selected people and dates, the same way for every duty; and optional Task assignment (pick one Task, select one or more people; one Task per person per day; unavailable for people on full-day leave).                                                                                                                                                                                                                                                     |
-| 8      | Lock dates                       | Supervisor, desktop              | Modal with a calendar for selecting dates or a range, a remarks field explaining why the dates are locked, shift scope (own shift for Supervisors; one, several, or all shifts for Management), and a list of locked dates with their remarks and edit / unlock actions.                                                                                                                                                                                                                                                                       |
+| 8      | Lock dates                       | Supervisor, desktop              | Modal with a calendar for selecting dates or a range, a remarks field explaining why the dates are locked, shift scope (own shift for Supervisors; one, several, or all shifts for Management), a list of locked dates with their remarks and edit / unlock actions, and an optional "also announce it" toggle with a message and start date (section 13.1).                                                                                                                                                                                                                                                                       |
 | 9      | Leave inbox and review drawer    | Supervisor, desktop              | Requests sorted earliest first showing name, type, dates, time submitted; opening a request shows staff notes and the Available Slot(s) impact. Approve is disabled with a message when a requested date has no available slot; Reject is always available.                                                                                                                                                                                                                                                                                    |
 | 10     | All-shift overview               | Management, desktop              | Shifts A, B, C for a selected day or week with strength figures; any duty at or below MFL highlighted; same edit functions as a supervisor.                                                                                                                                                                                                                                                                                                                                                                                                    |
 | 11     | Task management                  | Management, desktop              | List of Tasks (Task 1, Task 2, ...) with Add, Rename, and Delete; name only, 6-character counter, and a delete warning that all existing assignments of that Task will be deleted. Not visible to other roles.                                                                                                                                                                                                                                                                                                                                 |
 | 12     | Add custom leave type            | Supervisor / Management, desktop | Modal with 6-character limit, live counter, chip preview.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 13     | Swap a duty, from the roster     | Staff / Supervisor, desktop      | Request swap / Swap tab in the roster's side panel: the selected date fills in automatically, pick a partner (same role as you; another shift for AM / PM / Off, the same shift for V / V(SB)) and one or two dates, preview each person's duty before and after, then send (staff) or record (supervisor).                                                                                                                                                                                                                                                                                                                                      |
-| 14     | Staff records (`/staff`)         | Supervisor / Management, desktop | List of staff with role and birthday, scoped to the supervisor's own shift or (for Management) a chosen shift's tab; add, edit, and Deactivate/Reactivate. Only Management sees the role and shift fields, and can add a supervisor or move someone between shifts. See section 11.6. |
+| 14     | Staff records (`/staff`)         | Supervisor / Management, desktop | List of staff with role and birthday, scoped to the supervisor's own shift or (for Management) a chosen shift's tab; add, edit, and Deactivate/Reactivate. Only Management sees the role and shift fields, and can add a supervisor or move someone between shifts. A "Proficiency" action per person expands a Task-by-Task not trained / understudy / proficient picker, never shown to staff. See sections 9.3 and 11.6. |
 | 15     | Task report                      | Supervisor / Management          | Filter by year, month, or date range, and by shift. Summary card per Task (days, people), staff-by-Task table with totals, expandable dates per person, "include scheduled" and "hide staff with no Tasks" options. See section 9.2. |
 | 16     | Dayworkers                       | Supervisor / Management          | Add a dayworker (name, username with a live 7-character counter), a year / month / date-range filter, and a table of username, name, Ops duty days per shift and in total, with Edit and Deactivate. Opening a row shows the dates. See section 5.3. |
 | 17     | My Requests                      | Staff / Supervisor               | Leave taken this month or this year, as a list (every type shown, even at zero; AL/OL, MC, OML and BD/BD-IL show a combined annual limit); every leave request and duty swap the viewer has made, filterable by status. No creation form: request from the Roster. See sections 11.5 and 12.6. |
-| 18     | Manage requests                  | Supervisor / Management          | Pending leave, earliest submitted first, with Approve / Reject; duty swaps needing approval and the shift's full swap history. No creation form: record a swap from the Roster. See section 11.5. |
+| 18     | Manage requests                  | Supervisor / Management          | Leave on the left, swaps on the right (needing approval above the shift's full swap history): pending leave, earliest submitted first, with Approve / Reject; duty swaps needing approval and the shift's full swap history, each with an expandable Compare proficiency panel. No creation form: record a swap from the Roster. See sections 9.3 and 11.5. |
 
 If the first generation must be limited, start with screens 1, 2, 3, 5, 6, 7, and 11, then add the rest.
 
@@ -606,7 +632,7 @@ If the first generation must be limited, start with screens 1, 2, 3, 5, 6, 7, an
 
 ### 14.6 Sample data
 
-For now, use placeholder staff names that are each a **single 5-character word** (for example Alpha, Bravo, Delta, Eagle, Frost, Grace, Haven, Ivory, Jolly, Karma). Do not use realistic personal names. Names may repeat across different shifts. Dayworker sample data follows the same rule for names (for example Comet, Sable, Torch), with short usernames such as CMT or SBL, and one using the full 7 characters.
+For now, use placeholder staff names that are each a **single 5-character word** (for example Alpha, Bravo, Delta, Eagle, Frost, Grace, Haven, Ivory, Jolly, Karma). Do not use realistic personal names. Names may repeat across different shifts. Dayworker sample data follows the same rule for names (for example Comet, Sable, Torch), with short usernames such as CMT or SBL, and one using the full 7 characters. Seed data starts with **12 Tasks** ("Task 1" to "Task 12"), with sample Task proficiency (including some understudies) across the seeded staff.
 
 ## 15. Out of scope
 
@@ -694,16 +720,24 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
   /(app)/task-report        Task report (supervisor / management), section 9.2
   /(app)/dayworkers         dayworkers and their Ops duty counts (supervisor / management), section 5.3
   /(app)/tasks              Task management (management only)
-  /(app)/profile            profile, theme, links to Tasks and the Task report on mobile
-  actions.ts                all Server Actions: requestLeave, approveLeave, giveLeave, assignDuty, assignTask, ...
+  /(app)/staff              Staff records and Task proficiency (supervisor / management), section 11.6
+  /(app)/profile            profile, theme, links to Tasks, the Task report, and Staff on mobile
+  actions.ts                all Server Actions: requestLeave, approveLeave, giveLeave, assignDuty, assignTask,
+                            lockDates, setSpecialEvent (with the optional announce banner), ...
   swap-actions.ts           duty swap Server Actions
+  staff-actions.ts          staff record Server Actions (create / update / deactivate, Task proficiency)
+  announcement-actions.ts   closing the announcement banner (per viewer)
 /components/ui              shadcn/ui components
 /components/roster          RosterGrid, CalendarView, MobileRoster, SidePanel (incl. the roster's
-                            Request swap / Swap tabs), chips and legend
+                            Request swap / Swap tabs, and the lock/event date-settings panel with its
+                            optional announce fields), chips and legend
 /components/tasks           Task manager, Task report filters and table
 /components/requests        LeaveInbox: the pending-leave review list on Manage requests
-/components/swaps           swap request / record form (with preview) and swap list: the form is
-                            used from the roster, the list from My Requests and Manage requests
+/components/swaps           swap request / record form (with preview) and swap list (incl. the
+                            Compare proficiency panel on Manage requests): the form is used from the
+                            roster, the list from My Requests and Manage requests
+/components/staff           StaffManager: add / edit / deactivate staff, and the Task proficiency editor
+/components/announcements   AnnouncementBanner: the combined, sliding, per-viewer-dismissible banner
 /lib
   cycle.ts                  duty cycle, cycle position, V overlay and Off (post-V)
   swaps.ts                  duty swap exchange and preview (pure); swap-data.ts loads and checks swaps
@@ -719,9 +753,14 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
   dayworkers.ts             dayworker username rules (max 7, capitals), report row type
   dayworker-report.ts       Ops duty counts per dayworker
   report-period.ts          the year / month / date-range filter shared by both reports
+  staff.ts                  staff name / role normalisation
+  proficiency.ts            Task proficiency map and per-swap comparison summaries
+  notifications.ts          the bell: leave decisions, and locked-date / special-event notices
+  announcements.ts          active announcements for a viewer, and dismissing them
 /prisma
   schema.prisma
-  seed.ts                   3 shifts, demo staff and users, duties, V blocks, leave, Tasks, locks, events
+  seed.ts                   3 shifts, demo staff and users, duties, V blocks, leave, 12 Tasks with sample
+                            proficiency, locks, events, and their announcements
 /docs
   system-context.md         this document
 ```
@@ -738,9 +777,9 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
 
 ### 17.5 Build priority
 
-Done: Roster view and same-page leave request (staff), Calendar view, Edit view roster grid (supervisor), give / edit / cancel leave, approve / reject from the leave detail panel, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and special events, Task management (management), the Task report, dayworkers with Ops duty and their count, Extra shift duty, the Support and Recall placeholder rows, duty swaps (including picking one directly from the roster), the My Requests / Manage requests pages, staff records, and notifications for leave decisions.
+Done: Roster view and same-page leave request (staff), Calendar view, Edit view roster grid (supervisor), give / edit / cancel leave, approve / reject from the leave detail panel, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and special events (with the optional announcement banner), Task management (management), Task proficiency, the Task report, dayworkers with Ops duty and their count, Extra shift duty, the Support and Recall placeholder rows, duty swaps (including picking one directly from the roster, and comparing proficiency when reviewing one), the My Requests / Manage requests pages, staff records, and notifications for leave decisions and shift announcements.
 
-Next: the leave inbox page, all-shift overview, staff records, and custom leave types. See section 14.4 for the full hero-screen list.
+Next: the all-shift overview and custom leave types. See section 14.4 for the full hero-screen list.
 
 ## Appendix: Claude Design prompt
 

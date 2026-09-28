@@ -23,7 +23,8 @@ import { buildRoster } from "@/lib/roster-data";
 import { findLeaveConflict } from "@/lib/leave-rules";
 import { datesWithoutSlot } from "@/lib/slots";
 import { formatFigure } from "@/lib/strength";
-import { notifyLeaveDecision } from "@/lib/notifications";
+import { ANNOUNCEMENT_MESSAGE_MAX } from "@/lib/announcements";
+import { notifyLeaveDecision, notifyShiftEvent } from "@/lib/notifications";
 import { swapAffectedByDutyChange, swapLockMessage } from "@/lib/swap-data";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
@@ -455,8 +456,30 @@ async function editableShifts(viewer: Viewer, shiftId: string, allShifts: boolea
   return ids;
 }
 
+type AnnounceInput = { message: string; showFrom: string } | undefined;
+
+/**
+ * The optional banner a supervisor can add when locking dates or setting a special event (spec 8.4).
+ * Best-effort: the lock or event itself is already saved by the time this runs, so a problem with the
+ * banner is reported as a warning rather than failing the whole action.
+ */
+async function createAnnounceIfRequested(
+  viewer: Viewer,
+  announce: AnnounceInput,
+  { shiftId, activeUntil }: { shiftId: string | null; activeUntil: string },
+): Promise<string | null> {
+  if (!announce) return null;
+  const message = cleanText(announce.message, ANNOUNCEMENT_MESSAGE_MAX);
+  if (!message) return "Banner not set: add a message for it.";
+  const showFrom = isValidDate(announce.showFrom) ? announce.showFrom : undefined;
+  if (!showFrom) return "Banner not set: pick a valid start date.";
+  if (showFrom > activeUntil) return "Banner not set: it cannot start after the date it is about.";
+  await db.announcement.create({ data: { shiftId, message, showFrom, activeUntil, createdById: viewer.id } });
+  return null;
+}
+
 /** Locks dates for events. Staff cannot request leave on them; supervisors still can give leave. */
-export async function lockDates(input: { shiftId: string; dates: string[]; remarks: string; allShifts?: boolean }): Promise<ActionResult> {
+export async function lockDates(input: { shiftId: string; dates: string[]; remarks: string; allShifts?: boolean; announce?: AnnounceInput }): Promise<ActionResult> {
   const viewer = await requireViewer();
   const dates = cleanDates(input.dates);
   if (!dates) return fail("Pick at least one valid date.");
@@ -474,7 +497,10 @@ export async function lockDates(input: { shiftId: string; dates: string[]; remar
       });
     }
   }
-  return done(shifts.length > 1 ? `Locked on all ${shifts.length} shifts.` : "Date locked.");
+  await notifyShiftEvent(shifts, viewer.id, `${formatDateList(dates)} ${dates.length > 1 ? "were" : "was"} locked: ${remarks}`);
+  const warning = await createAnnounceIfRequested(viewer, input.announce, { shiftId: input.allShifts ? null : input.shiftId, activeUntil: dates[dates.length - 1] });
+  const base = shifts.length > 1 ? `Locked on all ${shifts.length} shifts.` : "Date locked.";
+  return done(warning ? `${base} ${warning}` : base);
 }
 
 export async function unlockDate(input: { shiftId: string; date: string; allShifts?: boolean }): Promise<ActionResult> {
@@ -487,7 +513,7 @@ export async function unlockDate(input: { shiftId: string; date: string; allShif
 }
 
 /** A whole shift reports at a different time. Does not change MFL or slots. */
-export async function setSpecialEvent(input: { shiftId: string; date: string; note?: string }): Promise<ActionResult> {
+export async function setSpecialEvent(input: { shiftId: string; date: string; note?: string; announce?: AnnounceInput }): Promise<ActionResult> {
   const viewer = await requireViewer();
   if (!isValidDate(input.date)) return fail("Invalid date.");
   if (!canEditShift(viewer, input.shiftId)) return fail("You can only set events for your own shift.");
@@ -499,7 +525,9 @@ export async function setSpecialEvent(input: { shiftId: string; date: string; no
     create: { shiftId: input.shiftId, date: input.date, note },
     update: { note },
   });
-  return done("Special event set.");
+  await notifyShiftEvent([input.shiftId], viewer.id, `Special event on ${formatDate(input.date)}: ${note}`);
+  const warning = await createAnnounceIfRequested(viewer, input.announce, { shiftId: input.shiftId, activeUntil: input.date });
+  return done(warning ? `Special event set. ${warning}` : "Special event set.");
 }
 
 export async function clearSpecialEvent(input: { shiftId: string; date: string }): Promise<ActionResult> {
