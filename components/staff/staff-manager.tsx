@@ -1,5 +1,6 @@
 "use client";
-import { Fragment, useState } from "react";
+import { Check, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { createStaff, setStaffActive, setStaffProficiency, updateStaff } from "@/app/staff-actions";
 import { ResultMessage, useAction } from "@/components/roster/use-action";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ function RoleSelect({ value, onChange, id }: { value: StaffRole; onChange: (v: S
 export function StaffManager({
   shiftId,
   staff,
+  allStaff,
   viewerId,
   canChangeRoleOrShift,
   tasks,
@@ -37,6 +39,9 @@ export function StaffManager({
 }: {
   shiftId: string;
   staff: StaffRow[];
+  /** Every shift's staff for Management (so the proficiency matrix can filter by shift without a
+   * page reload); the same as `staff` for a supervisor, who only ever sees their own shift. */
+  allStaff: StaffRow[];
   viewerId: string;
   canChangeRoleOrShift: boolean;
   tasks: TaskOption[];
@@ -51,7 +56,6 @@ export function StaffManager({
   const [editBirthday, setEditBirthday] = useState("");
   const [editRole, setEditRole] = useState<StaffRole>("STAFF");
   const [editShiftId, setEditShiftId] = useState(shiftId);
-  const [proficiencyId, setProficiencyId] = useState<string | null>(null);
   const cols = canChangeRoleOrShift ? 5 : 4;
 
   const startEdit = (s: StaffRow) => {
@@ -119,8 +123,7 @@ export function StaffManager({
               const editing = editingId === s.id;
               const self = s.id === viewerId;
               return (
-                <Fragment key={s.id}>
-                <tr className={cn("align-top", !s.active && "text-muted-foreground")}>
+                <tr key={s.id} className={cn("align-top", !s.active && "text-muted-foreground")}>
                   <td className="border-b px-3 py-2">
                     {editing ? (
                       <Input value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={STAFF_NAME_MAX} aria-label={`Name for ${s.name}`} className="w-48" />
@@ -186,9 +189,6 @@ export function StaffManager({
                         </>
                       ) : (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => setProficiencyId(proficiencyId === s.id ? null : s.id)}>
-                            Proficiency
-                          </Button>
                           <Button size="sm" variant="outline" onClick={() => startEdit(s)}>
                             Edit
                           </Button>
@@ -206,14 +206,6 @@ export function StaffManager({
                     </span>
                   </td>
                 </tr>
-                {proficiencyId === s.id && (
-                  <tr>
-                    <td colSpan={cols} className="border-b bg-muted/30 px-3 py-3">
-                      <ProficiencyEditor staffId={s.id} tasks={tasks} levels={proficiency[s.id] ?? {}} />
-                    </td>
-                  </tr>
-                )}
-                </Fragment>
               );
             })}
             {staff.length === 0 && (
@@ -226,52 +218,147 @@ export function StaffManager({
           </tbody>
         </table>
       </div>
+
+      <ProficiencyMatrix staff={allStaff} tasks={tasks} proficiency={proficiency} defaultShiftId={shiftId} showShiftFilter={canChangeRoleOrShift} />
     </div>
   );
 }
 
-const LEVEL_STYLE: Record<ProficiencyLevel, string> = {
-  NONE: "text-muted-foreground hover:bg-accent",
-  UNDERSTUDY: "bg-amber-500 text-white",
-  PROFICIENT: "bg-emerald-600 text-white",
-};
+const NEXT_LEVEL: Record<ProficiencyLevel, ProficiencyLevel> = { NONE: "PROFICIENT", PROFICIENT: "UNDERSTUDY", UNDERSTUDY: "NONE" };
+const SHIFT_IDS = ["A", "B", "C"];
 
-const LEVEL_LABEL: Record<ProficiencyLevel, string> = { NONE: "—", UNDERSTUDY: "(U/S)", PROFICIENT: "Can do" };
-
-/** Which Tasks this person can do, and which they are currently an understudy for. Never shown to
- * staff, never affects the roster: purely a record supervisors keep (spec: staff proficiency). */
-function ProficiencyEditor({ staffId, tasks, levels }: { staffId: string; tasks: TaskOption[]; levels: Record<string, ProficiencyLevel> }) {
+/** One cell of the matrix: a single button that cycles Not trained -> Proficient -> Understudy ->
+ * Not trained, so setting proficiency for many people across many Tasks stays a quick click each. */
+function ProficiencyCell({ staffId, taskId, level }: { staffId: string; taskId: string; level: ProficiencyLevel }) {
   const { pending, run } = useAction();
+  const label = level === "PROFICIENT" ? "Proficient — click to mark as understudy" : level === "UNDERSTUDY" ? "Understudy (U/S) — click to clear" : "Not trained — click to mark proficient";
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-muted-foreground">Only supervisors and Management see this. It does not affect the roster: it just records who is trained for which Task.</p>
+    <button
+      type="button"
+      disabled={pending}
+      title={label}
+      aria-label={label}
+      onClick={() => run(() => setStaffProficiency({ staffId, taskId, level: NEXT_LEVEL[level] }))}
+      className={cn(
+        "flex h-7 w-7 items-center justify-center rounded-md border text-[10px] font-bold transition-colors disabled:opacity-60",
+        level === "PROFICIENT" && "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700",
+        level === "UNDERSTUDY" && "border-amber-500 bg-amber-500 text-white hover:bg-amber-600",
+        level === "NONE" && "border-muted-foreground/30 bg-muted/40 text-muted-foreground hover:bg-muted",
+      )}
+    >
+      {level === "PROFICIENT" ? <Check className="size-3.5" /> : level === "UNDERSTUDY" ? "U/S" : <X className="size-3.5" />}
+    </button>
+  );
+}
+
+/** Which Tasks each person can do, and who is currently an understudy for one. Never shown to staff,
+ * never affects the roster: purely a record supervisors/Management keep (spec: staff proficiency).
+ * A grid rather than a per-row expander, so it stays usable as Management adds more Tasks over time —
+ * the table scrolls horizontally with a sticky name column, the same pattern as the roster grid. */
+function ProficiencyMatrix({
+  staff,
+  tasks,
+  proficiency,
+  defaultShiftId,
+  showShiftFilter,
+}: {
+  staff: StaffRow[];
+  tasks: TaskOption[];
+  proficiency: ProficiencyMap;
+  defaultShiftId: string;
+  showShiftFilter: boolean;
+}) {
+  const [shiftFilter, setShiftFilter] = useState<string>(defaultShiftId);
+  const rows = useMemo(
+    () =>
+      staff
+        .filter((s) => shiftFilter === "ALL" || s.shiftId === shiftFilter)
+        .sort((a, b) => (a.shiftId === b.shiftId ? a.name.localeCompare(b.name) : a.shiftId.localeCompare(b.shiftId))),
+    [staff, shiftFilter],
+  );
+
+  return (
+    <div className="space-y-2 rounded-xl border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold">Task proficiency</h2>
+          <p className="text-xs text-muted-foreground">Only supervisors and Management see this. It never affects the roster — a record of who is trained for which Task.</p>
+        </div>
+        {showShiftFilter && (
+          <div className="flex rounded-lg border p-0.5 text-xs" role="tablist" aria-label="Filter proficiency by shift">
+            {["ALL", ...SHIFT_IDS].map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={shiftFilter === id}
+                onClick={() => setShiftFilter(id)}
+                className={cn("rounded-md px-2.5 py-1", shiftFilter === id ? "bg-secondary font-semibold" : "text-muted-foreground")}
+              >
+                {id === "ALL" ? "All shifts" : `Shift ${id}`}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {tasks.length === 0 ? (
         <p className="text-xs text-muted-foreground">No Tasks yet. Management adds Tasks on the Tasks page.</p>
+      ) : rows.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No staff to show.</p>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          {tasks.map((t) => {
-            const level = levels[t.id] ?? "NONE";
-            return (
-              <div key={t.id} className="flex items-center gap-1 rounded-md border bg-background px-2 py-1">
-                <span className="text-xs font-medium">{t.name}</span>
-                {(["NONE", "UNDERSTUDY", "PROFICIENT"] as const).map((lv) => (
-                  <button
-                    key={lv}
-                    type="button"
-                    disabled={pending}
-                    aria-pressed={level === lv}
-                    title={LEVEL_LABEL[lv]}
-                    onClick={() => run(() => setStaffProficiency({ staffId, taskId: t.id, level: lv }))}
-                    className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", level === lv ? LEVEL_STYLE[lv] : "text-muted-foreground hover:bg-accent")}
-                  >
-                    {LEVEL_LABEL[lv]}
-                  </button>
+        <div className="max-h-[28rem] overflow-auto rounded-lg border" role="region" aria-label="Task proficiency matrix" tabIndex={0}>
+          <table className="w-full min-w-max border-separate border-spacing-0 text-xs">
+            <thead>
+              <tr>
+                <th className="sticky left-0 top-0 z-20 min-w-40 border-b border-r bg-background px-2 py-1.5 text-left font-semibold">Name</th>
+                {tasks.map((t) => (
+                  <th key={t.id} title={t.name} className="sticky top-0 z-10 min-w-14 border-b border-r bg-background px-1 py-1.5 text-center font-semibold">
+                    {t.name}
+                  </th>
                 ))}
-              </div>
-            );
-          })}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((s) => (
+                <tr key={s.id} className={cn(!s.active && "opacity-60")}>
+                  <th className="sticky left-0 z-10 border-b border-r bg-background px-2 py-1 text-left font-medium">
+                    <span className="flex items-center gap-1.5">
+                      {s.name}
+                      {shiftFilter === "ALL" && <span className="text-[10px] text-muted-foreground">Shift {s.shiftId}</span>}
+                      {!s.active && <span className="text-[10px] text-muted-foreground">(inactive)</span>}
+                    </span>
+                  </th>
+                  {tasks.map((t) => (
+                    <td key={t.id} className="border-b border-r px-1 py-1 text-center">
+                      <ProficiencyCell staffId={s.id} taskId={t.id} level={proficiency[s.id]?.[t.id] ?? "NONE"} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
+
+      <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded border border-emerald-600 bg-emerald-600 text-white">
+            <Check className="size-2.5" />
+          </span>
+          Proficient
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded border border-amber-500 bg-amber-500 text-[8px] font-bold text-white">U/S</span>
+          Understudy (training)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded border border-muted-foreground/30 bg-muted/40 text-muted-foreground">
+            <X className="size-2.5" />
+          </span>
+          Not trained
+        </span>
+      </div>
     </div>
   );
 }
