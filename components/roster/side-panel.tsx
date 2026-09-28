@@ -33,7 +33,7 @@ import { cycleDayLabel, cyclePositionLabel } from "@/lib/cycle";
 import { formatDate, formatDateList, formatDateShort, formatDateTime } from "@/lib/dates";
 import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_REPORT_TIME, DUTY_LABEL, HALF_DAY_TIMES, type Duty, type Half } from "@/lib/domain";
 import { canDecideLeave } from "@/lib/permissions";
-import { isLeaveEntry, ROW_EXTRA, ROW_OPS, type LeaveSummary, type LeaveTypeOption } from "@/lib/roster-types";
+import { isLeaveEntry, ROW_EXTRA, ROW_OPS, type LeaveSummary, type LeaveTypeOption, type RosterCell } from "@/lib/roster-types";
 import { formatFigure } from "@/lib/strength";
 import { cn } from "@/lib/utils";
 
@@ -72,9 +72,18 @@ export function SidePanel(props: PanelProps) {
   // Clicking a date (not a person's cell) opens its lock and special-event settings in place of the
   // normal duty / Task / leave tools. Clicking the date again, or the panel's close button, returns.
   const showDateSettings = mode === "edit" && canEdit && !focusLeave && selection.dateSettingsOpen && selection.focusDate;
+  // Someone else's cell clicked read-only (Staff view, or a shift the viewer can't edit): shown first,
+  // so it isn't buried under the request form.
+  const other = selection.focusStaffId && selection.focusStaffId !== viewer.id ? roster.staff.find((s) => s.id === selection.focusStaffId) : undefined;
+  const otherCell = other && selection.focusDate ? roster.cells[other.id]?.[selection.focusDate] : undefined;
 
   return (
     <div className="text-sm">
+      {!focusLeave && other && otherCell && (
+        <div className="border-b px-4 py-4">
+          <PersonOnDate title={`${other.name}, ${formatDateShort(selection.focusDate!)}`} cell={otherCell} anchor={roster.anchor} date={selection.focusDate!} onFocusLeave={props.onFocusLeave} />
+        </div>
+      )}
       {focusLeave && <LeaveDetail {...props} leave={focusLeave} />}
       {!focusLeave && showDateSettings && (
         <DateSettingsPanel roster={roster} date={selection.focusDate!} today={props.today} isManagement={viewer.role === "MANAGEMENT"} onClose={onCloseDateSettings} />
@@ -188,35 +197,59 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
           )}
         </div>
       )}
-      {own && (
-        <div className="space-y-1.5 rounded-md border p-2">
-          <div className="text-xs font-medium text-muted-foreground">You on this date</div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <DutyChip duty={own.duty} long />
-            {own.swap && <SwapTag swap={own.swap} duty={own.duty} />}
-            {own.dos && <DosTag kind={own.dos} />}
-            {own.task && <TaskTag name={own.task.name} />}
-            {own.absences.map((a, i) => (
-              <button key={i} onClick={() => onFocusLeave(a.leaveId)}>
-                <LeaveChip absence={a} />
-              </button>
-            ))}
-          </div>
-          {own.swap && (
-            <p className="text-[11px] text-muted-foreground">
-              Duty swap with {own.swap.partnerName} (Shift {own.swap.partnerShiftId}): you work {DUTY_LABEL[own.duty]} instead of your {DUTY_LABEL[own.swap.ownDuty]}.{" "}
+      {own && <PersonOnDate title="You on this date" cell={own} anchor={roster.anchor} date={date} onFocusLeave={onFocusLeave} isViewer />}
+    </Section>
+  );
+}
+
+/** One person's duty, swap, DOS/FDO, Task and leave on a date, read-only. */
+function PersonOnDate({
+  title,
+  cell,
+  anchor,
+  date,
+  isViewer = false,
+  onFocusLeave,
+}: {
+  title: string;
+  cell: RosterCell;
+  anchor: PanelProps["roster"]["anchor"];
+  date: string;
+  isViewer?: boolean;
+  onFocusLeave: (id: string | null) => void;
+}) {
+  return (
+    <div className="space-y-1.5 rounded-md border p-2">
+      <div className="text-xs font-medium text-muted-foreground">{title}</div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <DutyChip duty={cell.duty} long />
+        {cell.swap && <SwapTag swap={cell.swap} duty={cell.duty} />}
+        {cell.dos && <DosTag kind={cell.dos} />}
+        {cell.task && <TaskTag name={cell.task.name} />}
+        {cell.absences.map((a, i) => (
+          <button key={i} onClick={() => onFocusLeave(a.leaveId)}>
+            <LeaveChip absence={a} />
+          </button>
+        ))}
+      </div>
+      {cell.swap && (
+        <p className="text-[11px] text-muted-foreground">
+          Duty swap with {cell.swap.partnerName} (Shift {cell.swap.partnerShiftId}): {isViewer ? "you work" : "works"} {DUTY_LABEL[cell.duty]} instead of {isViewer ? "your" : "their"} {DUTY_LABEL[cell.swap.ownDuty]}.
+          {isViewer && (
+            <>
+              {" "}
               <Link href="/requests" className="underline underline-offset-2">
                 My Requests
               </Link>
-            </p>
+            </>
           )}
-          {own.absences.some((a) => a.derived) && (
-            <p className="text-[11px] text-muted-foreground">BD is shown on your birthday; on an Off day it becomes BD-IL on your next working day.</p>
-          )}
-          <p className="text-[11px] text-muted-foreground">{cyclePositionLabel(roster.anchor, date)}</p>
-        </div>
+        </p>
       )}
-    </Section>
+      {isViewer && cell.absences.some((a) => a.derived) && (
+        <p className="text-[11px] text-muted-foreground">BD is shown on your birthday; on an Off day it becomes BD-IL on your next working day.</p>
+      )}
+      <p className="text-[11px] text-muted-foreground">{cyclePositionLabel(anchor, date)}</p>
+    </div>
   );
 }
 

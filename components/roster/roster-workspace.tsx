@@ -66,10 +66,14 @@ export type Selection = {
   // duty / Task / leave tools (spec 8.1).
   dateSettingsOpen: boolean;
   focusLeaveId: string | null;
+  // A person whose cell was clicked where the viewer cannot edit it (Staff view, or another shift):
+  // the panel shows that person's duty, Task and leave on focusDate, read-only.
+  focusStaffId: string | null;
 };
 
 export function RosterWorkspace(props: WorkspaceProps) {
   const { roster, month, view, mode, canEdit, canRequest, canRequestLocked, today } = props;
+  const viewerId = props.viewer.id;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -79,6 +83,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
   const [focusDate, setFocusDate] = useState<string | null>(roster.dates.includes(today) ? today : null);
   const [dateSettingsOpen, setDateSettingsOpen] = useState(false);
   const [focusLeaveId, setFocusLeaveId] = useState<string | null>(null);
+  const [focusStaffId, setFocusStaffId] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<{ staffId: string | null; date: string } | null>(null);
   const [compact, setCompact] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -129,6 +134,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
       setFocusDate(date);
       setDateSettingsOpen(true);
       setFocusLeaveId(null);
+      setFocusStaffId(null);
       setSheetOpen(true);
     },
     [focusDate, dateSettingsOpen],
@@ -137,6 +143,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
   const closeDateSettings = useCallback(() => {
     setFocusDate(null);
     setDateSettingsOpen(false);
+    setFocusStaffId(null);
   }, []);
 
   /** Staff view: pick dates for a request (click toggles, shift-click selects a range). */
@@ -145,6 +152,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
       setFocusDate(date);
       setDateSettingsOpen(true);
       setFocusLeaveId(null);
+      setFocusStaffId(null);
       setSheetOpen(true);
       // Editors see the date settings (lock, event) instead of selecting every person on that day.
       if (mode === "edit" || !canRequest || !selectable(date)) return;
@@ -163,14 +171,30 @@ export function RosterWorkspace(props: WorkspaceProps) {
     [anchor, canRequest, mode, roster.days, selectable],
   );
 
-  /** Edit view: select cells (click toggles, shift-click selects a range in the row). */
+  /** Someone's date, read-only: their duty, Task and leave at the top of the panel. */
+  const showPerson = useCallback((staffId: string, date: string) => {
+    setFocusDate(date);
+    setDateSettingsOpen(false);
+    setFocusLeaveId(null);
+    setFocusStaffId(isPseudoRow(staffId) ? null : staffId);
+    setSheetOpen(true);
+  }, []);
+
+  /**
+   * Edit view: select cells (click toggles, shift-click selects a range in the row). Staff view: the
+   * viewer's own cells pick dates for a request; anyone else's cell shows their details read-only.
+   */
   const clickCell = useCallback(
     (staffId: string, date: string, shiftKey: boolean) => {
-      if (mode !== "edit") return clickDate(date, shiftKey);
+      if (mode !== "edit") {
+        if (staffId === viewerId || isPseudoRow(staffId)) return clickDate(date, shiftKey);
+        return showPerson(staffId, date);
+      }
+      if (!canEdit) return showPerson(staffId, date);
       setFocusDate(date);
       setDateSettingsOpen(false);
       setFocusLeaveId(null);
-      if (!canEdit) return;
+      setFocusStaffId(null);
       setSheetOpen(true);
       const pseudo = isPseudoRow(staffId);
       setCells((prev) => {
@@ -188,13 +212,14 @@ export function RosterWorkspace(props: WorkspaceProps) {
       });
       setAnchor({ staffId, date });
     },
-    [anchor, canEdit, clickDate, mode],
+    [anchor, canEdit, clickDate, mode, showPerson, viewerId],
   );
 
   const clickLeave = useCallback((leaveId: string | null, date: string) => {
     setFocusDate(date);
     setDateSettingsOpen(false);
     setFocusLeaveId(leaveId);
+    setFocusStaffId(null);
     setSheetOpen(true);
   }, []);
 
@@ -205,8 +230,8 @@ export function RosterWorkspace(props: WorkspaceProps) {
   }, []);
 
   const selection: Selection = useMemo(
-    () => ({ dates, cells, focusDate, dateSettingsOpen, focusLeaveId }),
-    [dates, cells, focusDate, dateSettingsOpen, focusLeaveId],
+    () => ({ dates, cells, focusDate, dateSettingsOpen, focusLeaveId, focusStaffId }),
+    [dates, cells, focusDate, dateSettingsOpen, focusLeaveId, focusStaffId],
   );
   const selectedCount = mode === "edit" ? cells.size : dates.size;
 
@@ -330,7 +355,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
           ) : isDesktop ? (
             <RosterGrid {...props} selection={selection} compact={compact} onDate={focusDateOnly} onCell={clickCell} onLeave={clickLeave} />
           ) : (
-            <MobileRoster {...props} selection={selection} compact={compact} onDate={clickDate} onFocusDate={focusDateOnly} onCell={clickCell} onLeave={clickLeave} />
+            <MobileRoster {...props} selection={selection} compact={compact} onDate={clickDate} onFocusDate={focusDateOnly} onCell={clickCell} onPerson={showPerson} onLeave={clickLeave} />
           )}
         </div>
       </section>
