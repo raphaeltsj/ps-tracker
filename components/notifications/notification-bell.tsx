@@ -59,7 +59,7 @@ export function NotificationBell({
           </div>
         </SheetHeader>
         <div className="flex-1 space-y-1.5 overflow-y-auto px-4 pb-4">
-          {notifications.length === 0 ? (
+          {notifications.length === 0 && waiting === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing yet.</p>
           ) : (
             notifications.map((n) => (

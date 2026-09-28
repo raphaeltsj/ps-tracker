@@ -3,6 +3,16 @@ import { useState } from "react";
 import { createDayworker, setDayworkerActive, updateDayworker } from "@/app/actions";
 import { OpsChip } from "@/components/roster/chips";
 import { ResultMessage, useAction } from "@/components/roster/use-action";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDateList } from "@/lib/dates";
@@ -33,6 +43,7 @@ export function DayworkerManager({ rows, countedUntil }: { rows: DayworkerReport
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editUsername, setEditUsername] = useState("");
+  const [toDeactivate, setToDeactivate] = useState<DayworkerReportRow | null>(null);
 
   const total = rows.reduce((sum, r) => sum + r.total, 0);
 
@@ -160,7 +171,13 @@ export function DayworkerManager({ rows, countedUntil }: { rows: DayworkerReport
                           >
                             Edit
                           </Button>
-                          <Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => setDayworkerActive(r.id, !r.active))}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={r.active ? "text-red-700 dark:text-red-300" : undefined}
+                            disabled={pending}
+                            onClick={() => (r.active ? setToDeactivate(r) : run(() => setDayworkerActive(r.id, true)))}
+                          >
                             {r.active ? "Deactivate" : "Reactivate"}
                           </Button>
                         </>
@@ -180,6 +197,30 @@ export function DayworkerManager({ rows, countedUntil }: { rows: DayworkerReport
           </tbody>
         </table>
       </div>
+
+      <AlertDialog open={toDeactivate !== null} onOpenChange={(open) => !open && setToDeactivate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate {toDeactivate?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {toDeactivate?.username} will no longer be available to assign Ops duty on the roster. Their clocked days so far are kept, and a supervisor or Management can
+              reactivate them at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep active</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => {
+                const r = toDeactivate!;
+                run(() => setDayworkerActive(r.id, false));
+              }}
+            >
+              Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

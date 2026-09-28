@@ -2,6 +2,16 @@
 import { useState } from "react";
 import { createStaff, setStaffActive, updateStaff } from "@/app/staff-actions";
 import { ResultMessage, useAction } from "@/components/roster/use-action";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/dates";
@@ -34,6 +44,7 @@ export function StaffManager({ shiftId, staff, viewerId, canChangeRoleOrShift }:
   const [editBirthday, setEditBirthday] = useState("");
   const [editRole, setEditRole] = useState<StaffRole>("STAFF");
   const [editShiftId, setEditShiftId] = useState(shiftId);
+  const [toDeactivate, setToDeactivate] = useState<StaffRow | null>(null);
 
   const startEdit = (s: StaffRow) => {
     setEditingId(s.id);
@@ -172,9 +183,10 @@ export function StaffManager({ shiftId, staff, viewerId, canChangeRoleOrShift }:
                           <Button
                             size="sm"
                             variant="outline"
+                            className={s.active ? "text-red-700 dark:text-red-300" : undefined}
                             disabled={pending || (s.active && self)}
                             title={s.active && self ? "You cannot deactivate your own account" : undefined}
-                            onClick={() => run(() => setStaffActive(s.id, !s.active))}
+                            onClick={() => (s.active ? setToDeactivate(s) : run(() => setStaffActive(s.id, true)))}
                           >
                             {s.active ? "Deactivate" : "Reactivate"}
                           </Button>
@@ -195,6 +207,30 @@ export function StaffManager({ shiftId, staff, viewerId, canChangeRoleOrShift }:
           </tbody>
         </table>
       </div>
+
+      <AlertDialog open={toDeactivate !== null} onOpenChange={(open) => !open && setToDeactivate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate {toDeactivate?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They will no longer appear as active on Shift {toDeactivate?.shiftId}&apos;s roster, and can no longer be assigned duties, Tasks, or leave. Their existing leave, duty
+              and Task history is kept, and a supervisor or Management can reactivate them at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep active</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => {
+                const s = toDeactivate!;
+                run(() => setStaffActive(s.id, false));
+              }}
+            >
+              Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
