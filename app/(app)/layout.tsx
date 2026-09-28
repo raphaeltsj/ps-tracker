@@ -1,5 +1,7 @@
+import { AnnouncementBanner } from "@/components/announcements/announcement-banner";
 import { AppHeader } from "@/components/app-header";
 import { MobileTabs } from "@/components/mobile-tabs";
+import { getActiveAnnouncements } from "@/lib/announcements";
 import { requireViewer } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getNotifications, getUnreadNotificationCount } from "@/lib/notifications";
@@ -12,7 +14,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const pending = await db.leave.findMany({ where: { status: "PENDING" }, select: { staffId: true, staff: { select: { shiftId: true } } } });
   // Plus duty swaps waiting for the viewer's answer or approval, plus unread notifications (their
   // own leave decisions).
-  const [swapsWaiting, notifications, unreadCount] = await Promise.all([swapsAwaiting(viewer), getNotifications(viewer.id), getUnreadNotificationCount(viewer.id)]);
+  const [swapsWaiting, notifications, unreadCount, announcements] = await Promise.all([
+    swapsAwaiting(viewer),
+    getNotifications(viewer.id),
+    getUnreadNotificationCount(viewer.id),
+    getActiveAnnouncements(viewer),
+  ]);
   const actionNeeded = pending.filter((l) => l.staffId === viewer.id || canEditShift(viewer, l.staff.shiftId)).length + swapsWaiting;
   const badge = actionNeeded + unreadCount;
   const showManageRequests = hasEditView(viewer);
@@ -21,6 +28,8 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <div className="flex min-h-dvh flex-col">
+      {/* Remounts when the active set changes, so a fresh banner reappears after one is closed. */}
+      <AnnouncementBanner key={announcements.map((a) => a.id).join(",")} announcements={announcements} />
       <AppHeader
         viewer={viewer}
         showTasks={canManageTasks(viewer)}

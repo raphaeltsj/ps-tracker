@@ -24,6 +24,7 @@ export function MobileRoster({
   onDate,
   onFocusDate,
   onCell,
+  onPerson,
   onLeave,
 }: WorkspaceProps & {
   selection: Selection;
@@ -31,6 +32,7 @@ export function MobileRoster({
   onDate: (date: string, shiftKey: boolean) => void;
   onFocusDate: (date: string) => void;
   onCell: (staffId: string, date: string, shiftKey: boolean) => void;
+  onPerson: (staffId: string, date: string) => void;
   onLeave: (leaveId: string | null, date: string) => void;
 }) {
   const initial = roster.dates.includes(today) ? today : roster.dates[0];
@@ -114,11 +116,11 @@ export function MobileRoster({
       <ul className="divide-y">
         {roster.staff.map((p) => {
           const cell = roster.cells[p.id][day];
-          const selected = selection.cells.has(cellKey(p.id, day));
+          const selected = selection.cells.has(cellKey(p.id, day)) || (selection.focusStaffId === p.id && selection.focusDate === day);
           return (
             <li
               key={p.id}
-              onClick={() => mode === "edit" && canEdit && onCell(p.id, day, false)}
+              onClick={() => (mode === "edit" && canEdit ? onCell(p.id, day, false) : onPerson(p.id, day))}
               className={cn("flex items-center gap-2 px-4 py-2", p.id === viewer.id && "bg-accent/60", selected && "bg-primary/15")}
             >
               <span className="flex-1 text-sm">

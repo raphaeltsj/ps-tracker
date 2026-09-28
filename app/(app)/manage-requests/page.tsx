@@ -3,6 +3,7 @@ import { LeaveInbox } from "@/components/requests/leave-inbox";
 import { SwapFeedbackProvider, SwapList } from "@/components/swaps/swap-list";
 import { requireViewer } from "@/lib/auth";
 import { canEditShift, hasEditView } from "@/lib/permissions";
+import { getProficiencySummaries } from "@/lib/proficiency";
 import { getPendingLeaves } from "@/lib/roster-data";
 import { getSwapsFor } from "@/lib/swap-data";
 
@@ -44,9 +45,12 @@ export default async function ManageRequestsPage() {
       (a, b) => Number(b.status === "APPROVED" || b.status.startsWith("PENDING")) - Number(a.status === "APPROVED" || a.status.startsWith("PENDING")) || a.dates[0].localeCompare(b.dates[0]),
     );
 
+  const swapStaffIds = [...new Set(notMine.flatMap((s) => [s.requester.id, s.partner.id]))];
+  const proficiencyByStaff = await getProficiencySummaries(swapStaffIds);
+
   return (
     <SwapFeedbackProvider>
-      <main className="mx-auto w-full max-w-4xl space-y-4 p-4 pb-24 lg:pb-6">
+      <main className="mx-auto w-full max-w-6xl space-y-4 p-4 pb-24 lg:pb-6">
         <div>
           <h1 className="text-xl font-semibold">Manage requests</h1>
           <p className="text-sm text-muted-foreground">
@@ -54,15 +58,21 @@ export default async function ManageRequestsPage() {
           </p>
         </div>
 
-        <Section title="Leave requests" note="Earliest submitted first.">
-          <LeaveInbox leaves={pendingLeaves} empty="Nothing pending." />
-        </Section>
-        <Section title="Duty swaps needing your approval">
-          <SwapList swaps={order(needsApproval)} viewerId={viewer.id} empty="Nothing waiting for you." />
-        </Section>
-        <Section title={viewer.role === "MANAGEMENT" ? "All shifts' swaps" : `Shift ${viewer.shiftId} swaps`} note="Swaps with a date from today on; past swaps drop off this list.">
-          <SwapList swaps={order(otherSwaps)} viewerId={viewer.id} empty="No other swaps." />
-        </Section>
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-5">
+          <div className="lg:col-span-2">
+            <Section title="Leave requests" note="Earliest submitted first.">
+              <LeaveInbox leaves={pendingLeaves} empty="Nothing pending." />
+            </Section>
+          </div>
+          <div className="space-y-4 lg:col-span-3">
+            <Section title="Duty swaps needing your approval">
+              <SwapList swaps={order(needsApproval)} viewerId={viewer.id} empty="Nothing waiting for you." proficiencyByStaff={proficiencyByStaff} />
+            </Section>
+            <Section title={viewer.role === "MANAGEMENT" ? "All shifts' swaps" : `Shift ${viewer.shiftId} swaps`} note="Swaps with a date from today on; past swaps drop off this list.">
+              <SwapList swaps={order(otherSwaps)} viewerId={viewer.id} empty="No other swaps." proficiencyByStaff={proficiencyByStaff} />
+            </Section>
+          </div>
+        </div>
       </main>
     </SwapFeedbackProvider>
   );
