@@ -16,9 +16,12 @@ export function LeaveInbox({ leaves, empty }: { leaves: LeaveSummary[]; empty: s
   // Management sees every shift's requests in one inbox; group them by shift so one shift's
   // backlog doesn't bury another's, while keeping each group in the earliest-submitted-first
   // order already applied to the full list. A supervisor's own shift never has more than one
-  // shiftId, so their inbox renders exactly as before.
-  const shiftIds = [...new Set(leaves.map((l) => l.shiftId).filter((v): v is string => v !== null))].sort();
-  if (shiftIds.length <= 1) {
+  // group, so their inbox renders exactly as before. shiftId is nullable in the type even
+  // though a real pending leave always has one; grouped by the raw value (not filtering nulls
+  // out first) so a null would still get its own "Unassigned" group instead of silently
+  // vanishing from the list.
+  const groupKeys = [...new Set(leaves.map((l) => l.shiftId))].sort((a, b) => (a ?? "").localeCompare(b ?? ""));
+  if (groupKeys.length <= 1) {
     return (
       <ul className="space-y-2">
         {leaves.map((l) => (
@@ -30,12 +33,12 @@ export function LeaveInbox({ leaves, empty }: { leaves: LeaveSummary[]; empty: s
 
   return (
     <div className="space-y-4">
-      {shiftIds.map((shiftId) => {
+      {groupKeys.map((shiftId) => {
         const items = leaves.filter((l) => l.shiftId === shiftId);
         return (
-          <div key={shiftId} className="space-y-2">
+          <div key={shiftId ?? "unassigned"} className="space-y-2">
             <h3 className="text-xs font-semibold text-muted-foreground">
-              Shift {shiftId} <span className="font-normal">({items.length})</span>
+              {shiftId ? `Shift ${shiftId}` : "Unassigned"} <span className="font-normal">({items.length})</span>
             </h3>
             <ul className="space-y-2">
               {items.map((l) => (
