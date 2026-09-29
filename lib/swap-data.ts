@@ -1,4 +1,5 @@
 import "server-only";
+import { cyclePosition } from "@/lib/cycle";
 import { addDays, dateRange, formatDate, todayLocal } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { isMedicalLeave, type AssignableDuty, type Duty } from "@/lib/domain";
@@ -280,6 +281,22 @@ function evaluateSwap(f: SwapFacts, { a: aId, b: bId, dates, excludeSwapId }: Pr
     }
   }
 
+  // V and V(SB) are worked in 2-night blocks, so they are swapped 2 for 2: both nights of the block,
+  // with the same partner. A single night would split the V (or its standby) between two people.
+  const vRows = rows.filter((r) => isVDuty(r.aBefore) || isVDuty(r.bBefore));
+  if (vRows.length > 0) {
+    const anchor = f.ctx.people.get(aId)?.anchor;
+    if (anchor !== undefined) {
+      const firstNight = (d: string) => (cyclePosition(anchor, d) === 5 ? addDays(d, -1) : d);
+      const n1 = firstNight(vRows[0].date);
+      const n2 = addDays(n1, 1);
+      const wholeBlock = vRows.length === 2 && dates.length === 2 && dates[0] === n1 && dates[1] === n2 && cyclePosition(anchor, n1) === 4;
+      if (!wholeBlock) {
+        return fail(`V and V(SB) are swapped 2 for 2: both nights of the block (${formatDate(n1)} and ${formatDate(n2)}) with the same partner. Pick both dates.`);
+      }
+    }
+  }
+
   // Swapping away a duty assigned over leave must not hand the person on leave another V or V(SB).
   for (const r of rows) {
     for (const [p, takes] of [[a, r.bBefore], [b, r.aBefore]] as const) {
@@ -551,6 +568,10 @@ export async function swapCandidates(aId: string, dates: string[]): Promise<{ aD
   const onLeave = new Set(leaveDays.map((d) => d.leave.staffId));
   const inSwap = new Set(swapDays.flatMap((d) => [d.swap.requesterId, d.swap.partnerId]));
   const aDuties = sorted.map((d) => ctx.resolve(aId, d).duty);
+  // V and V(SB) swap 2 for 2: the dates must be exactly the two nights of the block.
+  const aAnchor = ctx.people.get(aId)?.anchor;
+  const isVBlock =
+    aAnchor !== undefined && sorted.length === 2 && sorted[1] === addDays(sorted[0], 1) && cyclePosition(aAnchor, sorted[0]) === 4;
 
   // Supervisors swap only with supervisors, and staff with staff: the other role never appears.
   const people = staff
@@ -564,6 +585,7 @@ export async function swapCandidates(aId: string, dates: string[]): Promise<{ aD
       else if (duties.some((d, i) => !dutiesDiffer(d, aDuties[i]))) blocked = "Same duty";
       else if (s.shiftId === a.shiftId && !duties.every((d, i) => isVDuty(d) || isVDuty(aDuties[i]))) blocked = "Same shift: V or V(SB) days only";
       else if (s.shiftId !== a.shiftId && [...duties, ...aDuties].some(isVDuty)) blocked = "V / V(SB): same shift only";
+      else if ([...duties, ...aDuties].some(isVDuty) && !(isVBlock && duties.every((d, i) => isVDuty(d) || isVDuty(aDuties[i])))) blocked = "V / V(SB): pick both nights of the block";
       return { id: s.id, name: s.name, shiftId: s.shiftId!, duties, blocked, birthday: s.birthday };
     });
 
