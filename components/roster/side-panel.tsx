@@ -151,7 +151,7 @@ function DateDetails({ roster, viewer, date, onFocusLeave }: PanelProps & { date
       )}
       <StrengthSummary day={day} />
       {swapsToday.length > 0 && (
-        <div className="space-y-1 rounded-md border border-emerald-600/40 p-2">
+        <div className="space-y-1 rounded-md border border-success/40 p-2">
           <div className="text-xs font-medium text-muted-foreground">Duty swaps on this date</div>
           <ul className="space-y-1.5">
             {swapsToday.map(({ person, cell }) => (
@@ -546,7 +546,7 @@ function AnnounceFields({
   defaultMessage: string;
 }) {
   return (
-    <div className="space-y-2 rounded-md border border-cyan-600/30 p-2">
+    <div className="space-y-2 rounded-md border border-info/30 p-2">
       <label className="flex items-center gap-2 text-xs font-medium">
         <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} className="size-4" />
         Also tell staff with a banner
@@ -663,7 +663,7 @@ function RequestForm({ roster, viewer, selection, leaveTypes, onClear, onRemoveD
                 <span className="w-24">{formatDateShort(d)}</span>
                 {own && <DutyChip duty={own[d].duty} />}
                 {own?.[d].absences.map((a, i) => <LeaveChip key={i} absence={a} />)}
-                <span className={cn("ml-auto text-xs tabular-nums", s.slots < needSlot ? "font-semibold text-red-700 dark:text-red-300" : "text-muted-foreground")}>
+                <span className={cn("ml-auto text-xs tabular-nums", s.slots < needSlot ? "font-semibold text-danger-ink" : "text-muted-foreground")}>
                   {s.status === "zero" ? "No slots" : `${formatFigure(s.slots)} slots`}
                 </span>
                 <button aria-label={`Remove ${d}`} onClick={() => onRemoveDate(d)}>
@@ -685,17 +685,17 @@ function RequestForm({ roster, viewer, selection, leaveTypes, onClear, onRemoveD
         <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={500} placeholder="Optional" />
       </label>
       {taken.length > 0 && (
-        <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">
+        <p className="rounded-md bg-danger-soft p-2 text-xs font-medium text-danger-ink">
           You already have leave on {formatDateList(taken)}. Only one type of leave is allowed per day, so remove those dates.
         </p>
       )}
       {onDuty.length > 0 && (
-        <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">
+        <p className="rounded-md bg-danger-soft p-2 text-xs font-medium text-danger-ink">
           You have V or {DOS_LABEL} duty on {formatDateList(onDuty)}. Leave cannot be taken on a day with that duty, so remove those dates.
         </p>
       )}
       {tight.length > 0 && (
-        <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+        <p className="rounded-md bg-warning-soft p-2 text-xs text-warning-ink">
           No slot left on {formatDateList(tight)}. You can still submit; your supervisor decides.
         </p>
       )}
@@ -761,7 +761,7 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
       {leave.givenByName && <p className="text-xs text-muted-foreground">Given by {leave.givenByName}: already approved.</p>}
       {leave.notes && <p className="text-xs">Staff notes: {leave.notes}</p>}
       {leave.remarks && !editing && <p className="text-xs">Remarks: {leave.remarks}</p>}
-      {leave.rejectReason && <p className="text-xs text-red-700 dark:text-red-300">Reject reason: {leave.rejectReason}</p>}
+      {leave.rejectReason && <p className="text-xs text-danger-ink">Reject reason: {leave.rejectReason}</p>}
       {leave.status === "PENDING" && <p className="text-xs text-muted-foreground">Submitted {formatDateTime(leave.submittedAt)}</p>}
       {leave.auto && (
         <p className="rounded-md bg-muted p-2 text-xs">
@@ -780,7 +780,7 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
               Reject
             </Button>
           </div>
-          {leave.noSlotOn && <p className="text-xs font-medium text-red-700 dark:text-red-300">No slot available on {formatDate(leave.noSlotOn)}</p>}
+          {leave.noSlotOn && <p className="text-xs font-medium text-danger-ink">No slot available on {formatDate(leave.noSlotOn)}</p>}
         </div>
       )}
       {rejecting && (
@@ -803,14 +803,14 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
             {leave.auto ? "Change half" : "Edit leave"}
           </Button>
           {cancellable && (
-            <Button size="sm" variant="outline" className="text-red-700 dark:text-red-300" onClick={() => setConfirmCancel(true)}>
+            <Button size="sm" variant="outline" className="text-danger-ink" onClick={() => setConfirmCancel(true)}>
               {leave.status === "PENDING" ? "Cancel request" : "Cancel leave"}
             </Button>
           )}
         </div>
       )}
       {confirmCancel && (
-        <div className="space-y-2 rounded-md border border-red-300 p-2 dark:border-red-500/40">
+        <div className="space-y-2 rounded-md border border-danger/40 p-2">
           <p className="text-xs">
             {leave.status === "PENDING" ? "Cancel this pending request?" : "Cancel this approved leave? The slot is freed straight away."}
           </p>
@@ -930,7 +930,7 @@ function EditTools(props: PanelProps) {
       )}
 
       {swapped.length > 0 && (
-        <p className="rounded-md border border-emerald-600/40 bg-emerald-500/10 p-2 text-xs">
+        <p className="rounded-md border border-success/40 bg-success-soft p-2 text-xs">
           {swapped
             .slice(0, 3)
             .map((c) => {
@@ -1039,7 +1039,7 @@ function EditTools(props: PanelProps) {
             <option value="__none">No Task (remove)</option>
           </select>
           {onFullLeave > 0 && taskId && taskId !== "__none" && (
-            <p className="text-xs text-amber-800 dark:text-amber-200">{onFullLeave} selected cell(s) are on full-day leave and will be skipped.</p>
+            <p className="text-xs text-warning-ink">{onFullLeave} selected cell(s) are on full-day leave and will be skipped.</p>
           )}
           <Button
             className="w-full"
@@ -1063,7 +1063,7 @@ function EditTools(props: PanelProps) {
           {type?.halfDay && <HalfPicker value={half} onChange={setHalf} duty={cells[0] ? roster.cells[cells[0].staffId][cells[0].date].duty : null} />}
           <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} placeholder="Remarks (optional)" />
           {withLeave.length > 0 && (
-            <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">
+            <p className="rounded-md bg-danger-soft p-2 text-xs font-medium text-danger-ink">
               {withLeave.length} selected cell{withLeave.length > 1 ? "s" : ""} already {withLeave.length > 1 ? "have" : "has"} leave (
               {withLeave
                 .slice(0, 3)
@@ -1073,7 +1073,7 @@ function EditTools(props: PanelProps) {
             </p>
           )}
           {withDuty.length > 0 && (
-            <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">
+            <p className="rounded-md bg-danger-soft p-2 text-xs font-medium text-danger-ink">
               {withDuty.length} selected cell{withDuty.length > 1 ? "s" : ""} already {withDuty.length > 1 ? "have" : "has"} V or {DOS_LABEL} duty (
               {withDuty
                 .slice(0, 3)

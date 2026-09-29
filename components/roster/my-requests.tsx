@@ -39,7 +39,7 @@ export function MyRequests({
             {l.givenByName && <p className="mt-1 text-xs text-muted-foreground">Given by {l.givenByName} (already approved)</p>}
             {l.notes && <p className="mt-1 text-xs">Notes: {l.notes}</p>}
             {l.remarks && <p className="mt-1 text-xs">Remarks: {l.remarks}</p>}
-            {l.rejectReason && <p className="mt-1 text-xs text-red-700 dark:text-red-300">Reason: {l.rejectReason}</p>}
+            {l.rejectReason && <p className="mt-1 text-xs text-danger-ink">Reason: {l.rejectReason}</p>}
             {l.status === "PENDING" && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => withdrawLeave(l.id))}>
@@ -50,7 +50,7 @@ export function MyRequests({
                     <Button size="sm" disabled={pending || Boolean(l.noSlotOn)} onClick={() => run(() => approveLeave(l.id))}>
                       Approve my request
                     </Button>
-                    {l.noSlotOn && <span className="text-xs text-red-700 dark:text-red-300">No slot available on {formatDate(l.noSlotOn)}</span>}
+                    {l.noSlotOn && <span className="text-xs text-danger-ink">No slot available on {formatDate(l.noSlotOn)}</span>}
                   </>
                 )}
               </div>

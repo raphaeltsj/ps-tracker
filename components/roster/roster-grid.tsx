@@ -62,7 +62,6 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, ca
 
   return (
     <div className="flex h-full flex-col">
-      <DutyLegend className="border-b px-4 py-1.5" />
       <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto">
         <table className="border-separate border-spacing-0 text-xs">
           <thead className="sticky top-0 z-20 bg-background">
@@ -84,7 +83,7 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, ca
                       "min-w-14 cursor-pointer select-none border-b border-r px-1 py-1 text-center font-normal",
                       isWeekend(date) && "bg-muted/60",
                       day.locked && "bg-hatch",
-                      day.event && "border-t-2 border-t-fuchsia-500",
+                      day.event && "border-t-2 border-t-event",
                       selected && "ring-2 ring-inset ring-primary",
                     )}
                   >
@@ -97,7 +96,7 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, ca
                       <span className={cn("h-2 w-6 rounded-full", DUTY_CELL[day.shiftDuty])} title={SHIFT_DUTY_LABEL[day.shiftDuty]} />
                       <span className="sr-only">{SHIFT_DUTY_LABEL[day.shiftDuty]}</span>
                       {day.locked && <Lock className="size-3 text-foreground" aria-label="Locked date" />}
-                      {day.event && <CalendarClock className="size-3 text-fuchsia-600 dark:text-fuchsia-400" aria-label="Special event" />}
+                      {day.event && <CalendarClock className="size-3 text-event" aria-label="Special event" />}
                     </div>
                   </th>
                 );
@@ -132,7 +131,7 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, ca
                   const v = days[date].v;
                   const short = v && v.onDuty < v.mfl;
                   return (
-                    <td key={date} className={cn("border-b-2 border-r bg-background px-1 py-0.5 text-center tabular-nums", short && "bg-red-100 font-bold text-red-700 dark:bg-red-500/20 dark:text-red-300")}>
+                    <td key={date} className={cn("border-b-2 border-r bg-background px-1 py-0.5 text-center tabular-nums", short && "bg-danger-soft font-bold text-danger-ink")}>
                       {v ? `${v.onDuty}/${v.mfl}` : <span className="text-muted-foreground">–</span>}
                     </td>
                   );
@@ -169,6 +168,8 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, ca
           </tbody>
         </table>
       </div>
+      {/* Pinned below the scrolling grid, so it stays in view without taking room above the dates. */}
+      <DutyLegend className="border-t px-4 py-1.5" />
     </div>
   );
 }
@@ -203,7 +204,7 @@ const GridCell = memo(function GridCell({
         {/* AM, PM and Off are colour-coded (legend above); only V and V(SB) keep a text label. */}
         {LABELLED_DUTIES.includes(cell.duty) ? <DutyChip duty={cell.duty} /> : <span className="sr-only">{dutyTitle(cell.duty)}</span>}
         {day.event && working && (
-          <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-fuchsia-500" title={day.event.note ? `Special Event: ${day.event.note}` : "Special Event"} />
+          <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-event" title={day.event.note ? `Special Event: ${day.event.note}` : "Special Event"} />
         )}
         {cell.absences.map((a, i) => (
           <button

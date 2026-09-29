@@ -34,7 +34,7 @@ export function StrengthSummary({ day, compact = false }: { day: RosterDay; comp
       </div>
       {slots}
       {day.v && (
-        <div className={cn("text-xs", day.v.onDuty < day.v.mfl ? "font-semibold text-red-700 dark:text-red-300" : "text-muted-foreground")}>
+        <div className={cn("text-xs", day.v.onDuty < day.v.mfl ? "font-semibold text-danger-ink" : "text-muted-foreground")}>
           V on duty: {day.v.onDuty} of {day.v.mfl} needed
         </div>
       )}

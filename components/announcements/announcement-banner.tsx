@@ -26,7 +26,8 @@ export function AnnouncementBanner({ announcements }: { announcements: Announcem
   return (
     <div
       role="status"
-      className="flex items-center gap-2 border-b border-cyan-600/40 bg-cyan-50 px-3 py-1.5 text-sm text-cyan-900 dark:bg-cyan-500/10 dark:text-cyan-100"
+      data-announcement-banner
+      className="flex h-(--banner-h) items-center gap-2 border-b border-info/40 bg-info-soft px-3 text-sm text-info-ink"
     >
       <Megaphone className="size-4 shrink-0" aria-hidden />
       <div className="relative h-5 flex-1 overflow-hidden">
@@ -44,7 +45,7 @@ export function AnnouncementBanner({ announcements }: { announcements: Announcem
         onClick={close}
         aria-label="Close announcement banner"
         title="Close"
-        className="shrink-0 rounded p-0.5 hover:bg-cyan-600/10"
+        className="shrink-0 rounded p-0.5 hover:bg-info/10"
       >
         <X className="size-3.5" aria-hidden />
       </button>

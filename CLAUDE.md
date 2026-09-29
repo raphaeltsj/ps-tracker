@@ -73,10 +73,19 @@ Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, n
 - Selecting a person's date (a roster cell) opens the normal duty / Task / leave tools, defaulting to the **Task** tab.
 - In Staff view (and on a shift the viewer can't edit), clicking or tapping **someone else's** cell highlights it and shows their duty, Task, swap, DOS/FDO and visible leave for that date, read-only, at the top of the side panel. Only the viewer's **own** cells pick leave dates.
 - Mobile uses bottom tabs (Roster, Requests, Manage for supervisors and Management, Profile). Include a notification bell placeholder. The mobile Roster view has a **Day / Grid** switch: Day is the one-day list (default); Grid is the full month grid in a screen-high box that scrolls sideways, with names and dates pinned. The choice is remembered per browser.
-- Light and dark mode, calm and readable, colours paired with text, icons, or a legend. On the Roster view, AM / PM / Off are colour-coded cells with no text (legend above the grid names each colour without timings; tooltips and screen-reader labels carry the details); V, V(SB) and Off(V) keep a text label. Colours: AM yellow (solid in dark mode too, since see-through yellow reads as brown there), PM blue, V purple, V(SB) a neutral grey dashed outline (standby, not duty), Off grey, Off(V) a light violet tint with the "Off(V)" label, Leave teal, Special Event magenta, locked dates hatched with a lock icon. Task and DOS/FDO tags have a near-solid background so they read on any duty colour.
+- Light and dark mode, calm and readable, colours paired with text, icons, or a legend. On the Roster view, AM / PM / Off are colour-coded cells with no text (a legend **below** the grid, pinned in view, names each colour and leave group without timings; tooltips and screen-reader labels carry the details); V, V(SB) and Off(V) keep a text label. Colours follow the time of day: AM warm apricot (solid in dark mode too, since a see-through warm tone reads as brown there), PM a deeper dusk blue, V night indigo; V(SB) a neutral grey dashed outline (standby, not duty), Off slate grey, Off(V) a light lavender tint with the "Off(V)" label. Leave is coloured by group: Annual (AL, OL) teal, Health & care (MC, OML, MWO, HL, FCL) rose, Training & growth (CSE, GRW) green, Birthday & in lieu (BD, BD-IL, OIL) plum, custom types neutral slate. Special Event magenta, locked dates hatched with a lock icon, DOS/FDO a solid ink tag, duty swap an azure tag. Task and DOS/FDO tags have a near-solid background so they read on any duty colour.
 - Sample data: placeholder staff names that are each a single 5-character word (Alpha, Bravo, Delta...). No realistic personal names.
 
 **Out of scope.** Payroll, timesheets and attendance, HR records, festive balloting.
+
+## Colour scheme (read before building any UI)
+
+Every colour is a named token in `app/globals.css` (light under `:root`, dark under `.dark`), exposed as Tailwind utilities such as `bg-am`, `bg-danger-soft`, `text-success-ink`, `border-swap`. The full guide (token families, recipes, hue map, how to add a colour) is `docs/system-context.md` section 17.5. In short:
+
+- **Never use raw Tailwind palette colours** (`bg-red-100`, `text-emerald-700` ...) and never add `dark:` colour variants: the tokens switch with the theme. If nothing fits, add a token in both themes and document it in 17.5.
+- **Reuse the shared chips** in `components/roster/chips.tsx` (`DutyChip`, `DUTY_CELL`, `LeaveChip`, `StatusBadge`, `SlotBadge`, `DosTag`, `SwapTag`, `TaskTag`, `EventBadge`, `LockBadge`). Leave colour comes from `leaveGroup(code)` in `lib/domain.ts`: a new leave type joins a group there, not a new colour.
+- **One meaning per colour:** magenta = special events only; red = errors, no slots, rejected, destructive; amber = low, pending, caution; green = fine, approved; ink navy (`primary`) = the single accent. Panels and badges use `bg-X-soft text-X-ink`, outlines `border-X/40`.
+- Colour is never the only signal, text keeps 4.5:1 contrast in both themes, and anything on a roster cell has a near-solid background.
 
 ## Working agreements
 
