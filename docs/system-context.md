@@ -1,6 +1,6 @@
 # PS Tracker: System Context Document
 
-*Duty roster management for a shift-based team | Version 1.19 | Draft for editing*
+*Duty roster management for a shift-based team | Version 1.20 | Draft for editing*
 
 ## 1. Purpose of this document
 
@@ -12,6 +12,8 @@ It has two parts:
 - **Part B: Build framework** (section 17): the tech stack, project structure, and build conventions. Read both before implementing any feature.
 
 > **How to edit:** items in [square brackets] are still undecided. Section 16 lists assumptions and open questions. Update this document whenever a rule changes so it stays the single source of truth.
+
+**Changes in 1.20:** the Staff records page's Task proficiency editor is redesigned from a per-person expanding picker into a single matrix (people down, Tasks across, one click-to-cycle button per cell), which stays usable as Management adds more Tasks; Management can filter the matrix by shift (9.3, 11.6, 14).
 
 **Changes in 1.19:** in Staff view (and on a shift the viewer can't edit), clicking someone else's cell highlights it and shows that person's duty, Task, swap, DOS/FDO and visible leave for the date, read-only, at the top of the side panel; only the viewer's own cells pick leave dates (11.1); duty colours are now AM yellow, PM blue, V purple, and V(SB) a neutral grey dashed outline, since it is standby rather than duty (14.2); Task and DOS/FDO tags have a near-solid background so they stay readable on any duty colour, including the solid dark-mode AM yellow (14.2); on phones a **Day / Grid** switch shows the full month grid, scrolled sideways with names and dates pinned, as an alternative to the one-day list (14.1, 14.3); phones on the local network can use the dev server (17.2).
 
@@ -600,7 +602,7 @@ Other screens (Calendar view, side panel, Home, forms) keep text labels for duti
 | 11     | Task management                  | Management, desktop              | List of Tasks (Task 1, Task 2, ...) with Add, Rename, and Delete; name only, 6-character counter, and a delete warning that all existing assignments of that Task will be deleted. Not visible to other roles.                                                                                                                                                                                                                                                                                                                                 |
 | 12     | Add custom leave type            | Supervisor / Management, desktop | Modal with 6-character limit, live counter, chip preview.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 13     | Swap a duty, from the roster     | Staff / Supervisor, desktop      | Request swap / Swap tab in the roster's side panel: the selected date fills in automatically, pick a partner (same role as you; another shift for AM / PM / Off, the same shift for V / V(SB)) and one or two dates, preview each person's duty before and after, then send (staff) or record (supervisor).                                                                                                                                                                                                                                                                                                                                      |
-| 14     | Staff records (`/staff`)         | Supervisor / Management, desktop | List of staff with role and birthday, scoped to the supervisor's own shift or (for Management) a chosen shift's tab; add, edit, and Deactivate/Reactivate. Only Management sees the role and shift fields, and can add a supervisor or move someone between shifts. A "Proficiency" action per person expands a Task-by-Task not trained / understudy / proficient picker, never shown to staff. See sections 9.3 and 11.6. |
+| 14     | Staff records (`/staff`)         | Supervisor / Management, desktop | List of staff with role and birthday, scoped to the supervisor's own shift or (for Management) a chosen shift's tab; add, edit, and Deactivate/Reactivate. Only Management sees the role and shift fields, and can add a supervisor or move someone between shifts. Below the list, a Task proficiency matrix (people down, Tasks across, sticky name column, scrolls horizontally as Tasks are added) with one click-to-cycle button per cell (not trained / proficient / understudy), never shown to staff; Management can filter the matrix by shift ("All shifts" or one). See sections 9.3 and 11.6. |
 | 15     | Task report                      | Supervisor / Management          | Filter by year, month, or date range, and by shift. Summary card per Task (days, people), staff-by-Task table with totals, expandable dates per person, "include scheduled" and "hide staff with no Tasks" options. See section 9.2. |
 | 16     | Dayworkers                       | Supervisor / Management          | Add a dayworker (name, username with a live 7-character counter), a year / month / date-range filter, and a table of username, name, Ops duty days per shift and in total, with Edit and Deactivate. Opening a row shows the dates. See section 5.3. |
 | 17     | My Requests                      | Staff / Supervisor               | Leave taken this month or this year, as a list (every type shown, even at zero; AL/OL, MC, OML and BD/BD-IL show a combined annual limit); every leave request and duty swap the viewer has made, filterable by status. No creation form: request from the Roster. See sections 11.5 and 12.6. |
@@ -746,7 +748,7 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
 /components/swaps           swap request / record form (with preview) and swap list (incl. the
                             Compare proficiency panel on Manage requests): the form is used from the
                             roster, the list from My Requests and Manage requests
-/components/staff           StaffManager: add / edit / deactivate staff, and the Task proficiency editor
+/components/staff           StaffManager: add / edit / deactivate staff, and the Task proficiency matrix
 /components/announcements   AnnouncementBanner: the combined, sliding, per-viewer-dismissible banner
 /lib
   cycle.ts                  duty cycle, cycle position, V overlay and Off (post-V)

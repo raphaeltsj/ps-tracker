@@ -18,15 +18,19 @@ export default async function StaffPage({ searchParams }: PageProps<"/staff">) {
   const params = await searchParams;
   const requested = typeof params.shift === "string" ? params.shift : undefined;
   const shiftId = viewer.role === "SUPERVISOR" ? viewer.shiftId! : SHIFT_IDS.includes(requested ?? "") ? requested! : "A";
+  const isManagement = viewer.role === "MANAGEMENT";
 
-  const [staff, tasks] = await Promise.all([
+  // Management sees every shift's staff at once, so the proficiency matrix below can filter by
+  // shift client-side without a page reload; supervisors only ever get their own shift's staff.
+  const [allStaff, tasks] = await Promise.all([
     db.staff.findMany({
-      where: { shiftId, role: { not: "MANAGEMENT" } },
-      orderBy: [{ active: "desc" }, { role: "desc" }, { name: "asc" }],
+      where: isManagement ? { role: { not: "MANAGEMENT" } } : { shiftId, role: { not: "MANAGEMENT" } },
+      orderBy: [{ shiftId: "asc" }, { active: "desc" }, { role: "desc" }, { name: "asc" }],
     }),
     db.task.findMany({ orderBy: { createdAt: "asc" } }),
   ]);
-  const proficiency = await getProficiencyMap(staff.map((s) => s.id));
+  const staff = isManagement ? allStaff.filter((s) => s.shiftId === shiftId) : allStaff;
+  const proficiency = await getProficiencyMap(allStaff.map((s) => s.id));
 
   return (
     <main className="mx-auto w-full max-w-4xl space-y-4 p-4 pb-24 lg:pb-6">
@@ -56,8 +60,9 @@ export default async function StaffPage({ searchParams }: PageProps<"/staff">) {
       <StaffManager
         shiftId={shiftId}
         viewerId={viewer.id}
-        canChangeRoleOrShift={viewer.role === "MANAGEMENT"}
+        canChangeRoleOrShift={isManagement}
         staff={staff.map((s) => ({ id: s.id, name: s.name, role: s.role as "STAFF" | "SUPERVISOR", shiftId: s.shiftId!, birthday: s.birthday, active: s.active }))}
+        allStaff={allStaff.map((s) => ({ id: s.id, name: s.name, role: s.role as "STAFF" | "SUPERVISOR", shiftId: s.shiftId!, birthday: s.birthday, active: s.active }))}
         tasks={tasks.map((t) => ({ id: t.id, name: t.name }))}
         proficiency={proficiency}
       />
