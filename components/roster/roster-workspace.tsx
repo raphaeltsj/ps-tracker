@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, ChevronUp, Eye, PanelRightClose, PanelRightOpen, Pencil } from "lucide-react";
 import { CalendarView } from "@/components/roster/calendar-view";
 import { MobileRoster } from "@/components/roster/mobile-roster";
+import { MonthPicker } from "@/components/roster/month-picker";
 import { RosterGrid } from "@/components/roster/roster-grid";
 import { SidePanel } from "@/components/roster/side-panel";
 import { Button } from "@/components/ui/button";
@@ -210,7 +211,8 @@ export function RosterWorkspace(props: WorkspaceProps) {
       setSheetOpen(true);
       // Editors see the date settings (lock, event) instead of selecting every person on that day.
       if (mode === "edit" || !canRequest || !selectable(date)) return;
-      setSheetOpen(true);
+      // Picking a date to request leave or a swap: reopen a collapsed panel so the request tabs show.
+      expandPanel();
       setDates((prev) => {
         const next = new Set(prev);
         if (shiftKey && anchor) {
@@ -222,7 +224,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
       });
       setAnchor({ staffId: null, date });
     },
-    [anchor, canRequest, mode, roster.days, selectable],
+    [anchor, canRequest, expandPanel, mode, roster.days, selectable],
   );
 
   /** Someone's date, read-only: their duty, Task and leave at the top of the panel. */
@@ -338,8 +340,9 @@ export function RosterWorkspace(props: WorkspaceProps) {
             <Button variant="ghost" size="icon" className="size-8" aria-label="Previous month" onClick={() => navigate({ month: shiftMonth(month, -1) })}>
               <ChevronLeft className="size-4" />
             </Button>
-            <span className="min-w-20 text-center text-sm font-medium">{formatMonth(month)}</span>
+            <MonthPicker month={month} today={today} onPick={(m) => navigate({ month: m })} />
             <Button variant="ghost" size="icon" className="size-8" aria-label="Next month" onClick={() => navigate({ month: shiftMonth(month, 1) })}>
+
               <ChevronRight className="size-4" />
             </Button>
             {month !== today.slice(0, 7) && (
