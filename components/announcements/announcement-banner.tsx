@@ -1,10 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Megaphone, X } from "lucide-react";
 import { closeAnnouncements } from "@/app/announcement-actions";
 import type { AnnouncementSummary } from "@/lib/announcements";
 
 const SEPARATOR = "     •     ";
+// Keep in step with --banner-h in app/globals.css.
+const BANNER_HEIGHT = "2.125rem";
 
 /**
  * A supervisor's locked-date or special-event banner (spec 8.4). Several active announcements combine
@@ -13,7 +15,18 @@ const SEPARATOR = "     •     ";
  */
 export function AnnouncementBanner({ announcements }: { announcements: AnnouncementSummary[] }) {
   const [closed, setClosed] = useState(false);
-  if (closed || announcements.length === 0) return null;
+  const visible = !closed && announcements.length > 0;
+  // Full-height views subtract --banner-h. globals.css sets it with :has() on first paint; this also
+  // sets it for browsers without :has() support (e.g. Firefox before 121), and clears it on close.
+  useEffect(() => {
+    if (!visible) return;
+    const root = document.documentElement;
+    root.style.setProperty("--banner-h", BANNER_HEIGHT);
+    return () => {
+      root.style.removeProperty("--banner-h");
+    };
+  }, [visible]);
+  if (!visible) return null;
 
   const text = announcements.map((a) => a.message).join(SEPARATOR);
   const duration = Math.min(60, Math.max(18, text.length * 0.15));
@@ -27,7 +40,7 @@ export function AnnouncementBanner({ announcements }: { announcements: Announcem
     <div
       role="status"
       data-announcement-banner
-      className="flex h-(--banner-h) items-center gap-2 border-b border-info/40 bg-info-soft px-3 text-sm text-info-ink"
+      className="flex h-[2.125rem] items-center gap-2 border-b border-info/40 bg-info-soft px-3 text-sm text-info-ink"
     >
       <Megaphone className="size-4 shrink-0" aria-hidden />
       <div className="relative h-5 flex-1 overflow-hidden">

@@ -828,19 +828,14 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
         <p className="text-xs text-muted-foreground">Switch to Edit view to edit or cancel this leave.</p>
       )}
       {confirmCancel && (
-        <div className="space-y-2 rounded-md border border-danger/40 p-2">
-          <p className="text-xs">
-            {leave.status === "PENDING" ? "Cancel this pending request?" : "Cancel this approved leave? The slot is freed straight away."}
-          </p>
-          <div className="flex gap-2">
-            <Button size="sm" variant="destructive" disabled={pending} onClick={() => run(() => cancelLeave(leave.id), () => onFocusLeave(null))}>
-              {leave.status === "PENDING" ? "Yes, cancel request" : "Yes, cancel leave"}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirmCancel(false)}>
-              Keep it
-            </Button>
-          </div>
-        </div>
+        <CancelLeaveConfirm
+          leave={leave}
+          days={selection.focusDate && leave.days.includes(selection.focusDate) ? [selection.focusDate] : []}
+          run={run}
+          pending={pending}
+          onDone={() => setConfirmCancel(false)}
+          onBack={() => setConfirmCancel(false)}
+        />
       )}
       {editing && (
         <div className="space-y-2 rounded-md border p-2">
@@ -881,27 +876,63 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
   );
 }
 
-/**
- * Leave already on the selected cells, each with Cancel and a link to its full details, so cancelling
- * never depends on hitting the small chip inside a cell.
- */
 type RunAction = ReturnType<typeof useAction>["run"];
 
-// `run` comes from the panel so the result message outlives the row, which disappears once cancelled.
-function SelectedLeaveList({ leaves, onFocusLeave, run, pending }: { leaves: LeaveSummary[]; onFocusLeave: (leaveId: string | null) => void; run: RunAction; pending: boolean }) {
+/**
+ * Confirming a cancel. A leave of several days offers the whole leave or only `days` (the clicked or
+ * selected ones); a one-day leave, or a pick that covers every day, just confirms the whole leave.
+ * The staff member is notified either way (server side).
+ */
+function CancelLeaveConfirm({ leave, days, run, pending, onDone, onBack }: { leave: LeaveSummary; days: string[]; run: RunAction; pending: boolean; onDone: () => void; onBack: () => void }) {
+  const isPending = leave.status === "PENDING";
+  const noun = isPending ? "request" : "leave";
+  const partial = days.length > 0 && days.length < leave.days.length;
+  return (
+    <div className="space-y-2 rounded-md border border-danger/40 p-2">
+      <p className="text-xs">
+        {partial
+          ? `Cancel the whole ${noun} (${formatDateList(leave.days)}), or only ${formatDateList(days)}?`
+          : isPending
+            ? "Cancel this pending request?"
+            : "Cancel this approved leave? The slot is freed straight away."}{" "}
+        <span className="text-muted-foreground">{leave.staffName} will be notified.</span>
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {partial && (
+          <Button size="sm" variant="destructive" disabled={pending} onClick={() => run(() => cancelLeave(leave.id, days), onDone)}>
+            Cancel only {formatDateList(days)}
+          </Button>
+        )}
+        <Button size="sm" variant={partial ? "outline" : "destructive"} className={cn(partial && "text-danger-ink")} disabled={pending} onClick={() => run(() => cancelLeave(leave.id), onDone)}>
+          {partial ? `Cancel whole ${noun}` : `Yes, cancel ${noun}`}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onBack}>
+          Keep it
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Leave already on the selected cells, each with Cancel and a link to its full details, so cancelling
+ * never depends on hitting the small chip inside a cell. `run` comes from the panel so the result
+ * message outlives the row, which disappears once cancelled.
+ */
+function SelectedLeaveList({ leaves, selectedDays, onFocusLeave, run, pending }: { leaves: LeaveSummary[]; selectedDays: (leave: LeaveSummary) => string[]; onFocusLeave: (leaveId: string | null) => void; run: RunAction; pending: boolean }) {
   return (
     <div className="space-y-1.5 rounded-md border p-2">
       <p className="text-xs font-medium text-muted-foreground">Leave on the selected cells</p>
       <ul className="space-y-1.5">
         {leaves.map((l) => (
-          <SelectedLeaveRow key={l.id} leave={l} onFocusLeave={onFocusLeave} run={run} pending={pending} />
+          <SelectedLeaveRow key={l.id} leave={l} days={selectedDays(l)} onFocusLeave={onFocusLeave} run={run} pending={pending} />
         ))}
       </ul>
     </div>
   );
 }
 
-function SelectedLeaveRow({ leave, onFocusLeave, run, pending }: { leave: LeaveSummary; onFocusLeave: (leaveId: string | null) => void; run: RunAction; pending: boolean }) {
+function SelectedLeaveRow({ leave, days, onFocusLeave, run, pending }: { leave: LeaveSummary; days: string[]; onFocusLeave: (leaveId: string | null) => void; run: RunAction; pending: boolean }) {
   const [confirming, setConfirming] = useState(false);
   const isPending = leave.status === "PENDING";
   return (
@@ -913,15 +944,7 @@ function SelectedLeaveRow({ leave, onFocusLeave, run, pending }: { leave: LeaveS
         {isPending && <StatusBadge status={leave.status} />}
       </div>
       {confirming ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs">{isPending ? "Cancel this pending request?" : "Cancel this leave? The slot is freed straight away."}</span>
-          <Button size="sm" variant="destructive" disabled={pending} onClick={() => run(() => cancelLeave(leave.id), () => setConfirming(false))}>
-            {isPending ? "Yes, cancel request" : "Yes, cancel leave"}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-            Keep it
-          </Button>
-        </div>
+        <CancelLeaveConfirm leave={leave} days={days} run={run} pending={pending} onDone={() => setConfirming(false)} onBack={() => setConfirming(false)} />
       ) : (
         <div className="flex gap-2">
           {leave.auto ? (
@@ -1142,7 +1165,15 @@ function EditTools(props: PanelProps) {
 
       {tab === "leave" && (
         <div className="space-y-2">
-          {selectedLeaves.length > 0 && <SelectedLeaveList leaves={selectedLeaves} onFocusLeave={onFocusLeave} run={run} pending={pending} />}
+          {selectedLeaves.length > 0 && (
+            <SelectedLeaveList
+              leaves={selectedLeaves}
+              selectedDays={(l) => (byStaff[l.staffId] ?? []).filter((d) => l.days.includes(d)).sort()}
+              onFocusLeave={onFocusLeave}
+              run={run}
+              pending={pending}
+            />
+          )}
           <p className="text-xs text-muted-foreground">Leave you give is already approved. Locked dates and Off days are allowed. You can include yourself.</p>
           {Object.entries(byStaff).map(([id, ds]) => (
             <p key={id} className="text-xs">

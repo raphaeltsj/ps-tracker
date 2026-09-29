@@ -1,7 +1,7 @@
 import { ArrowLeftRight, CalendarClock, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { DOS_LABEL, DOS_REPORT_TIME, DUTY_LABEL, DUTY_TIMES, LEAVE_GROUP_LABEL, leaveGroup, STATUS_LABEL, type DosKind, type Duty, type LeaveGroup, type LeaveStatus } from "@/lib/domain";
+import { DOS_LABEL, DOS_REPORT_TIME, DUTY_LABEL, DUTY_TIMES, LEAVE_GROUP_CODES, LEAVE_GROUP_LABEL, leaveGroup, STATUS_LABEL, type DosKind, type Duty, type LeaveGroup, type LeaveStatus } from "@/lib/domain";
 import type { CellAbsence, CellSwap, ExtraEntry, OpsEntry } from "@/lib/roster-types";
 import { formatFigure, slotLabel, type Strength } from "@/lib/strength";
 
@@ -101,10 +101,11 @@ export function DutyLegend({ className }: { className?: string }) {
         <span className="size-2 rounded-full bg-event" aria-hidden />
         Special event
       </li>
+      {/* Named by their codes, as on the chips; the group's full name is in the tooltip. */}
       {LEGEND_LEAVE_GROUPS.map((g) => (
-        <li key={g} className="flex items-center gap-1.5">
+        <li key={g} className="flex items-center gap-1.5" title={`${LEAVE_GROUP_LABEL[g]} leave`}>
           <span data-leave={g} className="h-3.5 w-5 rounded-sm bg-(--chip)" aria-hidden />
-          {LEAVE_GROUP_LABEL[g]}
+          {LEAVE_GROUP_CODES[g].join("/")}
         </li>
       ))}
     </ul>

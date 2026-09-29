@@ -24,7 +24,7 @@ import { findLeaveConflict } from "@/lib/leave-rules";
 import { datesWithoutSlot } from "@/lib/slots";
 import { formatFigure } from "@/lib/strength";
 import { ANNOUNCEMENT_MESSAGE_MAX } from "@/lib/announcements";
-import { notifyLeaveDecision, notifyShiftEvent } from "@/lib/notifications";
+import { notifyLeaveCancelled, notifyLeaveDecision, notifyShiftEvent } from "@/lib/notifications";
 import { swapAffectedByDutyChange, swapLockMessage } from "@/lib/swap-data";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
@@ -374,14 +374,45 @@ export async function editLeave(input: {
   return done("Leave updated.");
 }
 
-export async function cancelLeave(leaveId: string): Promise<ActionResult> {
+/**
+ * Cancel a leave, or only some of its days (`dates`). Cancelling every day, or a single-day leave, cancels
+ * the whole leave; otherwise those days are removed and the rest stays as it was. The staff member is
+ * told either way.
+ */
+export async function cancelLeave(leaveId: string, dates?: string[]): Promise<ActionResult> {
   const viewer = await requireViewer();
-  const leave = await db.leave.findUnique({ where: { id: leaveId }, include: { staff: true } });
+  const leave = await db.leave.findUnique({ where: { id: leaveId }, include: { staff: true, days: true } });
   if (!leave || !canEditShift(viewer, leave.staff.shiftId)) return fail("Only supervisors and Management can cancel approved leave.");
   if (leave.autoFor) return fail(`This ${DOS_OIL_CODE} comes with the ${DOS_LABEL} duty and cannot be cancelled. Remove the duty instead.`);
   if (leave.status !== "APPROVED" && leave.status !== "PENDING") return fail("This leave has already been cancelled, rejected or withdrawn.");
-  await db.leave.update({ where: { id: leaveId }, data: { status: "CANCELLED", decidedById: viewer.id, decidedAt: new Date() } });
-  return done(leave.status === "PENDING" ? "Request cancelled." : "Leave cancelled. The slot is free again.");
+
+  const allDays = leave.days.map((d) => d.date).sort();
+  let toCancel = allDays;
+  if (dates !== undefined) {
+    const picked = cleanDates(dates);
+    if (!picked || picked.some((d) => !allDays.includes(d))) return fail("Pick days that belong to this leave.");
+    toCancel = picked;
+  }
+  const remaining = allDays.filter((d) => !toCancel.includes(d));
+  const wasPending = leave.status === "PENDING";
+
+  if (remaining.length === 0) {
+    await db.leave.update({ where: { id: leaveId }, data: { status: "CANCELLED", decidedById: viewer.id, decidedAt: new Date() } });
+  } else {
+    await db.leaveDay.deleteMany({ where: { leaveId, date: { in: toCancel } } });
+  }
+  await notifyLeaveCancelled({
+    staffId: leave.staffId,
+    byId: viewer.id,
+    byName: viewer.name,
+    typeCode: leave.typeCode,
+    cancelled: formatDateList(toCancel),
+    remaining: remaining.length ? formatDateList(remaining) : null,
+    wasPending,
+  });
+  const told = leave.staffId === viewer.id ? "" : ` ${leave.staff.name} has been notified.`;
+  if (remaining.length) return done(`Cancelled ${formatDateList(toCancel)}. The leave now covers ${formatDateList(remaining)}.${told}`);
+  return done((wasPending ? "Request cancelled." : "Leave cancelled. The slot is free again.") + told);
 }
 
 // ---------- Duties and Tasks ----------

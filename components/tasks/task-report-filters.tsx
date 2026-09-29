@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { MonthPicker } from "@/components/month-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -98,10 +99,10 @@ export function TaskReportFilters(props: Props) {
         </label>
       )}
       {period === "month" && (
-        <label className="space-y-1">
+        <div className="space-y-1">
           <span className={cn(label, "block")}>Month</span>
-          <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} required className="w-44" />
-        </label>
+          <MonthPicker value={month} onChange={setMonth} years={props.years} />
+        </div>
       )}
       {period === "range" && (
         <>
@@ -168,7 +169,8 @@ function TaskPicker({ tasks, picked, onChange }: { tasks: { id: string; name: st
     <div className="space-y-1">
       <span className="block text-xs font-medium text-muted-foreground">Tasks</span>
       <details className="relative">
-        <summary className={cn("flex h-9 cursor-pointer list-none items-center rounded-md border bg-background px-3 text-sm", picked?.length === 0 && "border-danger text-danger-ink")}>
+        {/* list-none hides the disclosure triangle in Chromium and Firefox; Safari needs the -webkit marker rule. */}
+        <summary className={cn("flex h-9 cursor-pointer list-none items-center rounded-md border bg-background px-3 text-sm [&::-webkit-details-marker]:hidden", picked?.length === 0 && "border-danger text-danger-ink")}>
           {summary}
         </summary>
         <div className="absolute z-50 mt-1 max-h-[60vh] w-64 space-y-2 overflow-y-auto rounded-lg border bg-popover p-2 shadow-xl">

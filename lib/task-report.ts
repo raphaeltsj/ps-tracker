@@ -7,7 +7,6 @@ export type TaskReportRow = {
   shiftId: string;
   role: string;
   counts: Record<string, number>; // taskId -> number of days
-  dates: Record<string, string[]>; // taskId -> dates
   total: number;
 };
 
@@ -41,14 +40,13 @@ export async function getTaskReport(from: string, to: string, shiftIds: string[]
             staff: { shiftId: { in: shiftIds } },
             taskId: taskIds ? { in: taskIds } : undefined,
           },
-          select: { taskId: true, staffId: true, date: true },
-          orderBy: { date: "asc" },
+          select: { taskId: true, staffId: true },
         })
       : Promise.resolve([]),
   ]);
 
   const rows = new Map<string, TaskReportRow>(
-    staff.map((s) => [s.id, { staffId: s.id, name: s.name, shiftId: s.shiftId!, role: s.role, counts: {}, dates: {}, total: 0 }]),
+    staff.map((s) => [s.id, { staffId: s.id, name: s.name, shiftId: s.shiftId!, role: s.role, counts: {}, total: 0 }]),
   );
   const taskTotals: Record<string, number> = {};
   const people: Record<string, Set<string>> = {};
@@ -56,7 +54,6 @@ export async function getTaskReport(from: string, to: string, shiftIds: string[]
     const row = rows.get(a.staffId);
     if (!row) continue; // inactive staff
     row.counts[a.taskId] = (row.counts[a.taskId] ?? 0) + 1;
-    (row.dates[a.taskId] ??= []).push(a.date);
     row.total++;
     taskTotals[a.taskId] = (taskTotals[a.taskId] ?? 0) + 1;
     (people[a.taskId] ??= new Set()).add(a.staffId);
