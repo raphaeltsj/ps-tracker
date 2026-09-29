@@ -5,7 +5,7 @@ import { getActiveAnnouncements } from "@/lib/announcements";
 import { requireViewer } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getNotifications, getUnreadNotificationCount } from "@/lib/notifications";
-import { canEditShift, canManageDayworkers, canManageTasks, canViewTaskReport, hasEditView } from "@/lib/permissions";
+import { canEditShift, canManageDayworkers, canManageTasks, canViewLeaveReport, canViewTaskReport, hasEditView } from "@/lib/permissions";
 import { swapsAwaiting } from "@/lib/swap-data";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
@@ -34,6 +34,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         viewer={viewer}
         showTasks={canManageTasks(viewer)}
         showTaskReport={canViewTaskReport(viewer)}
+        showLeaveReport={canViewLeaveReport(viewer)}
         showDayworkers={canManageDayworkers(viewer)}
         showManageRequests={showManageRequests}
         showStaff={hasEditView(viewer)}

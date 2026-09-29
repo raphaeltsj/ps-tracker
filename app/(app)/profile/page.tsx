@@ -6,7 +6,7 @@ import { cyclePositionLabel } from "@/lib/cycle";
 import { formatDate, todayLocal } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { ROLE_LABEL } from "@/lib/domain";
-import { canManageDayworkers, canManageTasks, canViewTaskReport, hasEditView } from "@/lib/permissions";
+import { canManageDayworkers, canManageTasks, canViewLeaveReport, canViewTaskReport, hasEditView } from "@/lib/permissions";
 import Link from "next/link";
 
 export const metadata = { title: "Profile | PS Tracker" };
@@ -41,6 +41,12 @@ export default async function ProfilePage() {
         <Link href="/task-report" className="flex items-center justify-between rounded-xl border p-4 text-sm hover:bg-accent/40">
           <span>Task report</span>
           <span className="text-muted-foreground">Tasks done by year, month or range</span>
+        </Link>
+      )}
+      {canViewLeaveReport(viewer) && (
+        <Link href="/leave-report" className="flex items-center justify-between rounded-xl border p-4 text-sm hover:bg-accent/40">
+          <span>Leave report</span>
+          <span className="text-muted-foreground">Leave against limits, award OIL</span>
         </Link>
       )}
       {canManageDayworkers(viewer) && (

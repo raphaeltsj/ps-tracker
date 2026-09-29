@@ -39,6 +39,7 @@ const SHIFTS = [
 async function main() {
   // Wipe in dependency order.
   await db.session.deleteMany();
+  await db.oilGrant.deleteMany();
   await db.dutySwap.deleteMany(); // days cascade
   await db.announcementDismissal.deleteMany();
   await db.announcement.deleteMany();
@@ -318,6 +319,26 @@ async function main() {
     for (const date of [`${year}-12-24`, `${year}-12-25`]) {
       await db.lockedDate.create({ data: { shiftId: s.id, date, remarks: "Festive period (Christmas). Balloting handled outside the app." } });
     }
+  }
+
+  // OIL each person may take, awarded by their supervisor: enough to cover the OIL leave already
+  // approved above, plus a different amount left for each person. Last, so it doesn't change the
+  // random sequence (and so the demo data) above.
+  const oilCodes = COMMON_LEAVE_TYPES.filter((t) => t.code.endsWith(" OIL"));
+  for (const s of SHIFTS) {
+    const people = await db.staff.findMany({ where: { shiftId: s.id, role: { not: "MANAGEMENT" } }, select: { id: true, role: true } });
+    const supervisorId = people.find((p) => p.role === "SUPERVISOR")?.id ?? null;
+    const oilLeave = await db.leave.findMany({
+      where: { staffId: { in: people.map((p) => p.id) }, status: "APPROVED", autoFor: null, typeCode: { in: oilCodes.map((t) => t.code) } },
+      select: { staffId: true, typeCode: true, _count: { select: { days: true } } },
+    });
+    const used = new Map<string, number>();
+    for (const l of oilLeave) used.set(l.staffId, (used.get(l.staffId) ?? 0) + l._count.days * (oilCodes.find((t) => t.code === l.typeCode)?.halfDay ? 0.5 : 1));
+    const grants = people.flatMap((p) => {
+      const amount = (used.get(p.id) ?? 0) + pick([0, 0.5, 1, 1, 1.5, 2, 3]);
+      return amount > 0 ? [{ staffId: p.id, amount, byId: supervisorId }] : [];
+    });
+    await db.oilGrant.createMany({ data: grants });
   }
 
   console.log("Seeded shifts A, B, C with demo staff, leave, duties and Tasks.");

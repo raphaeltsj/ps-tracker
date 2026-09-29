@@ -28,7 +28,15 @@ export const LEAVE_LIMIT_GROUPS: LeaveLimitGroup[] = [
   { key: "MC", label: "MC", codes: ["MC"], limit: 14 },
   { key: "OML", label: "OML", codes: ["OML"], limit: 3 },
   { key: "BD", label: "BD/BD-IL", codes: ["BD", "BD-IL"], limit: 1 },
+  // GRW and 0.5 GRW fold together (baseLeaveCode), so half days count toward the 7.
+  { key: "GRW", label: "GRW", codes: ["GRW"], limit: 7 },
 ];
+
+/**
+ * OIL someone may take: `allowed` is what supervisors have awarded, `used` their approved OIL leave, as
+ * a running balance (not per year). Loaded by lib/oil.ts.
+ */
+export type OilBalance = { allowed: number; used: number; left: number };
 
 export type LeaveTakenRow = {
   key: string;
@@ -38,15 +46,17 @@ export type LeaveTakenRow = {
   /** Taken this year, regardless of the selected period: what a limit is checked against. */
   annualCount: number;
   limit: number | null;
+  /** OIL only: the person's own allowance, which replaces a fixed limit. */
+  oil?: OilBalance;
 };
 
 /**
- * Every leave type the shift has, as one row per limit group (AL/OL, MC, OML, BD/BD-IL) plus one row
+ * Every leave type the shift has, as one row per limit group (AL/OL, MC, OML, BD/BD-IL, GRW) plus one row
  * for everything else (its own base code, no limit, tracked as before). `allCodes` is every base code
  * in use (half/full-day variants already folded together by `baseLeaveCode`), so a type with nothing
- * taken still shows at zero.
+ * taken still shows at zero. With `oil`, the OIL row carries the person's own allowance.
  */
-export function leaveTakenRows(byType: LeaveTally[], annualByType: LeaveTally[], allCodes: string[]): LeaveTakenRow[] {
+export function leaveTakenRows(byType: LeaveTally[], annualByType: LeaveTally[], allCodes: string[], oil?: OilBalance): LeaveTakenRow[] {
   const codeSet = new Set(allCodes);
   const grouped = new Set(LEAVE_LIMIT_GROUPS.flatMap((g) => g.codes));
   const sumFor = (list: LeaveTally[], code: string) => list.filter((b) => baseLeaveCode(b.code) === code).reduce((sum, b) => sum + b.count, 0);
@@ -63,7 +73,7 @@ export function leaveTakenRows(byType: LeaveTally[], annualByType: LeaveTally[],
   });
   for (const code of allCodes) {
     if (grouped.has(code)) continue;
-    rows.push({ key: code, label: code, limit: null, count: sumFor(byType, code), annualCount: sumFor(annualByType, code) });
+    rows.push({ key: code, label: code, limit: null, count: sumFor(byType, code), annualCount: sumFor(annualByType, code), ...(code === "OIL" && oil ? { oil } : {}) });
   }
   return rows;
 }

@@ -50,6 +50,23 @@ model Staff {
   proficiencies       StaffTaskProficiency[]
   announcementsMade   Announcement[]
   announcementsClosed AnnouncementDismissal[]
+  oilGrants           OilGrant[]              @relation("OilGrantStaff")
+  oilGrantsGiven      OilGrant[]              @relation("OilGrantBy")
+}
+
+// OIL (off in lieu) a supervisor or Management has allowed someone to take: each row is an award (+)
+// or a correction (-), in days (0.5 steps). What they can take = the sum, minus the OIL leave they have
+// already had approved. The 0.5 OIL that comes with a DOS/FDO duty is separate and not counted here.
+model OilGrant {
+  id        String   @id @default(cuid())
+  staffId   String
+  staff     Staff    @relation("OilGrantStaff", fields: [staffId], references: [id], onDelete: Cascade)
+  amount    Float
+  byId      String?
+  by        Staff?   @relation("OilGrantBy", fields: [byId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([staffId])
 }
 
 model Session {
