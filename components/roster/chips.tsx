@@ -33,6 +33,21 @@ export const DUTY_CELL: Record<Duty, string> = {
   OFF_V: "bg-violet-50 dark:bg-violet-500/10",
 };
 
+/**
+ * A duty assigned over leave (spec 5.1): orange, pending until the person swaps it away or the duty
+ * or leave is removed. Always paired with the "Pending" tag below.
+ */
+export const DUTY_ON_LEAVE_CELL = "bg-orange-100 outline-2 outline-dashed -outline-offset-2 outline-orange-500 dark:bg-orange-500/20";
+export const DUTY_ON_LEAVE_TITLE = "Duty assigned on a leave day: pending until it is swapped away, or the duty or leave is removed";
+
+export function PendingTag() {
+  return (
+    <span className="rounded border border-orange-500 bg-orange-50 px-1 text-[10px] font-semibold leading-4 text-orange-800 dark:bg-orange-950 dark:text-orange-200" title={DUTY_ON_LEAVE_TITLE}>
+      Pending
+    </span>
+  );
+}
+
 /** Duties that keep a text label on the roster. */
 export const LABELLED_DUTIES: Duty[] = ["V", "VSB", "OFF_V"];
 
@@ -71,6 +86,10 @@ export function DutyLegend({ className }: { className?: string }) {
           <ArrowLeftRight className="size-2.5" />
         </span>
         Duty swap
+      </li>
+      <li className="flex items-center gap-1.5" title={DUTY_ON_LEAVE_TITLE}>
+        <span className={cn("h-3.5 w-5 rounded-sm", DUTY_ON_LEAVE_CELL)} aria-hidden />
+        Duty on leave (pending)
       </li>
       <li className="flex items-center gap-1.5">
         <span className="h-3.5 w-5 rounded-sm border bg-hatch" aria-hidden />

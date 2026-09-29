@@ -1,7 +1,7 @@
 import "server-only";
 import { addDays, dateRange, formatDate, todayLocal } from "@/lib/dates";
 import { db } from "@/lib/db";
-import type { AssignableDuty, Duty } from "@/lib/domain";
+import { isMedicalLeave, type AssignableDuty, type Duty } from "@/lib/domain";
 import { findLeaveConflict } from "@/lib/leave-rules";
 import { buildRoster } from "@/lib/roster-data";
 import { canEditShift, type Viewer } from "@/lib/permissions";
@@ -245,9 +245,12 @@ function evaluateSwap(f: SwapFacts, { a: aId, b: bId, dates, excludeSwapId }: Pr
     return fail(`${who} is already in a duty swap on ${formatDate(clash.date)}. One swap per person per day.`);
   }
 
-  // No swap on a day either person has leave (pending or approved, including BD / BD-IL).
+  // No swap on a day either person has leave (pending or approved, including BD / BD-IL), except to
+  // swap away a duty a supervisor assigned over non-medical leave (spec 5.1): that is how the person
+  // clears the clash and keeps their leave.
+  const dutyOverLeave = (id: string, l: { date: string; code: string }) => !isMedicalLeave(l.code) && Boolean(f.ctx.people.get(id)?.overrides.get(l.date));
   for (const p of [a, b]) {
-    const onLeave = (f.leave.get(p.id) ?? []).find((l) => dates.includes(l.date));
+    const onLeave = (f.leave.get(p.id) ?? []).find((l) => dates.includes(l.date) && !dutyOverLeave(p.id, l));
     if (onLeave) return fail(`${p.name} has ${onLeave.status === "PENDING" ? "pending " : ""}${onLeave.code} on ${formatDate(onLeave.date)}. Duties cannot be swapped on a leave day.`);
   }
 
@@ -277,10 +280,22 @@ function evaluateSwap(f: SwapFacts, { a: aId, b: bId, dates, excludeSwapId }: Pr
     }
   }
 
+  // Swapping away a duty assigned over leave must not hand the person on leave another V or V(SB).
+  for (const r of rows) {
+    for (const [p, takes] of [[a, r.bBefore], [b, r.aBefore]] as const) {
+      const l = (f.leave.get(p.id) ?? []).find((x) => x.date === r.date);
+      if (l && isVDuty(takes)) return fail(`${p.name} has ${l.code} on ${formatDate(r.date)}, so cannot take over ${dutyWord(takes)} that day. Pick a partner who is not on V or V(SB).`);
+    }
+  }
+
   // A V swap takes the PM block after it with it (the taker gets the Off(V), the giver works PM):
   // those follow-on days are part of the swap, so they must be free the same way as the swap dates.
   const linked = linkedDates(ripples);
   for (const p of [a, b]) {
+    // Someone swapping away a V assigned over their leave gets their PM block back, and leave that
+    // runs over it simply becomes leave on those PM days again.
+    const clearing = (f.leave.get(p.id) ?? []).some((l) => dates.includes(l.date) && dutyOverLeave(p.id, l));
+    if (clearing) continue;
     const onLeave = (f.leave.get(p.id) ?? []).find((l) => linked.includes(l.date));
     if (onLeave) return fail(`${p.name} has ${onLeave.status === "PENDING" ? "pending " : ""}${onLeave.code} on ${formatDate(onLeave.date)}, a follow-on day of this V swap (the Off(V) moves with the V). Sort out that leave first.`);
   }

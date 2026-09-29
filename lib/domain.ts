@@ -104,6 +104,17 @@ export function baseLeaveCode(code: string): string {
   return code.replace(/^(?:0\.5|1)\s+/, "");
 }
 
+/**
+ * Medical leave: someone on it cannot be asked to work, so no duty is ever assigned over it. Any other
+ * leave can have a duty (V, V(SB), Off(V), DOS/FDO) assigned over it, which flags the day as pending
+ * until the person swaps the duty away or the duty or leave is removed (spec 5.1).
+ */
+export const MEDICAL_LEAVE_CODES = ["MC", "OML", "HL"] as const;
+
+export function isMedicalLeave(code: string): boolean {
+  return (MEDICAL_LEAVE_CODES as readonly string[]).includes(code);
+}
+
 export const NAME_MAX = 6; // Task names and custom leave type codes
 
 export const MFL: Record<"weekday" | "weekend", { AM: number; PM: number; V: number }> = {

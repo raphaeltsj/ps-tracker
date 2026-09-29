@@ -27,6 +27,11 @@ export type RosterCell = {
   absences: CellAbsence[];
   /** Approved duty swap on this date (spec 11.4): `duty` is what the person works, taken from the partner. */
   swap: CellSwap | null;
+  /**
+   * A duty was assigned (V, V(SB), Off(V) or DOS/FDO) on a day the person has leave: pending until
+   * they swap it away or the duty or leave is removed (spec 5.1). Only set where the leave is visible.
+   */
+  dutyOnLeave: boolean;
 };
 
 export type CellSwap = {

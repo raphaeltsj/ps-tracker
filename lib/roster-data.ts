@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import type { AssignableDuty, DosKind, Half, LeaveStatus, Role } from "@/lib/domain";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { canEditShift, type Viewer } from "@/lib/permissions";
-import type { CellAbsence, LeaveSummary, RosterCell, RosterData, RosterDay } from "@/lib/roster-types";
+import { isLeaveEntry, type CellAbsence, type LeaveSummary, type RosterCell, type RosterData, type RosterDay } from "@/lib/roster-types";
 import { computeStrength, mflFor, V_MFL } from "@/lib/strength";
 import { loadDutyContext } from "@/lib/swap-data";
 import type { PersonCycle } from "@/lib/swaps";
@@ -154,6 +154,7 @@ export async function buildRoster(
         task: null,
         absences: [],
         swap: swap && partner ? { swapId: swap.swapId, partnerId: partner.id, partnerName: partner.name, partnerShiftId: swap.partnerShiftId ?? partner.shiftId ?? "", ownDuty: swap.ownDuty, linked: swap.linked } : null,
+        dutyOnLeave: false,
       };
       // A swap is one for one, so V cover is counted on the crew's own duties.
       if ((swap?.ownDuty ?? duty) === "V") vOnDuty.set(date, vOnDuty.get(date)! + 1);
@@ -208,6 +209,17 @@ export async function buildRoster(
   for (const e of extraDuties) {
     const cell = cells[e.staffId]?.[e.date];
     if (cell) cell.dos = e.kind as DosKind;
+  }
+
+  // A duty assigned over leave (spec 5.1) stays pending until it is swapped away (the person then
+  // works their partner's duty) or the duty or leave is removed. A DOS/FDO stays with its holder
+  // through a swap, so only removing it clears the day. Uses visible leave only, so nobody learns
+  // of someone else's pending request this way.
+  for (const row of Object.values(cells)) {
+    for (const cell of Object.values(row)) {
+      const assigned = (cell.dutySource === "override" && !cell.swap) || cell.dos !== null;
+      cell.dutyOnLeave = assigned && cell.absences.some(isLeaveEntry);
+    }
   }
 
   const lockByDate = new Map(locks.map((l) => [l.date, l.remarks]));

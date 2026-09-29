@@ -1,7 +1,25 @@
 "use client";
 import { useState } from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, Lock } from "lucide-react";
-import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, EventBadge, ExtraChip, LABELLED_DUTIES, LeaveChip, LockBadge, OpsChip, SwapTag, swapTitle, TaskTag } from "@/components/roster/chips";
+import {
+  DosTag,
+  DUTY_CELL,
+  DUTY_ON_LEAVE_CELL,
+  DUTY_ON_LEAVE_TITLE,
+  DutyChip,
+  DutyLegend,
+  dutyTitle,
+  EventBadge,
+  ExtraChip,
+  LABELLED_DUTIES,
+  LeaveChip,
+  LockBadge,
+  OpsChip,
+  PendingTag,
+  SwapTag,
+  swapTitle,
+  TaskTag,
+} from "@/components/roster/chips";
 import { StrengthSummary } from "@/components/roster/strength-summary";
 import { cellKey, type Selection, type WorkspaceProps } from "@/components/roster/roster-workspace";
 import { Button } from "@/components/ui/button";
@@ -135,6 +153,7 @@ export function MobileRoster({
               {cell.swap && <SwapTag swap={cell.swap} duty={cell.duty} />}
               {cell.dos && <DosTag kind={cell.dos} />}
               {cell.task && <TaskTag name={cell.task.name} />}
+              {cell.dutyOnLeave && <PendingTag />}
               {cell.absences.map((a, i) => (
                 <button
                   key={i}
@@ -147,7 +166,10 @@ export function MobileRoster({
                 </button>
               ))}
               {/* AM, PM and Off by colour only; V and V(SB) keep their label. */}
-              <span className={cn("grid h-6 w-12 place-items-center rounded-md", DUTY_CELL[cell.duty])} title={cell.swap ? swapTitle(cell.swap, cell.duty) : dutyTitle(cell.duty)}>
+              <span
+                className={cn("grid h-6 w-12 place-items-center rounded-md", cell.dutyOnLeave ? DUTY_ON_LEAVE_CELL : DUTY_CELL[cell.duty])}
+                title={[cell.swap ? swapTitle(cell.swap, cell.duty) : dutyTitle(cell.duty), cell.dutyOnLeave && DUTY_ON_LEAVE_TITLE].filter(Boolean).join(". ")}
+              >
                 {LABELLED_DUTIES.includes(cell.duty) ? <DutyChip duty={cell.duty} /> : <span className="sr-only">{dutyTitle(cell.duty)}</span>}
               </span>
             </li>

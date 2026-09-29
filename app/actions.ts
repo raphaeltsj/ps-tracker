@@ -8,7 +8,7 @@ import { dosEarnsOil, shiftDutyOn } from "@/lib/cycle";
 import { addDays, formatDate, formatDateList, isValidDate } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { normalizeDayworkerName, normalizeUsername } from "@/lib/dayworkers";
-import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, NAME_MAX, type AssignableDuty, type Half } from "@/lib/domain";
+import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DUTY_LABEL, MEDICAL_LEAVE_CODES, NAME_MAX, type AssignableDuty, type Half } from "@/lib/domain";
 import { createDosOil } from "@/lib/dos-oil";
 import {
   canDecideLeave,
@@ -58,7 +58,7 @@ function halfFor(halfDay: boolean, half: unknown): Half | null | "invalid" {
   return half === "FIRST" || half === "SECOND" ? half : "invalid";
 }
 
-/** Duties cannot be assigned on a day the person is on leave (spec 5.1). */
+/** Extra shift duty cannot be assigned on a day the person is on leave (spec 5.4). */
 async function firstCellOnLeave(cells: CellRef[]): Promise<string | null> {
   const byStaff = new Map<string, string[]>();
   for (const { staffId, date } of cells) byStaff.set(staffId, [...(byStaff.get(staffId) ?? []), date]);
@@ -70,6 +70,47 @@ async function firstCellOnLeave(cells: CellRef[]): Promise<string | null> {
     }
   }
   return null;
+}
+
+/**
+ * V, V(SB), Off(V) and DOS/FDO may go on a leave day, except medical leave (spec 5.1): nobody on MC,
+ * OML or HL is asked to work. Returns a message for the first cell on medical leave, or null.
+ */
+async function firstCellOnMedicalLeave(cells: CellRef[]): Promise<string | null> {
+  const clash = await db.leaveDay.findFirst({
+    where: {
+      OR: cells.map(({ staffId, date }) => ({ date, leave: { staffId } })),
+      leave: { status: { in: ["PENDING", "APPROVED"] }, typeCode: { in: [...MEDICAL_LEAVE_CODES] } },
+    },
+    include: { leave: { include: { staff: true } } },
+    orderBy: { date: "asc" },
+  });
+  if (!clash) return null;
+  return `${clash.leave.staff.name} has ${clash.leave.typeCode} on ${formatDate(clash.date)}. No duty can be assigned on medical leave.`;
+}
+
+/**
+ * Tells each person given a duty on a day they have leave (approved or pending, BD / BD-IL included),
+ * so they can swap the duty away or sort it out with their supervisor. Their cell shows the day as
+ * pending until then (spec 5.1).
+ */
+async function notifyDutyOnLeave(viewer: Viewer, cells: CellRef[], dutyLabel: string) {
+  for (const { staffId, date } of cells) {
+    if (staffId === viewer.id) continue;
+    const leave = await findLeaveConflict(staffId, [date]);
+    if (!leave) continue;
+    const next =
+      dutyLabel === DUTY_LABEL.OFF_V
+        ? "Your leave that day may no longer be needed: check with your supervisor."
+        : "Swap the duty with someone, or check with your supervisor.";
+    await db.notification.create({
+      data: {
+        staffId,
+        message: `${viewer.name} assigned you ${dutyLabel} on ${formatDate(date)}, a day you have ${leave.status === "PENDING" ? "pending " : ""}${leave.code}. ${next}`,
+        href: `/roster?month=${date.slice(0, 7)}`,
+      },
+    });
+  }
 }
 
 /** Duties cannot change on a date an approved duty swap holds (spec 11.4). Tasks still can. */
@@ -414,7 +455,7 @@ export async function assignDuty(input: { cells: CellRef[]; duty: string }): Pro
   }
 
   if (!isCycle) {
-    const onLeave = await firstCellOnLeave(input.cells);
+    const onLeave = await firstCellOnMedicalLeave(input.cells);
     if (onLeave) return fail(onLeave);
   }
   const vRule = input.duty === "V" || input.duty === "VSB" ? await vRuleMessage(input.cells, input.duty) : null;
@@ -436,7 +477,9 @@ export async function assignDuty(input: { cells: CellRef[]; duty: string }): Pro
           }),
     ),
   );
-  return done(isCycle ? "Reset to the normal cycle." : "Duty assigned.");
+  if (isCycle) return done("Reset to the normal cycle.");
+  await notifyDutyOnLeave(viewer, input.cells, DUTY_LABEL[input.duty === "OFF" ? "OFF_V" : (input.duty as AssignableDuty)]);
+  return done("Duty assigned.");
 }
 
 /**
@@ -459,7 +502,7 @@ export async function assignExtraDuty(input: { cells: CellRef[]; kind: string | 
     return done(`${DOS_LABEL} duty removed, with its ${DOS_OIL_CODE}.`);
   }
   if (!(DOS_KINDS as readonly string[]).includes(input.kind)) return fail(`Pick ${DOS_KINDS.join(", ")}.`);
-  const onLeave = await firstCellOnLeave(input.cells);
+  const onLeave = await firstCellOnMedicalLeave(input.cells);
   if (onLeave) return fail(onLeave);
 
   // A cell that already holds a DOS/FDO duty only changes its name: same duty, same 0.5 OIL (and
@@ -498,6 +541,7 @@ export async function assignExtraDuty(input: { cells: CellRef[]; kind: string | 
     withOil++;
     await createDosOil(duty, viewer.id);
   }
+  await notifyDutyOnLeave(viewer, newCells, input.kind);
   if (newCells.length === 0) return done(`Changed to ${input.kind}. Its ${DOS_OIL_CODE}, if any, is unchanged.`);
   return done(
     withOil === newCells.length
