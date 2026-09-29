@@ -9,7 +9,7 @@ The full spec is `docs/system-context.md`. It is the source of truth: update it 
 Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, npm. Details in `docs/system-context.md` section 17.
 
 - Setup: `npm install`, then `npm run setup` (creates and seeds `prisma/dev.db`)
-- Run: `npm run dev` (http://localhost:3000, pick a demo user)
+- Run: `npm run dev` (http://localhost:3000, pick a demo user). To test on a phone, open the "Network" address it prints; that network must be in `allowedDevOrigins` in `next.config.ts` (restart after editing), or buttons won't work and changes won't reach the phone.
 - Test: `npm test`; lint: `npm run lint`; types: `npm run typecheck`
 - Reseed demo data: `npm run db:seed`
 
@@ -71,8 +71,9 @@ Next.js (App Router, TypeScript), Prisma with SQLite, Tailwind CSS, shadcn/ui, n
 - The request form sits on the same page as the calendar/roster (right panel on desktop, bottom sheet on mobile). On desktop the panel can be collapsed and reopened (a small edge button), for everyone, to see the full roster; the roster grid opens scrolled to today, not the 1st of the month, so today-onwards dates for a request or swap are visible without scrolling first.
 - Clicking a date (header, calendar cell, or mobile week strip) shows that date's details. It never selects every person on that day. For supervisors and Management it replaces the normal duty / Task / leave tools with that date's lock and special-event settings; clicking the date again, or Close, returns to the normal tools. Staff see read-only details only.
 - Selecting a person's date (a roster cell) opens the normal duty / Task / leave tools, defaulting to the **Task** tab.
-- Mobile uses bottom tabs (Roster, Requests, Manage for supervisors and Management, Profile). Include a notification bell placeholder.
-- Light and dark mode, calm and readable, colours paired with text, icons, or a legend. On the Roster view, AM / PM / Off are colour-coded cells with no text (legend above the grid names each colour without timings; tooltips and screen-reader labels carry the details); V, V(SB) and Off(V) keep a text label. Suggested: AM amber, PM indigo, V deep navy/purple, V(SB) lighter outline of V, Off grey, Off(V) a light violet tint with the "Off(V)" label, Leave teal, Special Event magenta, locked dates hatched with a lock icon.
+- In Staff view (and on a shift the viewer can't edit), clicking or tapping **someone else's** cell highlights it and shows their duty, Task, swap, DOS/FDO and visible leave for that date, read-only, at the top of the side panel. Only the viewer's **own** cells pick leave dates.
+- Mobile uses bottom tabs (Roster, Requests, Manage for supervisors and Management, Profile). Include a notification bell placeholder. The mobile Roster view has a **Day / Grid** switch: Day is the one-day list (default); Grid is the full month grid in a screen-high box that scrolls sideways, with names and dates pinned. The choice is remembered per browser.
+- Light and dark mode, calm and readable, colours paired with text, icons, or a legend. On the Roster view, AM / PM / Off are colour-coded cells with no text (legend above the grid names each colour without timings; tooltips and screen-reader labels carry the details); V, V(SB) and Off(V) keep a text label. Colours: AM yellow (solid in dark mode too, since see-through yellow reads as brown there), PM blue, V purple, V(SB) a neutral grey dashed outline (standby, not duty), Off grey, Off(V) a light violet tint with the "Off(V)" label, Leave teal, Special Event magenta, locked dates hatched with a lock icon. Task and DOS/FDO tags have a near-solid background so they read on any duty colour.
 - Sample data: placeholder staff names that are each a single 5-character word (Alpha, Bravo, Delta...). No realistic personal names.
 
 **Out of scope.** Payroll, timesheets and attendance, HR records, festive balloting.
