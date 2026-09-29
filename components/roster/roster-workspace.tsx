@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, ChevronUp, Eye, PanelRightClose, PanelRightOpen, Pencil } from "lucide-react";
 import { CalendarView } from "@/components/roster/calendar-view";
@@ -72,6 +72,13 @@ export type Selection = {
   focusStaffId: string | null;
 };
 
+// One look for every toolbar switch (shift, Calendar/Roster, phone Day/Grid): a 32px bordered box
+// with rounded segments, the selected one in the accent.
+const SEGMENTED = "flex h-8 items-center gap-0.5 rounded-lg border p-0.5 text-sm";
+function segment(selected: boolean): string {
+  return cn("h-full rounded-md px-2", selected ? "bg-primary font-medium text-primary-foreground" : "text-muted-foreground hover:bg-accent");
+}
+
 export function RosterWorkspace(props: WorkspaceProps) {
   const { roster, month, view, mode, canEdit, canRequest, canRequestLocked, today } = props;
   const viewerId = props.viewer.id;
@@ -90,6 +97,17 @@ export function RosterWorkspace(props: WorkspaceProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
   const isDesktop = useIsDesktop();
+  // Phones: the bottom sheet's live height (collapsed or open), so the page and the Grid box make room
+  // for it and nothing ends up permanently underneath it.
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const [sheetHeight, setSheetHeight] = useState(0);
+  useEffect(() => {
+    const el = sheetRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setSheetHeight(el.offsetHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isDesktop]);
   // Month, shift and view changes reload the page data: show that something is happening.
   const [navPending, startNav] = useTransition();
 
@@ -287,8 +305,11 @@ export function RosterWorkspace(props: WorkspaceProps) {
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh_-_3.6rem_-_var(--banner-h))] lg:flex-none lg:flex-row">
-      <section className="relative flex min-w-0 flex-1 flex-col" aria-busy={navPending}>
+    <div
+      className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh_-_3.6rem_-_var(--banner-h))] lg:flex-none lg:flex-row"
+      style={{ "--sheet-h": `${isDesktop ? 0 : sheetHeight}px` } as React.CSSProperties}
+    >
+      <section className="relative flex min-w-0 flex-1 flex-col pb-(--sheet-h)" aria-busy={navPending}>
         <h1 className="sr-only">
           {roster.shiftName} {view === "calendar" ? "calendar" : "roster"}, {formatMonth(month)}
           {mode === "edit" ? " (Edit view)" : ""}
@@ -303,50 +324,38 @@ export function RosterWorkspace(props: WorkspaceProps) {
             <SwapWaitingBanner count={props.swapsWaiting} href={props.hasEditView ? "/manage-requests" : "/requests"} />
           </div>
         )}
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2.5">
-          <div className="flex rounded-lg border p-0.5" role="tablist" aria-label="Shift">
+        {/* Toolbar: every control is one 32px-high box with the same shape, so they sit on one line
+            (supervisors included) from about 1280px wide with the panel open. */}
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 border-b px-4 py-2.5">
+          <div className={SEGMENTED} role="tablist" aria-label="Shift">
             {["A", "B", "C"].map((id) => (
-              <button
-                key={id}
-                role="tab"
-                aria-selected={roster.shiftId === id}
-                onClick={() => navigate({ shift: id })}
-                className={cn(
-                  "rounded-md px-3 py-1 text-sm",
-                  roster.shiftId === id ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-accent",
-                )}
-              >
+              <button key={id} role="tab" aria-selected={roster.shiftId === id} onClick={() => navigate({ shift: id })} className={segment(roster.shiftId === id)}>
                 Shift {id}
                 {props.viewer.shiftId === id && <span className="sr-only"> (your shift)</span>}
               </button>
             ))}
           </div>
 
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" aria-label="Previous month" onClick={() => navigate({ month: shiftMonth(month, -1) })}>
+          <div className="flex h-8 items-center gap-1">
+            <Button variant="ghost" size="icon" className="size-8" aria-label="Previous month" onClick={() => navigate({ month: shiftMonth(month, -1) })}>
               <ChevronLeft className="size-4" />
             </Button>
             <MonthPicker month={month} today={today} onPick={(m) => navigate({ month: m })} />
-            <Button variant="ghost" size="icon" aria-label="Next month" onClick={() => navigate({ month: shiftMonth(month, 1) })}>
+            <Button variant="ghost" size="icon" className="size-8" aria-label="Next month" onClick={() => navigate({ month: shiftMonth(month, 1) })}>
+
               <ChevronRight className="size-4" />
             </Button>
             {month !== today.slice(0, 7) && (
-              <Button variant="outline" size="sm" onClick={() => navigate({ month: today.slice(0, 7) })}>
+              <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => navigate({ month: today.slice(0, 7) })}>
                 Today
               </Button>
             )}
           </div>
 
           {/* Calendar / Roster switch: every role */}
-          <div className="flex rounded-full border p-0.5 text-sm" role="group" aria-label="View">
+          <div className={SEGMENTED} role="group" aria-label="View">
             {(["calendar", "roster"] as const).map((v) => (
-              <button
-                key={v}
-                aria-pressed={view === v}
-                onClick={() => navigate({ view: v })}
-                className={cn("rounded-full px-3 py-1 capitalize", view === v ? "bg-foreground text-background font-medium" : "text-muted-foreground hover:bg-accent")}
-              >
+              <button key={v} aria-pressed={view === v} onClick={() => navigate({ view: v })} className={cn(segment(view === v), "capitalize")}>
                 {v}
               </button>
             ))}
@@ -354,45 +363,64 @@ export function RosterWorkspace(props: WorkspaceProps) {
 
           {/* Phones only: one day at a time, or the full month grid scrolled sideways */}
           {!isDesktop && view === "roster" && (
-            <div className="flex rounded-full border p-0.5 text-sm" role="group" aria-label="Phone layout">
+            <div className={SEGMENTED} role="group" aria-label="Phone layout">
               {([
                 [false, "Day"],
                 [true, "Grid"],
               ] as const).map(([grid, label]) => (
-                <button
-                  key={label}
-                  aria-pressed={phoneGrid === grid}
-                  onClick={() => togglePhoneGrid(grid)}
-                  className={cn("rounded-full px-3 py-1", phoneGrid === grid ? "bg-foreground text-background font-medium" : "text-muted-foreground hover:bg-accent")}
-                >
+                <button key={label} aria-pressed={phoneGrid === grid} onClick={() => togglePhoneGrid(grid)} className={segment(phoneGrid === grid)}>
                   {label}
                 </button>
               ))}
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <label className="flex h-8 items-center gap-2 text-sm text-muted-foreground">
             <Switch checked={compact} onCheckedChange={toggleCompact} aria-label="Compact strength rows" />
             Compact
           </label>
 
-          {/* Edit / Staff switch: supervisors and Management, deliberately styled differently */}
-          {props.hasEditView && (
-            <div className="ml-auto flex items-center rounded-lg border-2 border-dashed p-0.5 text-sm" role="group" aria-label="Edit or Staff view">
-              <button
-                aria-pressed={mode === "staff"}
-                onClick={() => navigate({ mode: "staff" })}
-                className={cn("flex items-center gap-1.5 rounded-md px-3 py-1", mode === "staff" ? "bg-secondary font-semibold" : "text-muted-foreground")}
-              >
-                <Eye className="size-3.5" /> Staff view
-              </button>
-              <button
-                aria-pressed={mode === "edit"}
-                onClick={() => navigate({ mode: "edit" })}
-                className={cn("flex items-center gap-1.5 rounded-md px-3 py-1", mode === "edit" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground")}
-              >
-                <Pencil className="size-3.5" /> Edit view
-              </button>
+          {/* Right-aligned together, so they wrap as one unit on narrower screens. */}
+          {(props.hasEditView || isDesktop) && (
+            <div className="ml-auto flex items-center gap-2">
+              {/* Edit / Staff switch: supervisors and Management. The dashed border marks it as the mode switch. */}
+              {props.hasEditView && (
+                <div className="flex h-8 items-center gap-0.5 rounded-lg border-2 border-dashed p-0.5 text-sm" role="group" aria-label="Edit or Staff view">
+                  <button
+                    aria-pressed={mode === "staff"}
+                    aria-label="Staff view"
+                    title="Staff view"
+                    onClick={() => navigate({ mode: "staff" })}
+                    className={cn("flex h-full items-center gap-1.5 rounded-md px-2", mode === "staff" ? "bg-secondary font-semibold" : "text-muted-foreground hover:bg-accent")}
+                  >
+                    <Eye className="size-3.5" aria-hidden /> Staff
+                  </button>
+                  <button
+                    aria-pressed={mode === "edit"}
+                    aria-label="Edit view"
+                    title="Edit view"
+                    onClick={() => navigate({ mode: "edit" })}
+                    className={cn("flex h-full items-center gap-1.5 rounded-md px-2", mode === "edit" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:bg-accent")}
+                  >
+                    <Pencil className="size-3.5" aria-hidden /> Edit
+                  </button>
+                </div>
+              )}
+
+              {/* In the toolbar (not on the panel edge) so it never covers the panel's own tabs; a square the
+                  same height as the other controls. */}
+              {isDesktop && (
+                <button
+                  type="button"
+                  onClick={togglePanel}
+                  aria-expanded={!panelCollapsed}
+                  aria-label={panelCollapsed ? "Show the side panel" : "Hide the side panel"}
+                  title={panelCollapsed ? "Show panel" : "Hide panel"}
+                  className="flex size-8 items-center justify-center rounded-lg border text-foreground/80 hover:bg-accent hover:text-foreground"
+                >
+                  {panelCollapsed ? <PanelRightOpen className="size-[18px]" aria-hidden /> : <PanelRightClose className="size-[18px]" aria-hidden />}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -412,10 +440,10 @@ export function RosterWorkspace(props: WorkspaceProps) {
           {view === "calendar" ? (
             <CalendarView {...props} selection={selection} compact={compact} onDate={clickDate} />
           ) : isDesktop || phoneGrid ? (
-            // On a phone the grid gets its own box, one screen tall minus the bottom sheet header and tab bar
-            // (about 8rem): scroll the page to bring it into view, then it scrolls both ways inside with the
-            // date header and name column pinned.
-            <div className={isDesktop ? "h-full" : "h-[calc(100dvh-8rem-var(--banner-h))] min-h-80"}>
+            // On a phone the grid gets its own box, one screen tall minus the tab bar and the bottom sheet (its
+            // measured height, so it shrinks while the sheet is open): scroll the page to bring it into view,
+            // then it scrolls both ways inside with the date header and name column pinned.
+            <div className={isDesktop ? "h-full" : "h-[calc(100dvh-4rem-var(--sheet-h))] min-h-64"}>
               <RosterGrid {...props} selection={selection} compact={compact} onDate={focusDateOnly} onCell={clickCell} onLeave={clickLeave} />
             </div>
           ) : (
@@ -425,22 +453,11 @@ export function RosterWorkspace(props: WorkspaceProps) {
       </section>
 
       {isDesktop ? (
-        // Right-hand panel on desktop, collapsible so the roster can take the full width.
-        <div className="relative flex shrink-0">
-          <button
-            type="button"
-            onClick={togglePanel}
-            aria-label={panelCollapsed ? "Show the side panel" : "Hide the side panel"}
-            title={panelCollapsed ? "Show panel" : "Hide panel, see the full roster"}
-            className="absolute -left-3.5 top-3 z-30 flex size-7 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground"
-          >
-            {panelCollapsed ? <PanelRightOpen className="size-3.5" /> : <PanelRightClose className="size-3.5" />}
-          </button>
-          {!panelCollapsed && <aside className="w-[23rem] overflow-y-auto border-l">{panel}</aside>}
-        </div>
+        // Right-hand panel on desktop, collapsible (toolbar button) so the roster can take the full width.
+        !panelCollapsed && <aside className="w-[23rem] shrink-0 overflow-y-auto border-l">{panel}</aside>
       ) : (
         // Half-height bottom sheet on mobile, so the calendar stays visible
-        <div className="fixed inset-x-0 bottom-16 z-30 rounded-t-2xl border border-b-0 bg-background shadow-[0_-8px_24px_rgba(0,0,0,0.15)]">
+        <div ref={sheetRef} className="fixed inset-x-0 bottom-16 z-30 rounded-t-2xl border border-b-0 bg-background shadow-[0_-8px_24px_rgba(0,0,0,0.15)]">
           <button
             className="flex w-full flex-col px-4 pb-2 pt-1.5 text-left text-sm"
             onClick={() => setSheetOpen((o) => !o)}
@@ -449,7 +466,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
             <span className="mx-auto mb-1.5 block h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden />
             <span className="flex w-full items-center justify-between">
               <span className="font-medium">
-                {mode === "edit" ? (canEdit ? "Edit" : "Details") : canRequest ? "Request leave and details" : "Details"}
+                {mode === "edit" ? (canEdit ? "Edit" : "Details") : canRequest && (!focusStaffId || focusStaffId === viewerId) && (!focusLeaveId || props.myLeaves.some((l) => l.id === focusLeaveId)) ? "Request leave and details" : "Details"}
                 {selectedCount > 0 && <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">{selectedCount} selected</span>}
               </span>
               <ChevronUp className={cn("size-4 transition-transform", sheetOpen && "rotate-180")} aria-hidden />

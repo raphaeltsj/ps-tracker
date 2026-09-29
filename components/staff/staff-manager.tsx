@@ -241,7 +241,7 @@ function ProficiencyCell({ staffId, taskId, level }: { staffId: string; taskId: 
       aria-label={label}
       onClick={() => run(() => setStaffProficiency({ staffId, taskId, level: NEXT_LEVEL[level] }))}
       className={cn(
-        "flex h-7 w-7 items-center justify-center rounded-md border text-[10px] font-bold transition-colors disabled:opacity-60",
+        "flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-bold transition-colors disabled:opacity-60",
         level === "PROFICIENT" && "border-success bg-success text-white hover:bg-success/90 dark:text-background",
         // Softer than proficient: training is still in progress.
         level === "UNDERSTUDY" && "border-warning bg-warning-soft text-warning-ink hover:bg-warning/25",
@@ -309,11 +309,11 @@ function ProficiencyMatrix({
       ) : rows.length === 0 ? (
         <p className="text-xs text-muted-foreground">No staff to show.</p>
       ) : (
-        <div className="max-h-[28rem] overflow-auto rounded-lg border" role="region" aria-label="Task proficiency matrix" tabIndex={0}>
+        <div className="relative max-h-[28rem] overflow-auto rounded-lg border" role="region" aria-label="Task proficiency matrix" tabIndex={0}>
           <table className="w-full min-w-max border-separate border-spacing-0 text-xs">
             <thead>
               <tr>
-                <th className="sticky left-0 top-0 z-20 min-w-40 border-b border-r bg-background px-2 py-1.5 text-left font-semibold">Name</th>
+                <th className="sticky left-0 top-0 z-20 min-w-28 border-b border-r bg-background px-2 py-1.5 text-left font-semibold sm:min-w-40">Name</th>
                 {tasks.map((t) => (
                   <th key={t.id} title={t.name} className="sticky top-0 z-10 min-w-14 border-b border-r bg-background px-1 py-1.5 text-center font-semibold">
                     {t.name}
@@ -343,20 +343,20 @@ function ProficiencyMatrix({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <span className="inline-flex h-4 w-4 items-center justify-center rounded border border-success bg-success text-white dark:text-background">
-            <Check className="size-2.5" />
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-flex h-5 w-7 items-center justify-center rounded border border-success bg-success text-white dark:text-background">
+            <Check className="size-3" />
           </span>
           Proficient
         </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-flex h-4 w-4 items-center justify-center rounded border border-warning bg-warning-soft text-[8px] font-bold text-warning-ink">U/S</span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-flex h-5 w-7 items-center justify-center rounded border border-warning bg-warning-soft text-[11px] font-bold text-warning-ink">U/S</span>
           Understudy (training)
         </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-flex h-4 w-4 items-center justify-center rounded border border-muted-foreground/30 bg-muted/40 text-muted-foreground">
-            <X className="size-2.5" />
+        <span className="flex items-center gap-1.5">
+          <span className="inline-flex h-5 w-7 items-center justify-center rounded border border-muted-foreground/30 bg-muted/40 text-muted-foreground">
+            <X className="size-3" />
           </span>
           Not trained
         </span>

@@ -1,10 +1,9 @@
 import { TaskTag } from "@/components/roster/chips";
-import { formatDateList } from "@/lib/dates";
 import type { TaskReport, TaskReportRow } from "@/lib/task-report";
 import { cn } from "@/lib/utils";
 
 /**
- * Staff x Task counts with per-Task totals and each person's dates on expand.
+ * Staff x Task counts with per-Task totals.
  * Built to stay readable with many Tasks and many staff: the table scrolls inside its own frame
  * with the header row, the Staff column and the Total column pinned.
  */
@@ -27,7 +26,7 @@ export function TaskReportTable({ report, hideEmpty, showShift }: { report: Task
   return (
     <div className="space-y-4">
       {/* Summary per Task: a horizontal strip so it never grows taller with more Tasks */}
-      <ul className="flex gap-2 overflow-x-auto pb-1" aria-label="Days per Task" tabIndex={0}>
+      <ul className="relative flex gap-2 overflow-x-auto pb-1" aria-label="Days per Task" tabIndex={0}>
         <li className="min-w-32 shrink-0 rounded-lg border bg-muted/50 p-3">
           <span className="text-xs font-medium">All Tasks</span>
           <div className="mt-1 text-2xl font-semibold tabular-nums">{report.total}</div>
@@ -42,7 +41,7 @@ export function TaskReportTable({ report, hideEmpty, showShift }: { report: Task
         ))}
       </ul>
 
-      <div className="max-h-[65vh] overflow-auto rounded-xl border">
+      <div className="relative max-h-[65vh] overflow-auto rounded-xl border">
         <table className="w-full min-w-max border-separate border-spacing-0 text-sm">
           <thead>
             <tr className="text-left">
@@ -60,7 +59,7 @@ export function TaskReportTable({ report, hideEmpty, showShift }: { report: Task
             {rows.map((r) => (
               <tr key={r.staffId} className="group align-top">
                 <td className={cn(pinned, "left-0 border-b border-r px-3 py-2 group-hover:bg-accent")}>
-                  <StaffCell row={r} report={report} />
+                  <StaffCell row={r} />
                 </td>
                 {showShift && <td className="border-b px-3 py-2 text-muted-foreground group-hover:bg-accent/40">{r.shiftId}</td>}
                 {report.tasks.map((t) => (
@@ -106,27 +105,12 @@ export function TaskReportTable({ report, hideEmpty, showShift }: { report: Task
   );
 }
 
-function StaffCell({ row, report }: { row: TaskReportRow; report: TaskReport }) {
-  const name = (
-    <>
-      {row.name}
-      {row.role === "SUPERVISOR" && <span className="ml-1 text-[10px] text-muted-foreground">Sup</span>}
-    </>
-  );
-  if (row.total === 0) return <span className="font-medium">{name}</span>;
+// Name only: which dates someone did a Task is on the roster, and a per-person list would get long.
+function StaffCell({ row }: { row: TaskReportRow }) {
   return (
-    <details>
-      <summary className="cursor-pointer font-medium whitespace-nowrap">{name}</summary>
-      {/* Dates per Task, capped in height so long periods do not blow up the row. */}
-      <ul className="mt-1 max-h-40 max-w-72 space-y-0.5 overflow-y-auto text-xs text-muted-foreground">
-        {report.tasks
-          .filter((t) => row.dates[t.id])
-          .map((t) => (
-            <li key={t.id}>
-              <span className="font-medium text-foreground">{t.name}:</span> {formatDateList(row.dates[t.id])}
-            </li>
-          ))}
-      </ul>
-    </details>
+    <span className="font-medium whitespace-nowrap">
+      {row.name}
+      {row.role === "SUPERVISOR" && <span className="ml-1 text-[11px] font-normal text-muted-foreground">Sup</span>}
+    </span>
   );
 }

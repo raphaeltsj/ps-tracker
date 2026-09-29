@@ -130,20 +130,18 @@ export const LEAVE_GROUP_LABEL: Record<LeaveGroup, string> = {
   custom: "Custom",
 };
 
-const LEAVE_GROUP_BY_BASE_CODE: Record<string, LeaveGroup> = {
-  AL: "annual",
-  OL: "annual",
-  MC: "health",
-  OML: "health",
-  MWO: "health",
-  HL: "health",
-  FCL: "health",
-  CSE: "growth",
-  GRW: "growth",
-  BD: "inlieu",
-  "BD-IL": "inlieu",
-  OIL: "inlieu",
+/** The base codes in each group, in the order the legend names them (e.g. "GRW/CSE"). */
+export const LEAVE_GROUP_CODES: Record<LeaveGroup, string[]> = {
+  annual: ["AL", "OL"],
+  health: ["MC", "OML", "MWO", "HL", "FCL"],
+  growth: ["GRW", "CSE"],
+  inlieu: ["BD", "BD-IL", "OIL"],
+  custom: [],
 };
+
+const LEAVE_GROUP_BY_BASE_CODE: Record<string, LeaveGroup> = Object.fromEntries(
+  (Object.entries(LEAVE_GROUP_CODES) as [LeaveGroup, string[]][]).flatMap(([group, codes]) => codes.map((code) => [code, group])),
+);
 
 export function leaveGroup(code: string): LeaveGroup {
   return LEAVE_GROUP_BY_BASE_CODE[baseLeaveCode(code)] ?? "custom";

@@ -8,7 +8,7 @@ export function StrengthSummary({ day, compact = false }: { day: RosterDay; comp
   const s = day.strength;
   const slots = (
     <div className={cn("rounded-md px-2 py-1.5", SLOT_BG[s.status])}>
-      <div className="text-[10px] uppercase text-muted-foreground">Available Slot(s)</div>
+      <div className="text-[11px] uppercase text-muted-foreground">Available Slot(s)</div>
       <div className={cn("text-lg tabular-nums", SLOT_STYLE[s.status])}>
         {s.status === "zero" ? "No slots" : s.status === "below" ? `⚠ ${formatFigure(s.slots)} (below MFL)` : formatFigure(s.slots)}
       </div>
@@ -27,7 +27,7 @@ export function StrengthSummary({ day, compact = false }: { day: RosterDay; comp
       <div className="grid grid-cols-4 gap-1.5">
         {figures.map(([label, value]) => (
           <div key={label} className="rounded-md bg-muted px-2 py-1.5">
-            <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
+            <div className="text-[11px] uppercase text-muted-foreground">{label}</div>
             <div className={cn("tabular-nums", value.length > 6 ? "text-[11px] leading-5" : "text-base")}>{value}</div>
           </div>
         ))}
