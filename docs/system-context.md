@@ -533,8 +533,8 @@ Some types are tracked together against a combined **annual limit**, shown as a 
 | **Group**   | **Codes**  | **Limit** |
 |-------------|------------|-----------|
 | AL/OL       | AL, OL     | 18        |
-| MC          | MC         | 14        |
-| OML         | OML        | 3         |
+| MC          | MC, OML    | 14 (includes any OML taken) |
+| OML         | OML        | 3 (also counts toward MC's 14, so 3 OML leaves 11 MC days) |
 | BD/BD-IL    | BD, BD-IL  | 1 (always, since there is one birthday a year) |
 | GRW         | GRW, 0.5 GRW | 7 (Growth Days; half days count 0.5) |
 

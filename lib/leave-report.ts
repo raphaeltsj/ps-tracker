@@ -22,10 +22,12 @@ export function tallyLeaveTaken(cells: Record<string, RosterCell>, dates: string
 
 export type LeaveLimitGroup = { key: string; label: string; codes: string[]; limit: number };
 
-/** Leave types tracked together against a combined annual limit. Everything else has no limit. */
+/** Leave types tracked together against a combined annual limit. Everything else has no limit.
+ * OML has its own limit of 3 and is also part of MC's 14 (it is MC without a certificate), so an OML
+ * day appears in both rows: 3 OML leaves 11 MC days. */
 export const LEAVE_LIMIT_GROUPS: LeaveLimitGroup[] = [
   { key: "AL", label: "AL/OL", codes: ["AL", "OL"], limit: 18 },
-  { key: "MC", label: "MC", codes: ["MC"], limit: 14 },
+  { key: "MC", label: "MC", codes: ["MC", "OML"], limit: 14 },
   { key: "OML", label: "OML", codes: ["OML"], limit: 3 },
   { key: "BD", label: "BD/BD-IL", codes: ["BD", "BD-IL"], limit: 1 },
   // GRW and 0.5 GRW fold together (baseLeaveCode), so half days count toward the 7.

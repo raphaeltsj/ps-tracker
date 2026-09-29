@@ -61,7 +61,7 @@ export function LeaveTaken({ rows, total, periodLabel }: { rows: LeaveTakenRow[]
       </ul>
       <p className="text-xs text-muted-foreground">
         {formatFigure(total)} day{total === 1 ? "" : "s"} total, {periodLabel}. Limits (AL/OL, MC, OML, BD/BD-IL, GRW) are checked against the year, whichever period is shown
-        above. OIL is what your supervisor has allowed you, and carries over; the 0.5 OIL that comes with a DOS/FDO duty is separate.
+        above. OML also counts toward the MC limit. OIL is what your supervisor has allowed you, and carries over; the 0.5 OIL that comes with a DOS/FDO duty is separate.
       </p>
     </div>
   );
