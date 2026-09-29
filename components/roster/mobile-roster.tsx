@@ -10,6 +10,11 @@ import { formatDate, weekdayShort } from "@/lib/dates";
 import { ROW_EXTRA, ROW_OPS } from "@/lib/roster-types";
 import { cn } from "@/lib/utils";
 
+// The day list has room the roster grid doesn't, so its tags use a phone-readable size (12px, 24px
+// tall), matching the duty block beside them.
+const DAY_TAG = "h-6 px-1.5 text-xs";
+const DAY_ROW_CHIP = "px-1 text-[11px] leading-5";
+
 /** Mobile roster: a week strip with a day-by-day agenda, not a shrunken table (spec 14.1). */
 export function MobileRoster({
   roster,
@@ -43,7 +48,7 @@ export function MobileRoster({
   const selectedForLeave = selection.dates.has(day);
 
   return (
-    <div className="pb-40">
+    <div className="pb-3">
       <div className="flex items-center gap-1 border-b px-2 py-2">
         <Button variant="ghost" size="icon" aria-label="Previous week" disabled={weekStart === 0} onClick={() => setWeekStart((w) => Math.max(0, w - 7))}>
           <ChevronLeft className="size-4" />
@@ -69,7 +74,7 @@ export function MobileRoster({
                   selection.dates.has(d) && d !== day && "ring-2 ring-primary",
                 )}
               >
-                <span className="text-[10px] uppercase opacity-70">{weekdayShort(d)}</span>
+                <span className="text-[11px] uppercase opacity-70">{weekdayShort(d)}</span>
                 <span className="text-sm font-semibold">{Number(d.slice(8))}</span>
                 <span className="flex h-3 items-center gap-0.5">
                   {dd.locked && <Lock className="size-2.5" />}
@@ -127,26 +132,29 @@ export function MobileRoster({
               onClick={() => (mode === "edit" && canEdit ? onCell(p.id, day, false) : onPerson(p.id, day))}
               className={cn("flex items-center gap-2 px-4 py-2", p.id === viewer.id && "bg-accent/60", selected && "bg-primary/15")}
             >
-              <span className="flex-1 text-sm">
+              <span className="min-w-0 flex-1 truncate text-sm">
                 {p.name}
-                {p.role === "SUPERVISOR" && <span className="ml-1 text-[10px] text-muted-foreground">Sup</span>}
+                {p.role === "SUPERVISOR" && <span className="ml-1 text-[11px] text-muted-foreground">Sup</span>}
               </span>
-              {cell.swap && <SwapTag swap={cell.swap} duty={cell.duty} />}
-              {cell.dos && <DosTag kind={cell.dos} />}
-              {cell.task && <TaskTag name={cell.task.name} />}
-              {cell.absences.map((a, i) => (
-                <button
-                  key={i}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onLeave(a.leaveId, day);
-                  }}
-                >
-                  <LeaveChip absence={a} />
-                </button>
-              ))}
+              {/* Tags wrap as a group rather than pushing the row off the screen. */}
+              <span className="flex flex-wrap items-center justify-end gap-1">
+                {cell.swap && <SwapTag swap={cell.swap} duty={cell.duty} className={DAY_TAG} />}
+                {cell.dos && <DosTag kind={cell.dos} className={DAY_TAG} />}
+                {cell.task && <TaskTag name={cell.task.name} className={DAY_TAG} />}
+                {cell.absences.map((a, i) => (
+                  <button
+                    key={i}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onLeave(a.leaveId, day);
+                    }}
+                  >
+                    <LeaveChip absence={a} className={DAY_TAG} />
+                  </button>
+                ))}
+              </span>
               {/* AM, PM and Off by colour only; V and V(SB) keep their label. */}
-              <span className={cn("grid h-6 w-12 place-items-center rounded-md", DUTY_CELL[cell.duty])} title={cell.swap ? swapTitle(cell.swap, cell.duty) : dutyTitle(cell.duty)}>
+              <span className={cn("grid h-6 w-12 shrink-0 place-items-center rounded-md", DUTY_CELL[cell.duty])} title={cell.swap ? swapTitle(cell.swap, cell.duty) : dutyTitle(cell.duty)}>
                 {LABELLED_DUTIES.includes(cell.duty) ? <DutyChip duty={cell.duty} /> : <span className="sr-only">{dutyTitle(cell.duty)}</span>}
               </span>
             </li>
@@ -179,13 +187,13 @@ export function MobileRoster({
                 {row.soon && <span className="text-xs text-muted-foreground">Not active yet</span>}
                 {ops.map((o) => (
                   <span key={o.dayworkerId} className="flex items-center gap-1.5">
-                    <OpsChip entry={o} />
+                    <OpsChip entry={o} className={DAY_ROW_CHIP} />
                     <span className="text-xs text-muted-foreground">{o.name}</span>
                   </span>
                 ))}
                 {extra.map((e) => (
                   <span key={e.staffId} className="flex items-center gap-1.5">
-                    <ExtraChip entry={e} />
+                    <ExtraChip entry={e} className={DAY_ROW_CHIP} />
                     <span className="text-xs text-muted-foreground">Shift {e.fromShiftId}</span>
                   </span>
                 ))}

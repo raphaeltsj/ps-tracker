@@ -75,7 +75,7 @@ export function DayworkerManager({ rows, countedUntil }: { rows: DayworkerReport
         <span className="text-muted-foreground"> counted up to {countedUntil}</span>
       </p>
 
-      <div className="overflow-x-auto rounded-xl border" role="region" aria-label="Dayworkers" tabIndex={0}>
+      <div className="relative overflow-x-auto rounded-xl border" role="region" aria-label="Dayworkers" tabIndex={0}>
         <table className="w-full min-w-max border-separate border-spacing-0 text-sm">
           <thead>
             <tr className="bg-muted/50 text-left">

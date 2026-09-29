@@ -8,6 +8,8 @@ import { formatFigure } from "@/lib/strength";
 import { cn } from "@/lib/utils";
 
 const HEAD = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+// Phones: narrow day cells, so chips drop to minimal side padding and never outgrow the cell.
+const PHONE_CHIP = "max-w-full truncate px-0.5 sm:px-1";
 
 /** Month calendar: each date's duty and Available Slot(s) at a glance (spec 8.1, screen 2). */
 export function CalendarView({
@@ -22,11 +24,11 @@ export function CalendarView({
   const lead = (weekday(roster.dates[0]) + 6) % 7; // Monday-first
 
   return (
-    <div className="h-full overflow-auto p-3 pb-40 sm:p-4 lg:pb-4">
+    <div className="relative h-full overflow-auto p-3 sm:p-4">
       <p className="mb-2 text-xs text-muted-foreground">
         {own ? "Your duty on each date" : `${roster.shiftName} duty on each date`} with Available Slot(s). Click dates to select, shift-click for a range.
       </p>
-      <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-1.5">
         {HEAD.map((h) => (
           <div key={h} className="pb-1 text-center text-[11px] font-medium uppercase text-muted-foreground">
             {h}
@@ -51,7 +53,7 @@ export function CalendarView({
               aria-pressed={selected}
               aria-label={`${date}${day.locked ? ", locked date" : ""}`}
               className={cn(
-                "relative flex min-h-20 flex-col items-stretch gap-1 rounded-lg border p-1.5 text-left transition-colors hover:bg-accent sm:min-h-24",
+                "relative flex min-h-20 min-w-0 flex-col items-stretch gap-1 rounded-lg border p-1 text-left transition-colors hover:bg-accent sm:min-h-24 sm:p-1.5",
                 day.locked && "bg-hatch",
                 selected && "border-primary bg-primary/10 ring-2 ring-primary",
                 focused && !selected && "border-foreground/40",
@@ -65,16 +67,16 @@ export function CalendarView({
                   {hasRemarks && <span className="size-1.5 rounded-full bg-foreground/60" aria-label="Has remarks" />}
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-0.5">
+              <div className="flex min-w-0 flex-wrap items-center gap-0.5">
                 {duty === "OFF" && !cell ? (
                   <span className="text-[11px] text-muted-foreground">Rest day</span>
                 ) : (
-                  <DutyChip duty={duty} />
+                  <DutyChip duty={duty} className={`${PHONE_CHIP} sm:px-1.5`} />
                 )}
-                {cell?.absences.map((a, i) => <LeaveChip key={i} absence={a} />)}
+                {cell?.absences.map((a, i) => <LeaveChip key={i} absence={a} className={PHONE_CHIP} />)}
                 {cell?.swap && <SwapTag swap={cell.swap} duty={cell.duty} />}
-                {cell?.dos && <DosTag kind={cell.dos} />}
-                {cell?.task && <TaskTag name={cell.task.name} />}
+                {cell?.dos && <DosTag kind={cell.dos} className={PHONE_CHIP} />}
+                {cell?.task && <TaskTag name={cell.task.name} className={PHONE_CHIP} />}
               </div>
               <span
                 className={cn("mt-auto self-start rounded px-1 text-[11px] tabular-nums", SLOT_STYLE[s.status], SLOT_BG[s.status])}
