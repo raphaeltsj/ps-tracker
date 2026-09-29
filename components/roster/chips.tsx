@@ -39,9 +39,12 @@ export const DUTY_CELL: Record<Duty, string> = {
 export const DUTY_ON_LEAVE_CELL = "bg-warning-soft outline-2 outline-dashed -outline-offset-2 outline-warning";
 export const DUTY_ON_LEAVE_TITLE = "Duty assigned on a leave day: pending until it is swapped away, or the duty or leave is removed";
 
-export function PendingTag() {
+export function PendingTag({ className }: { className?: string }) {
   return (
-    <span className="rounded border border-warning bg-warning-soft px-1 text-[10px] font-semibold leading-4 text-warning-ink" title={DUTY_ON_LEAVE_TITLE}>
+    <span
+      className={cn("inline-flex items-center rounded border border-warning bg-warning-soft px-1 text-[10px] font-semibold leading-4 text-warning-ink", className)}
+      title={DUTY_ON_LEAVE_TITLE}
+    >
       Pending
     </span>
   );

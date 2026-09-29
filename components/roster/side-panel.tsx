@@ -33,7 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cycleDayLabel, cyclePositionLabel } from "@/lib/cycle";
 import { formatDate, formatDateList, formatDateShort, formatDateTime } from "@/lib/dates";
 import { ASSIGNABLE_DUTIES, DOS_KINDS, DOS_LABEL, DOS_OIL_CODE, DOS_REPORT_TIME, DUTY_LABEL, HALF_DAY_TIMES, type Duty, type Half } from "@/lib/domain";
-import { canDecideLeave } from "@/lib/permissions";
+import { canDecideLeave, canEditShift } from "@/lib/permissions";
 import { isLeaveEntry, ROW_EXTRA, ROW_OPS, type LeaveSummary, type LeaveTypeOption, type RosterCell } from "@/lib/roster-types";
 import { formatFigure } from "@/lib/strength";
 import { cn } from "@/lib/utils";
@@ -77,6 +77,9 @@ export function SidePanel(props: PanelProps) {
   // so it isn't buried under the request form.
   const other = selection.focusStaffId && selection.focusStaffId !== viewer.id ? roster.staff.find((s) => s.id === selection.focusStaffId) : undefined;
   const otherCell = other && selection.focusDate ? roster.cells[other.id]?.[selection.focusDate] : undefined;
+  // Leave and swap requests are only ever the viewer's own, so they're hidden while looking at someone
+  // else's cell. The viewer's picked dates are kept for when they click back on their own row.
+  const requesting = mode === "staff" && canRequest && !other && !(focusLeave && focusLeave.staffId !== viewer.id);
 
   return (
     <div className="text-sm">
@@ -90,7 +93,7 @@ export function SidePanel(props: PanelProps) {
         <DateSettingsPanel roster={roster} date={selection.focusDate!} today={props.today} isManagement={viewer.role === "MANAGEMENT"} onClose={onCloseDateSettings} />
       )}
       {!focusLeave && !showDateSettings && mode === "edit" && canEdit && (rowKind ? <RowEditor key={rowKind} {...props} kind={rowKind} /> : <EditTools {...props} />)}
-      {mode === "staff" && canRequest && (
+      {requesting && (
         <div className="grid grid-cols-2 gap-0.5 border-b p-2" role="tablist" aria-label="Request leave or a swap">
           <button
             role="tab"
@@ -110,12 +113,12 @@ export function SidePanel(props: PanelProps) {
           </button>
         </div>
       )}
-      {mode === "staff" && canRequest && staffTool === "swap" && (
+      {requesting && staffTool === "swap" && (
         <Section title="Request a swap">
           <SwapForm mode="request" viewerId={viewer.id} firstPeople={[]} today={props.today} prefillDates={[...selection.dates]} />
         </Section>
       )}
-      {mode === "staff" && canRequest && staffTool === "leave" && <RequestForm {...props} />}
+      {requesting && staffTool === "leave" && <RequestForm {...props} />}
       {selection.focusDate && <DateDetails {...props} date={selection.focusDate} />}
     </div>
   );
@@ -821,6 +824,9 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
           )}
         </div>
       )}
+      {mode === "staff" && active && !leave.auto && canEditShift(viewer, leave.shiftId) && (
+        <p className="text-xs text-muted-foreground">Switch to Edit view to edit or cancel this leave.</p>
+      )}
       {confirmCancel && (
         <div className="space-y-2 rounded-md border border-danger/40 p-2">
           <p className="text-xs">
@@ -875,10 +881,69 @@ function LeaveDetail({ leave, viewer, mode, canEdit, leaveTypes, selection, onFo
   );
 }
 
+/**
+ * Leave already on the selected cells, each with Cancel and a link to its full details, so cancelling
+ * never depends on hitting the small chip inside a cell.
+ */
+type RunAction = ReturnType<typeof useAction>["run"];
+
+// `run` comes from the panel so the result message outlives the row, which disappears once cancelled.
+function SelectedLeaveList({ leaves, onFocusLeave, run, pending }: { leaves: LeaveSummary[]; onFocusLeave: (leaveId: string | null) => void; run: RunAction; pending: boolean }) {
+  return (
+    <div className="space-y-1.5 rounded-md border p-2">
+      <p className="text-xs font-medium text-muted-foreground">Leave on the selected cells</p>
+      <ul className="space-y-1.5">
+        {leaves.map((l) => (
+          <SelectedLeaveRow key={l.id} leave={l} onFocusLeave={onFocusLeave} run={run} pending={pending} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function SelectedLeaveRow({ leave, onFocusLeave, run, pending }: { leave: LeaveSummary; onFocusLeave: (leaveId: string | null) => void; run: RunAction; pending: boolean }) {
+  const [confirming, setConfirming] = useState(false);
+  const isPending = leave.status === "PENDING";
+  return (
+    <li className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        <LeaveChip absence={{ code: leave.typeCode, half: leave.half, status: leave.status, counts: 1, derived: false }} />
+        <span className="font-medium">{leave.staffName}</span>
+        <span className="text-muted-foreground">{formatDateList(leave.days)}</span>
+        {isPending && <StatusBadge status={leave.status} />}
+      </div>
+      {confirming ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs">{isPending ? "Cancel this pending request?" : "Cancel this leave? The slot is freed straight away."}</span>
+          <Button size="sm" variant="destructive" disabled={pending} onClick={() => run(() => cancelLeave(leave.id), () => setConfirming(false))}>
+            {isPending ? "Yes, cancel request" : "Yes, cancel leave"}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+            Keep it
+          </Button>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          {leave.auto ? (
+            <span className="text-xs text-muted-foreground">Comes with the {DOS_LABEL} duty: remove the duty to remove it.</span>
+          ) : (
+            <Button size="sm" variant="outline" className="text-danger-ink" onClick={() => setConfirming(true)}>
+              {isPending ? "Cancel request" : "Cancel leave"}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => onFocusLeave(leave.id)}>
+            Details / edit
+          </Button>
+        </div>
+      )}
+    </li>
+  );
+}
+
 // ---------------- Edit view: duties, Tasks, give leave ----------------
 
 function EditTools(props: PanelProps) {
-  const { selection, roster, tasks, leaveTypes, onClear, swapFirstPeople, viewer, today } = props;
+  const { selection, roster, tasks, leaveTypes, onClear, swapFirstPeople, viewer, today, onFocusLeave } = props;
   // Task is the default: it is the most common action once a person's date is selected.
   const [tab, setTab] = useState<"duty" | "task" | "leave" | "swap">("task");
   const { pending, result, run } = useAction();
@@ -908,6 +973,13 @@ function EditTools(props: PanelProps) {
     return cell && (cell.duty === "V" || cell.dos !== null);
   });
   const type = leaveTypes.find((t) => t.code === typeCode);
+  // Leave already on the selection (approved or pending), once each even if it spans several cells.
+  const selectedLeaves = useMemo(() => {
+    const ids = new Set(cells.flatMap((c) => roster.cells[c.staffId]?.[c.date]?.absences.map((a) => a.leaveId) ?? []));
+    return [...ids]
+      .map((id) => (id ? roster.leaves[id] : undefined))
+      .filter((l): l is LeaveSummary => Boolean(l) && (l!.status === "APPROVED" || l!.status === "PENDING"));
+  }, [cells, roster.cells, roster.leaves]);
   // An approved duty swap holds its dates: duties and leave cannot change there (Tasks can).
   const swapped = cells.filter((c) => roster.cells[c.staffId]?.[c.date]?.swap);
   // Swap tab: prefill from the selection when it is exactly one person (a swap is one person and a
@@ -929,7 +1001,7 @@ function EditTools(props: PanelProps) {
     >
       {cells.length === 0 ? (
         <p className="text-muted-foreground">
-          Click cells to select people and dates (shift-click for a range in a row). Click a leave chip to edit or cancel it, or a date header for that date&apos;s settings.
+          Click cells to select people and dates (shift-click for a range in a row). To edit or cancel leave, click its chip, or select the cell and open the Leave tab. Click a date header for that date&apos;s settings.
         </p>
       ) : (
         <p>
@@ -1070,6 +1142,7 @@ function EditTools(props: PanelProps) {
 
       {tab === "leave" && (
         <div className="space-y-2">
+          {selectedLeaves.length > 0 && <SelectedLeaveList leaves={selectedLeaves} onFocusLeave={onFocusLeave} run={run} pending={pending} />}
           <p className="text-xs text-muted-foreground">Leave you give is already approved. Locked dates and Off days are allowed. You can include yourself.</p>
           {Object.entries(byStaff).map(([id, ds]) => (
             <p key={id} className="text-xs">

@@ -62,7 +62,7 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, ca
 
   return (
     <div className="flex h-full flex-col">
-      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto">
+      <div ref={scrollRef} onScroll={onScroll} className="relative min-h-0 flex-1 overflow-auto">
         <table className="border-separate border-spacing-0 text-xs">
           <thead className="sticky top-0 z-20 bg-background">
             <tr>
