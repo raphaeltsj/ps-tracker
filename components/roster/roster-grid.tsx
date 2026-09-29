@@ -1,7 +1,7 @@
 "use client";
 import { memo, useEffect, useRef } from "react";
 import { CalendarClock, Lock } from "lucide-react";
-import { DosTag, DUTY_CELL, DutyChip, DutyLegend, dutyTitle, LABELLED_DUTIES, LeaveChip, SLOT_BG, SLOT_STYLE, SwapTag, swapTitle, TaskTag } from "@/components/roster/chips";
+import { DosTag, DUTY_CELL, DUTY_ON_LEAVE_CELL, DUTY_ON_LEAVE_TITLE, DutyChip, DutyLegend, dutyTitle, LABELLED_DUTIES, LeaveChip, PendingTag, SLOT_BG, SLOT_STYLE, SwapTag, swapTitle, TaskTag } from "@/components/roster/chips";
 import { BottomRows } from "@/components/roster/bottom-rows";
 import { cellKey, type Selection, type WorkspaceProps } from "@/components/roster/roster-workspace";
 import { isWeekend, weekdayShort } from "@/lib/dates";
@@ -191,18 +191,19 @@ const GridCell = memo(function GridCell({
   return (
     <td
       onClick={(e) => onClick(e.shiftKey)}
-      title={cell.swap ? swapTitle(cell.swap, cell.duty) : dutyTitle(cell.duty)}
+      title={[cell.swap ? swapTitle(cell.swap, cell.duty) : dutyTitle(cell.duty), cell.dutyOnLeave && DUTY_ON_LEAVE_TITLE].filter(Boolean).join(". ")}
       className={cn(
         // Vertically centered: a cell with just a duty (no leave/DOS/Task chip below) isn't pinned to the top.
         "h-12 cursor-pointer select-none border-b border-r border-background/60 p-0.5 align-middle",
-        DUTY_CELL[cell.duty],
+        cell.dutyOnLeave ? DUTY_ON_LEAVE_CELL : DUTY_CELL[cell.duty],
         day.locked && "bg-hatch",
-        selected && "outline-2 -outline-offset-2 outline-primary",
+        selected && "outline-2 outline-solid -outline-offset-2 outline-primary",
       )}
     >
       <div className="relative flex flex-col items-center gap-0.5">
         {/* AM, PM and Off are colour-coded (legend above); only V and V(SB) keep a text label. */}
         {LABELLED_DUTIES.includes(cell.duty) ? <DutyChip duty={cell.duty} /> : <span className="sr-only">{dutyTitle(cell.duty)}</span>}
+        {cell.dutyOnLeave && <PendingTag />}
         {day.event && working && (
           <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-event" title={day.event.note ? `Special Event: ${day.event.note}` : "Special Event"} />
         )}

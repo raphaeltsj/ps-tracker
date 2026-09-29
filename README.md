@@ -7,7 +7,7 @@ A duty roster web app for a shift-based team: three fixed shifts on a 6-day AM /
 
 ## Status
 
-Core loop built (build priority, spec section 17.5): Roster and Calendar views with the same-page leave request, supervisor Edit view, give / edit / cancel leave, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and set special events, approve or reject from the leave detail panel, Task management, the Task report, dayworkers with Ops duty and a duty count, Extra shift duty, placeholder Support and Recall rows, duty swaps (pickable directly on the roster), and the My Requests / Manage requests pages (leave inbox included). One type of leave per person per day is enforced. Still to come: all-shift overview, staff records, and custom leave type editor.
+Core loop built (build priority, spec section 17.5): Roster and Calendar views with the same-page leave request, supervisor Edit view, give / edit / cancel leave, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and set special events, approve or reject from the leave detail panel, Task management, the Task report, dayworkers with Ops duty and a duty count, Extra shift duty, placeholder Support and Recall rows, duty swaps (pickable directly on the roster), the My Requests / Manage requests pages (leave inbox included), and staff records with Task proficiency. One type of leave per person per day is enforced. Still to come: all-shift overview and custom leave type editor.
 
 ## Stack
 

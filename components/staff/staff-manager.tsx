@@ -105,7 +105,8 @@ export function StaffManager({
       </form>
       <ResultMessage result={result} />
 
-      <div className="overflow-x-auto rounded-xl border" role="region" aria-label="Staff" tabIndex={0}>
+      {/* relative: keeps the absolutely positioned sr-only header text inside the scroll box, so a wide table never widens the page on phones. */}
+      <div className="relative overflow-x-auto rounded-xl border" role="region" aria-label="Staff" tabIndex={0}>
         <table className="w-full min-w-max border-separate border-spacing-0 text-sm">
           <thead>
             <tr className="bg-muted/50 text-left">

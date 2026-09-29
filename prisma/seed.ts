@@ -63,7 +63,8 @@ async function main() {
   });
 
   const tasks = [];
-  for (let i = 1; i <= 12; i++) tasks.push(await db.task.create({ data: { name: `Task ${i}` } }));
+  // Names are at most 6 characters: "Task 10" would be 7, so from the tenth on they are "T10", "T11"...
+  for (let i = 1; i <= 12; i++) tasks.push(await db.task.create({ data: { name: i < 10 ? `Task ${i}` : `T${i}` } }));
 
   // Dayworkers: office staff who clock shift duty as Ops duty. One username uses the full 7 characters,
   // and one is inactive, so both show in the demo.
@@ -113,17 +114,16 @@ async function main() {
     const offDay = monthDays.find((d) => d.slice(8) >= "05" && shiftDutyOn(s.cycleAnchor, d) === "OFF" && cyclePosition(s.cycleAnchor, d) === 4)!;
     await db.staff.update({ where: { id: members[3].id }, data: { birthday: `1991${offDay.slice(4)}` } });
 
-    // V duty: on every Off block one person works V on both days, with a different V(SB) each day.
+    // V duty: on every Off block one person works V on both days, with one V(SB) standing by for both.
     const overrides: { staffId: string; date: string; duty: string }[] = [];
     let vTurn = 2;
     for (const date of range) {
       if (cyclePosition(s.cycleAnchor, date) !== 4) continue;
       const next = addDays(date, 1);
       const v = members[vTurn % s.size];
-      const sb1 = members[(vTurn + 5) % s.size];
-      const sb2 = members[(vTurn + 9) % s.size];
+      const sb = members[(vTurn + 5) % s.size];
       overrides.push({ staffId: v.id, date, duty: "V" }, { staffId: v.id, date: next, duty: "V" });
-      overrides.push({ staffId: sb1.id, date, duty: "VSB" }, { staffId: sb2.id, date: next, duty: "VSB" });
+      overrides.push({ staffId: sb.id, date, duty: "VSB" }, { staffId: sb.id, date: next, duty: "VSB" });
       vTurn += 3;
     }
     // An activated V(SB) gets an Off(V) on a day the supervisor picks (an assigned Off is an Off(V)).
@@ -133,6 +133,7 @@ async function main() {
       if (offDate) overrides.push({ staffId: sbActivated.staffId, date: offDate, duty: "OFF" });
     }
     await db.dutyOverride.createMany({ data: overrides });
+    for (const o of overrides) if (o.duty === "V" || o.duty === "VSB") markDutyDay(o.staffId, o.date);
 
     const sup = members[0];
     const staff = members.slice(1);
@@ -146,6 +147,7 @@ async function main() {
       if (onV.has(who.id + "|" + date) || onV.has(who.id + "|" + addDays(date, 1))) continue;
       const kind = DOS_KINDS[dosTurn % DOS_KINDS.length];
       const duty = await db.extraDuty.create({ data: { staffId: who.id, date, kind } });
+      markDutyDay(who.id, date);
       // Only a 1st AM duty earns the next-day 0.5 OIL: after a 2nd AM the person is already Off.
       if (dosEarnsOil(s.cycleAnchor, date)) {
         await createLeave(who.id, DOS_OIL_CODE, [addDays(date, 1)], "APPROVED", {
@@ -323,6 +325,11 @@ async function main() {
 
 // Only one type of leave per person per day: skip any active leave that would overlap.
 const activeLeaveDays = new Map<string, Set<string>>();
+// No leave on a V, V(SB) or DOS/FDO day (spec 5.1, 12.3): skip leave that would land on one.
+const dutyDays = new Map<string, Set<string>>();
+function markDutyDay(staffId: string, date: string) {
+  dutyDays.set(staffId, (dutyDays.get(staffId) ?? new Set<string>()).add(date));
+}
 
 async function createLeave(
   staffId: string,
@@ -333,7 +340,7 @@ async function createLeave(
 ) {
   if (status === "APPROVED" || status === "PENDING") {
     const taken = activeLeaveDays.get(staffId) ?? new Set<string>();
-    if (dates.some((d) => taken.has(d))) return;
+    if (dates.some((d) => taken.has(d) || dutyDays.get(staffId)?.has(d))) return;
     dates.forEach((d) => taken.add(d));
     activeLeaveDays.set(staffId, taken);
   }

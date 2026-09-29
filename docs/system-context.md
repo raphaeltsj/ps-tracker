@@ -90,7 +90,7 @@ Each staff member should be able to see their position in the cycle. Days in a b
 
 ## 5. V duty (night shift)
 
-The night shift is written as **V**. V duty is a **temporary overlay on the normal cycle**, not a separate team. **Exactly 1 person** covers V each night (see section 7).
+The night shift is written as **V**. V duty is a **temporary overlay on the normal cycle**, not a separate team. **Exactly 1 person** covers V each night (see section 7): the app refuses a second person on V for a night that already has one, and refuses V on a day that is not one of the shift's Off days.
 
 A person assigned to V duty follows this rule:
 
@@ -114,13 +114,13 @@ The duty picker offers **V, V(SB), and Off(V)**, plus "reset to cycle". A superv
 - **AM and PM are never assigned by hand.** They come from the shift cycle. Supervisors change the cycle only through V duty and its Off(V) days.
 - **Off(V)** is an Off awarded because of V duty. It covers both the 2 days the app creates after a V block, and an Off a supervisor gives by hand, for example to a V(SB) who was activated and did the V duty. The app does not track activation: the supervisor simply picks the Off day.
 - **Reset to cycle** removes whatever was assigned, so the person follows the normal rotation again.
-- **No duty on a day the person is on leave.** If the date already holds leave (approved or pending, including BD / BD-IL), the app refuses the duty and names the clash. Cancel or move the leave first.
+- **Duty on a leave day is pending.** A supervisor may assign V, V(SB), Off(V) or a DOS/FDO duty on a day the person has leave (approved or pending, including BD / BD-IL), except **medical leave (MC, OML, HL)**, which the app refuses and names. The leave stays and still counts in the strength figures. The person gets a bell notification, and their cell turns **amber (`warning`, the reserved "pending" colour) with a dashed outline and a "Pending" tag** (legend: "Duty on leave (pending)") so they can plan: they may **swap the duty away** (section 11.4), or the supervisor removes the duty, or the leave is cancelled. The Pending flag clears by itself once any of those happens. A DOS/FDO stays with its holder through a swap, so only removing it clears that day. The flag shows only where the leave itself is visible to the viewer. Extra shift duty is still refused on any leave day (section 5.4).
 - **No leave on a day the person already has V duty or a DOS/FDO duty**, the other way around (section 12.3). Remove the duty first if leave is genuinely needed that day.
 
-V duty runs for **2 days**, and each of those days has a **standby person** on **V(SB)**. Standby people come from **within the same shift** as the person on V duty.
+V duty runs for **2 days**, and the block has a **standby person** on **V(SB)**, who comes from **within the same shift** as the person on V duty.
 
-- **One person** is on V(SB) for the **first** V day.
-- A **different person** is on V(SB) for the **second** V day.
+- **The same person** is on V(SB) for **both** V nights of the block. Picking V(SB) on either Off day assigns that person to both nights, and resetting either night to the cycle clears both.
+- **One standby per block:** if someone else is already V(SB) on either night, the app refuses and names them (reset them to the cycle first). Like V, V(SB) goes only on the shift's 2 Off days after AM.
 - On the roster, a standby person's cell for that day reads "V(SB)", so it is clearly different from a person actually working V.
 - V(SB) does **not** affect Total Strength, Not in Strength, Working Strength, MFL, or leave slots.
 - Supervisors (own shift) and Management (any shift) assign V, V(SB) and Off(V) from the duty picker.
@@ -175,7 +175,7 @@ On some dates an entire shift has something on that the roster should flag. This
 
 - The UI must show a clear "Special Event" indicator, with the note, on the day header, the day view, the mobile day card, and the affected staff cells.
 - Special events **do not change MFL or leave slots** for that day. They are a note for the whole shift.
-- Supervisors can set a special-event time for their own shift.
+- Supervisors can set a special event for their own shift; Management for any shift.
 - Like a locked date, setting a special event offers the option to **also announce it**: see section 13.1.
 
 **Public holidays** do not affect MFL or duty. The team works as usual, so they need no special handling in the roster.
@@ -238,7 +238,7 @@ Rest day (Off day) example, shift total 26, with 3 people on leave and MFL blank
 Besides their daily duty (AM, PM, V, V(SB), or Off), staff can be given a **specific duty** that shows what they are doing during that duty. To avoid confusion with the duty types, this document calls them **Tasks**.
 
 - Tasks are named **Task 1, Task 2, Task 3**, and so on. There is a variety of them. Only the **name** is stored: a Task has **no description** and no other details.
-- A Task name is limited to **6 characters maximum, spaces included**, with a live counter (for example "6/6"). "Task 1" to "Task 9" fit exactly. From the tenth Task, "Task 10" is 7 characters, so Management renames it (for example "T10").
+- A Task name is limited to **6 characters maximum, spaces included**, with a live counter (for example "6/6"). "Task 1" to "Task 9" fit exactly. From the tenth Task, "Task 10" is 7 characters, so Management renames it (for example "T10"). Names are **unique** (ignoring upper/lower case), so two Tasks can never share a name.
 - **Only Management** can **add**, **rename**, and **delete** Tasks.
 - **Task assignment is optional.** Supervisors can assign Tasks to people in their own shift, but nobody is required to have a Task.
 - **People on V duty can be given a Task** for their V days, in the same way as people on AM or PM. A **DOS/FDO duty also keeps its Task** (section 5.2).
@@ -306,7 +306,7 @@ There are three user roles. **Everyone can view the roster of every shift.** The
 | **Request a duty swap (partner accepts)** | Yes               | Yes                     | Not needed                 |
 | **Approve / reject / cancel duty swaps**  | No                | Own shift's side only   | All shifts, both sides     |
 | **Record a duty swap directly**           | No                | For own shift's staff   | All shifts                 |
-| **Manage staff records**                  | No                | No                      | Yes                        |
+| **Manage staff records**                  | No                | Own shift only          | All shifts                 |
 | **Set special events**               | No                | Own shift only          | All shifts                 |
 | **Add custom leave type**                 | No                | Yes                     | Yes                        |
 | **Add / rename / delete Tasks**           | No                | No                      | Yes                        |
@@ -318,7 +318,7 @@ There are three user roles. **Everyone can view the roster of every shift.** The
 
 - **Regular Staff** can view every shift roster and request leave. They have no edit controls and cannot request leave on locked dates.
 - **Supervisors** have the regular staff view plus an edit view for **their own shift only**. Other shifts appear in clearly marked read-only mode. They do not have the staff restrictions.
-- **Management** can do everything a supervisor can do across all three shifts, and is the **only** role that can add, rename, and delete Tasks and manage staff records. Management does **not** request or take leave of any sort. Their role is the bigger picture of roster and duty management.
+- **Management** can do everything a supervisor can do across all three shifts, and is the **only** role that can add, rename, and delete Tasks, and manage staff records for every shift (supervisors manage their own shift's; section 11.6). Management does **not** request or take leave of any sort. Their role is the bigger picture of roster and duty management.
 
 ## 11. Role views and functions
 
@@ -382,6 +382,7 @@ Swapping duties (often called shift swaps) is **in scope**, between two people o
 - **V and V(SB) never go to another shift:** the standby comes from the V person's shift, and the Off(V) falls on that shift's PM block.
 
 - **One date or two.** A swap has one date (a straight exchange) or two (a give-and-take: Charl covers Bravo's AM on the 3rd, and Bravo covers Charl's PM on the 7th). Each date is an exchange of that day's duties, so a two-date swap works the same way as two one-date exchanges.
+- **V and V(SB) swap 2 for 2.** V is worked in 2-night blocks, with one V(SB) for both nights (section 5.1), so a swap involving V or V(SB) must cover **both nights of the block, with the same partner**. A single night is refused, naming the two dates, and the partner list shows "V / V(SB): pick both nights of the block" until both are picked.
 - **Any duties** can be exchanged: AM, PM, Off, V, V(SB), Off(V). The two duties must differ on each date, and Off and Off(V) count as the same day off.
 - **V swaps include the Off(V) days.** When a V is swapped, the 2 PM days after it are swapped too: the person who takes the V gets the Off(V) on those days, and the person who gave it away works PM. They are stored with the swap as follow-on days, show the ⇄ tag and appear on the swap card and preview. They are locked like the V nights (no leave or duty changes) and must be free the same way when the swap is made (no leave, Extra duty or other swap). Cancelling the swap restores all of it.
 - **Rest after V.** V ends at 0745, so no swap may leave anyone on V followed by AM at 0745 the next morning. Swap both V nights, or pick another date. The same check runs when a supervisor later assigns a V next to a swapped day.
@@ -392,7 +393,7 @@ Swapping duties (often called shift swaps) is **in scope**, between two people o
 - **Today onwards only.** "Today" is Singapore time (the app time zone, `NEXT_PUBLIC_APP_TIME_ZONE`), whatever time zone the server runs in. Swaps are for dates from today on. A swap can still be cancelled on its first date. Once that date has passed, the swap is part of what was worked and can no longer be cancelled. It drops off the My Requests / Manage requests lists once all its dates have passed, but the roster still shows who worked what. A pending request whose first date passes before it is fully approved becomes **Expired**.
 - **Off(V) follows the V.** Whoever actually works a V earns the Off(V), on the PM block after it (see above).
 - **Strength does not change.** Each crew loses one person and gains one on that duty, so Total, Not in, Working Strength, MFL and slots stay as they were. V cover (V on duty / MFL) counts the crew's own duty.
-- **Leave and Tasks do not move.** No swap on a date where either person has leave (pending or approved, including BD / BD-IL). A person can be in only one swap per date (pending or approved). A Task stays with its holder on a swapped date.
+- **Leave and Tasks do not move.** No swap on a date where either person has leave (pending or approved, including BD / BD-IL), with one exception: a person whose V, V(SB) or Off(V) was assigned over their (non-medical) leave (section 5.1) may swap that duty away, to a partner who is not on leave, as long as they do not take over a V or V(SB) in return. Their leave stays; for a V, the PM block after it comes back to them as usual, and leave that runs over it becomes ordinary leave on those PM days. A person can be in only one swap per date (pending or approved). A Task stays with its holder on a swapped date.
 - **DOS/FDO.** A DOS/FDO duty stays with its holder, but a DOS on a swapped date earns **no 0.5 OIL**. Approving the swap removes that OIL, and cancelling the swap restores it.
 
 **Flow.** Request → partner accepts or declines → each side's shift supervisor approves → Approved.
@@ -471,7 +472,7 @@ Common leave types and their full names:
 - If a staff member's birthday falls on a **working day**, they take **BD** (birthday leave) on that day.
 - If the birthday falls on an **Off day**, the leave becomes **BD-IL**, an off in lieu for the birthday.
 - **BD is still shown** on the roster and calendar on the birthday, even when it falls on an Off day.
-- The **BD-IL** is placed on the **next closest working day** the staff member has after the birthday **that does not already have leave** (one type of leave per day, section 12.3).
+- The **BD-IL** is placed on the **next closest working day** the staff member has after the birthday **that does not already have leave** (one type of leave per day, section 12.3). A V night or a DOS/FDO day never counts as free (no leave on those days, section 5.1), and a birthday that falls on a V night is treated like one on an Off day.
 - While BD or BD-IL is on a day, no other leave can be requested or given for that day.
 - A BD shown on an Off day is a marker only and does not count in Not in Strength; the BD-IL day counts like other leave [to confirm].
 - Birthdays come from the staff record, which Management maintains (section 11.3).
@@ -530,7 +531,7 @@ Some types are tracked together against a combined **annual limit**, shown as a 
 | OML         | OML        | 3         |
 | BD/BD-IL    | BD, BD-IL  | 1 (always, since there is one birthday a year) |
 
-Everything else (MWO, HL, FCL, CSE, OIL, custom types) has **no limit**: it just keeps a running total, as before. A limit is always checked against the **whole year**, whichever period (month or year) the list is currently showing, so switching to "This month" changes the counts shown but never the "left" figure. Colour the remaining figure the same way as Available Slot(s) (section 6): green above 2 left, amber at 1-2, red at 0 or below (over the limit, for example leave given beyond it).
+Everything else (MWO, HL, FCL, CSE, OIL, custom types) has **no limit**: it just keeps a running total, as before. A limit is always checked against the **whole year**, whichever period (month or year) the list is currently showing, so switching to "This month" changes the counts shown but never the "left" figure. Colour the remaining figure the same way as Available Slot(s) (section 8): green above 2 left, amber at 1-2, red at 0 or below (over the limit, for example leave given beyond it).
 
 ## 13. Notifications
 
@@ -574,6 +575,7 @@ When locking dates or setting a special event (sections 6, 12.5), a supervisor o
 | **Special event** | Magenta accent (used for nothing else)    |
 | **V(SB) standby** | Neutral grey dashed outline: standby only, so not the V colour |
 | **Locked date**   | Neutral hatch pattern with a lock icon    |
+| **Duty on leave (pending)** | Amber (`warning`) tint with a dashed amber outline and a "Pending" tag (section 5.1) |
 | **Announcement banner** | Cyan accent, with a megaphone icon  |
 | **Status**        | Green = fine / approved, amber = low / pending, red = none left / rejected / error |
 
@@ -857,7 +859,7 @@ Design polished **hero screens** for a responsive web app (desktop and mobile) c
 
 **Duties and timings:** The daily duties are AM (0745-1445), PM (1445-2130), V (the night shift, 2130-0745, crossing midnight), V(SB) (standby for V), and Off. A supervisor assigns V, V(SB) and Off(V) from one duty picker, and can reset a day to the cycle; AM and PM always come from the cycle. A separate DOS/FDO duty (named DOS, DOS2IC or FDO) sits on top of an AM day: 24 hours reporting at 0800, the Task is kept, and a 0.5 OIL (first half) follows automatically the next day.
 
-**V duty and standby:** Normally 1 person covers V; specific dates can require more. The person works 2 days of V on what would be their 2 Off days after AM, then their next 2-day PM block becomes 2 Off, then they continue normally. Example: PM PM AM AM V V OFF OFF AM AM OFF OFF PM PM. Label the converted Off days "Off (post-V)". For the 2-day V block, one person from the same shift is on V(SB) for the first V day and a different person from the same shift is on V(SB) for the second V day. V(SB) does not affect strength, MFL, or leave slots.
+**V duty and standby:** Normally 1 person covers V; specific dates can require more. The person works 2 days of V on what would be their 2 Off days after AM, then their next 2-day PM block becomes 2 Off, then they continue normally. Example: PM PM AM AM V V OFF OFF AM AM OFF OFF PM PM. Label the converted Off days "Off (post-V)". For the 2-day V block, one person from the same shift is on V(SB) for both V nights. V(SB) does not affect strength, MFL, or leave slots.
 
 **Special events:** Some dates carry a note for the whole shift. Show a clear "Special Event" indicator with its note on the day header, day view, mobile day card, and affected cells. There is no reporting time, and special events do not change MFL or leave slots. Public holidays do not affect MFL or duty.
 

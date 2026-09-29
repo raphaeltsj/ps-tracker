@@ -21,7 +21,7 @@ import {
   setSpecialEvent,
   unlockDate,
 } from "@/app/actions";
-import { DosTag, DutyChip, EventBadge, ExtraChip, LeaveChip, LockBadge, OpsChip, StatusBadge, SwapTag, TaskTag } from "@/components/roster/chips";
+import { DosTag, DutyChip, EventBadge, ExtraChip, LeaveChip, LockBadge, OpsChip, PendingTag, StatusBadge, SwapTag, TaskTag } from "@/components/roster/chips";
 import type { Selection, WorkspaceProps } from "@/components/roster/roster-workspace";
 import { StrengthSummary } from "@/components/roster/strength-summary";
 import { ResultMessage, useAction } from "@/components/roster/use-action";
@@ -244,6 +244,18 @@ function PersonOnDate({
               </Link>
             </>
           )}
+        </p>
+      )}
+      {cell.dutyOnLeave && (
+        <p className="rounded-md border border-warning/40 bg-warning-soft p-1.5 text-[11px] text-warning-ink">
+          <PendingTag />{" "}
+          {isViewer
+            ? cell.dos
+              ? `You have a ${cell.dos} duty on a day you are on leave. Ask your supervisor to move it; the leave stays until then.`
+              : cell.duty === "OFF_V"
+                ? "You were given an Off(V) on a day you are on leave, so the leave may no longer be needed. Check with your supervisor."
+                : `You have ${DUTY_LABEL[cell.duty]} on a day you are on leave. Swap it with someone (Request swap tab) or check with your supervisor; your leave stays.`
+            : "A duty was assigned on a day this person is on leave. It stays pending until they swap it away, or the duty or leave is removed."}
         </p>
       )}
       {isViewer && cell.absences.some((a) => a.derived) && (
@@ -965,7 +977,7 @@ function EditTools(props: PanelProps) {
           <div className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">Shift duty</p>
             <p className="text-xs text-muted-foreground">
-              AM and PM come from the shift cycle and are not set by hand. Assigning a 2-day V turns the next PM block into Off(V) by itself; resetting the V duty puts that PM block back.
+              AM and PM come from the shift cycle and are not set by hand. Assigning a 2-day V turns the next PM block into Off(V) by itself; resetting the V duty puts that PM block back. V(SB) covers both V nights: picking either Off day assigns the same person to both.
             </p>
             <div className="flex flex-wrap items-stretch gap-1.5">
               {ASSIGNABLE_DUTIES.map((d) => {
@@ -987,6 +999,11 @@ function EditTools(props: PanelProps) {
             <Button className="w-full" disabled={pending || !duty || cells.length === 0 || swapped.length > 0} onClick={() => run(() => assignDuty({ cells, duty }), onClear)}>
               {duty === "CYCLE" ? "Reset to normal cycle" : duty ? `Assign ${DUTY_LABEL[(duty === "OFF" ? "OFF_V" : duty) as Duty]}` : "Pick a duty above"}
             </Button>
+            {withLeave.length > 0 && duty !== "CYCLE" && (
+              <p className="rounded-md border border-warning/40 bg-warning-soft p-2 text-xs text-warning-ink">
+                {withLeave.length} selected day{withLeave.length > 1 ? "s have" : " has"} leave. A duty there (not on MC, OML or HL) keeps the leave, notifies the person, and shows the day as Pending until they swap it away or the duty or leave is removed.
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5 rounded-md border p-2">

@@ -49,7 +49,8 @@ export function NotificationBell({
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-sm">
         <SheetHeader>
-          <div className="flex items-center justify-between">
+          {/* pr-10 keeps "Mark all read" clear of the sheet's close button, which sits top right. */}
+          <div className="flex items-center justify-between gap-3 pr-10">
             <SheetTitle>Notifications</SheetTitle>
             {unreadCount > 0 && (
               <button type="button" className="text-xs text-muted-foreground underline underline-offset-2" onClick={() => readAllNotifications()}>
