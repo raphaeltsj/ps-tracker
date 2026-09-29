@@ -276,7 +276,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh_-_3.6rem)] lg:flex-none lg:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh_-_3.6rem_-_var(--banner-h))] lg:flex-none lg:flex-row">
       <section className="relative flex min-w-0 flex-1 flex-col" aria-busy={navPending}>
         <h1 className="sr-only">
           {roster.shiftName} {view === "calendar" ? "calendar" : "roster"}, {formatMonth(month)}
@@ -378,7 +378,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
               <button
                 aria-pressed={mode === "edit"}
                 onClick={() => navigate({ mode: "edit" })}
-                className={cn("flex items-center gap-1.5 rounded-md px-3 py-1", mode === "edit" ? "bg-fuchsia-700 text-white font-semibold dark:bg-fuchsia-600" : "text-muted-foreground")}
+                className={cn("flex items-center gap-1.5 rounded-md px-3 py-1", mode === "edit" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground")}
               >
                 <Pencil className="size-3.5" /> Edit view
               </button>
@@ -404,7 +404,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
             // On a phone the grid gets its own box, one screen tall minus the bottom sheet header and tab bar
             // (about 8rem): scroll the page to bring it into view, then it scrolls both ways inside with the
             // date header and name column pinned.
-            <div className={isDesktop ? "h-full" : "h-[calc(100dvh-8rem)] min-h-80"}>
+            <div className={isDesktop ? "h-full" : "h-[calc(100dvh-8rem-var(--banner-h))] min-h-80"}>
               <RosterGrid {...props} selection={selection} compact={compact} onDate={focusDateOnly} onCell={clickCell} onLeave={clickLeave} />
             </div>
           ) : (

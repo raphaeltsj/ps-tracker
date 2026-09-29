@@ -74,7 +74,7 @@ export default async function TaskReportPage({ searchParams }: PageProps<"/task-
           {hiddenUnused ? ` · ${hiddenUnused} unused Task${hiddenUnused > 1 ? "s" : ""} hidden` : ""}
         </span>
       </p>
-      {rangeError && <p className="text-sm font-medium text-red-700 dark:text-red-300">{rangeError}</p>}
+      {rangeError && <p className="text-sm font-medium text-danger-ink">{rangeError}</p>}
       {countTo < from ? (
         <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
           This period has not started yet. Tick &quot;Include scheduled Tasks&quot; to see what is planned.

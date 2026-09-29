@@ -6,7 +6,7 @@ import { DUTY_LABEL, type Duty } from "@/lib/domain";
 import type { SwapCheck } from "@/lib/swap-data";
 
 export function SwapPreview({ preview, aName, bName, viewerId, asYou }: { preview: SwapCheck; aName: string; bName: string; viewerId: string; asYou: boolean }) {
-  if (!preview.ok) return <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">{preview.error}</p>;
+  if (!preview.ok) return <p className="rounded-md bg-danger-soft p-2 text-xs font-medium text-danger-ink">{preview.error}</p>;
   return (
     <div className="space-y-2 rounded-md border p-2">
       <p className="text-xs font-medium text-muted-foreground">What changes</p>

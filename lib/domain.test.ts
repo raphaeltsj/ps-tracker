@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { birthdayEvents } from "./birthday";
 import { cycleDayLabel, cyclePositionLabel, dosEarnsOil, effectiveDuty, shiftDutyOn } from "./cycle";
 import { addDays, dateRange, dayIndex, formatDateList, formatDateTime } from "./dates";
-import { ASSIGNABLE_DUTIES, type AssignableDuty } from "./domain";
+import { ASSIGNABLE_DUTIES, COMMON_LEAVE_TYPES, leaveGroup, type AssignableDuty } from "./domain";
 import { computeStrength, formatFigure, mflFor, V_MFL } from "./strength";
 
 const DAY1 = dayIndex("2026-01-01");
@@ -14,6 +14,19 @@ test("the three shifts follow the spec's 6-day table (section 3.2)", () => {
   assert.deepEqual(days.map((d) => shiftDutyOn(ANCHORS.A, d)), ["PM", "PM", "AM", "AM", "OFF", "OFF"]);
   assert.deepEqual(days.map((d) => shiftDutyOn(ANCHORS.B, d)), ["OFF", "OFF", "PM", "PM", "AM", "AM"]);
   assert.deepEqual(days.map((d) => shiftDutyOn(ANCHORS.C, d)), ["AM", "AM", "OFF", "OFF", "PM", "PM"]);
+});
+
+test("leave colour groups: half-day codes follow their full-day type; unknown codes are custom", () => {
+  assert.equal(leaveGroup("AL"), "annual");
+  assert.equal(leaveGroup("0.5 AL"), "annual");
+  assert.equal(leaveGroup("OL"), "annual");
+  for (const code of ["MC", "OML", "MWO", "HL", "FCL"]) assert.equal(leaveGroup(code), "health", code);
+  assert.equal(leaveGroup("0.5 GRW"), "growth");
+  assert.equal(leaveGroup("CSE"), "growth");
+  for (const code of ["BD", "BD-IL", "0.5 OIL", "1 OIL"]) assert.equal(leaveGroup(code), "inlieu", code);
+  assert.equal(leaveGroup("EXAM"), "custom");
+  // Every common type belongs to a real group: only supervisor-made types fall through to custom.
+  for (const t of COMMON_LEAVE_TYPES) assert.notEqual(leaveGroup(t.code), "custom", t.code);
 });
 
 test("cycle day labels read 1st / 2nd", () => {

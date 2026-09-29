@@ -185,9 +185,9 @@ export function SwapForm({
           />
           Add a second date (a give-and-take, or both V nights)
         </label>
-        {fromRoster && date1 && <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">Picked from your roster selection. Change the date above if needed.</p>}
+        {fromRoster && date1 && <p className="text-[11px] font-medium text-success-ink">Picked from your roster selection. Change the date above if needed.</p>}
         {!date1 && pickedOnlyPast && (
-          <p className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+          <p className="text-[11px] font-medium text-warning-ink">
             The date you picked on the roster has already passed. Swaps are for today onwards: pick a date from today or later, above or on the roster.
           </p>
         )}
@@ -231,7 +231,7 @@ export function SwapForm({
       </div>
 
       {ready && checking && !preview && <p className="text-xs text-muted-foreground">Checking...</p>}
-      {preview && !preview.ok && <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">{preview.error}</p>}
+      {preview && !preview.ok && <p className="rounded-md bg-danger-soft p-2 text-xs font-medium text-danger-ink">{preview.error}</p>}
       {preview?.ok && (
         <div className="space-y-2 rounded-md border p-2">
           <p className="text-xs font-medium text-muted-foreground">What changes</p>
@@ -268,7 +268,7 @@ export function SwapForm({
             </div>
           )}
           {preview.warnings.map((w) => (
-            <p key={w} className="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
+            <p key={w} className="rounded-md bg-warning-soft p-2 text-xs text-warning-ink">
               {w}
             </p>
           ))}

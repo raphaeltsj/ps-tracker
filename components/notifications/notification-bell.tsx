@@ -43,7 +43,7 @@ export function NotificationBell({
         <Button variant="ghost" size="icon" className="relative" aria-label={`${badge} waiting for you`} title={badge ? `${badge} waiting for you` : "Nothing waiting"}>
           <Bell className="size-4" />
           {badge > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">{badge}</span>
+            <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">{badge}</span>
           )}
         </Button>
       </SheetTrigger>

@@ -30,7 +30,7 @@ export default async function DayworkersPage({ searchParams }: PageProps<"/daywo
       </div>
 
       <DayworkerFilters period={period} year={year} month={month} from={from} to={to} includeScheduled={includeScheduled} years={years} />
-      {rangeError && <p className="text-sm font-medium text-red-700 dark:text-red-300">{rangeError}</p>}
+      {rangeError && <p className="text-sm font-medium text-danger-ink">{rangeError}</p>}
 
       {countTo < from && (
         <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">

@@ -168,7 +168,7 @@ function TaskPicker({ tasks, picked, onChange }: { tasks: { id: string; name: st
     <div className="space-y-1">
       <span className="block text-xs font-medium text-muted-foreground">Tasks</span>
       <details className="relative">
-        <summary className={cn("flex h-9 cursor-pointer list-none items-center rounded-md border bg-background px-3 text-sm", picked?.length === 0 && "border-red-500 text-red-700 dark:text-red-300")}>
+        <summary className={cn("flex h-9 cursor-pointer list-none items-center rounded-md border bg-background px-3 text-sm", picked?.length === 0 && "border-danger text-danger-ink")}>
           {summary}
         </summary>
         <div className="absolute z-50 mt-1 max-h-[60vh] w-64 space-y-2 overflow-y-auto rounded-lg border bg-popover p-2 shadow-xl">
