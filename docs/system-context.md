@@ -527,8 +527,8 @@ Some types are tracked together against a combined **annual limit**, shown as a 
 | **Group**   | **Codes**  | **Limit** |
 |-------------|------------|-----------|
 | AL/OL       | AL, OL     | 18        |
-| MC          | MC         | 14        |
-| OML         | OML        | 3         |
+| MC          | MC, OML    | 14 (includes any OML taken) |
+| OML         | OML        | 3 (also counts toward MC's 14, so 3 OML leaves 11 MC days) |
 | BD/BD-IL    | BD, BD-IL  | 1 (always, since there is one birthday a year) |
 
 Everything else (MWO, HL, FCL, CSE, OIL, custom types) has **no limit**: it just keeps a running total, as before. A limit is always checked against the **whole year**, whichever period (month or year) the list is currently showing, so switching to "This month" changes the counts shown but never the "left" figure. Colour the remaining figure the same way as Available Slot(s) (section 8): green above 2 left, amber at 1-2, red at 0 or below (over the limit, for example leave given beyond it).

@@ -30,3 +30,18 @@ test("tallyLeaveTaken sums BD-IL (a real approved leave day) and sorts by count"
     { code: "BD-IL", count: 1 },
   ]);
 });
+
+test("leaveTakenRows counts OML in its own row and in MC's, so 3 OML leaves 11 MC days", async () => {
+  const { leaveTakenRows } = await import("./leave-report");
+  const tally = [
+    { code: "OML", count: 3 },
+    { code: "MC", count: 2 },
+  ];
+  const rows = leaveTakenRows(tally, tally, ["AL", "OL", "MC", "OML", "BD", "BD-IL"]);
+  const mc = rows.find((r) => r.key === "MC")!;
+  const oml = rows.find((r) => r.key === "OML")!;
+  assert.equal(mc.annualCount, 5);
+  assert.equal(mc.limit! - mc.annualCount, 9);
+  assert.equal(oml.annualCount, 3);
+  assert.equal(rows.filter((r) => r.label === "OML").length, 1); // not duplicated in the "everything else" rows
+});
