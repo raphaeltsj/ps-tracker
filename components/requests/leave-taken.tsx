@@ -49,7 +49,7 @@ export function LeaveTaken({ rows, total, periodLabel }: { rows: LeaveTakenRow[]
         })}
       </ul>
       <p className="text-xs text-muted-foreground">
-        {formatFigure(total)} day{total === 1 ? "" : "s"} total, {periodLabel}. Limits (AL/OL, MC, OML, BD/BD-IL) are checked against the year, whichever period is shown above.
+        {formatFigure(total)} day{total === 1 ? "" : "s"} total, {periodLabel}. Limits (AL/OL, MC, OML, BD/BD-IL) are checked against the year, whichever period is shown above. OML also counts toward the MC limit.
       </p>
     </div>
   );
