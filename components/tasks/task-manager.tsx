@@ -36,7 +36,8 @@ const validName = (v: string) => v.trim().length > 0 && v.length <= NAME_MAX;
 
 export function TaskManager({ tasks }: { tasks: TaskRow[] }) {
   const { pending, result, run } = useAction();
-  const [newName, setNewName] = useState(`Task ${tasks.length + 1}`);
+  // Suggest the next name, kept within 6 characters: "Task 9", then "T10", "T11"...
+  const [newName, setNewName] = useState(tasks.length < 9 ? `Task ${tasks.length + 1}` : `T${tasks.length + 1}`);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [toDelete, setToDelete] = useState<TaskRow | null>(null);

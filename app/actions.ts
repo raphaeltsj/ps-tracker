@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { endSession, requireViewer, startSession } from "@/lib/auth";
-import { dosEarnsOil } from "@/lib/cycle";
+import { dosEarnsOil, shiftDutyOn } from "@/lib/cycle";
 import { addDays, formatDate, formatDateList, isValidDate } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { normalizeDayworkerName, normalizeUsername } from "@/lib/dayworkers";
@@ -349,6 +349,57 @@ async function checkCells(viewer: Viewer, cells: CellRef[]): Promise<string | nu
 }
 
 /**
+ * The V overlay rules (spec 5, 5.1), checked against the roster as it will be after this change:
+ * V is worked on the shift's Off days (the 2 days after AM), exactly 1 person covers V each night,
+ * and the two V nights of a block have a different V(SB) each.
+ */
+async function vRuleMessage(cells: CellRef[], duty: "V" | "VSB"): Promise<string | null> {
+  const staff = await db.staff.findMany({ where: { id: { in: [...new Set(cells.map((c) => c.staffId))] } }, include: { shift: true } });
+  const byId = new Map(staff.map((s) => [s.id, s]));
+  const inBatch = new Set(cells.map((c) => `${c.staffId}|${c.date}`));
+
+  if (duty === "V") {
+    for (const { staffId, date } of cells) {
+      const person = byId.get(staffId)!;
+      if (person.shift && shiftDutyOn(person.shift.cycleAnchor, date) !== "OFF") {
+        return `${formatDate(date)} is not an Off day for ${person.shift.name}. V is worked on the 2 Off days after AM.`;
+      }
+    }
+    // One V per night per shift: people already on V that night, plus everyone in this change.
+    const nights = new Map<string, Set<string>>();
+    for (const { staffId, date } of cells) {
+      const key = `${byId.get(staffId)!.shiftId}|${date}`;
+      nights.set(key, (nights.get(key) ?? new Set()).add(staffId));
+    }
+    for (const [key, people] of nights) {
+      const [shiftId, date] = key.split("|");
+      const already = await db.dutyOverride.findMany({
+        where: { date, duty: "V", staff: { shiftId, active: true } },
+        include: { staff: true },
+      });
+      const others = already.filter((o) => !inBatch.has(`${o.staffId}|${date}`));
+      if (people.size + others.length > 1) {
+        const who = others[0]?.staff.name ?? byId.get([...people][1])!.name;
+        return `${who} is already on V on ${formatDate(date)}. Exactly 1 person covers V each night: reset them to the cycle first.`;
+      }
+    }
+    return null;
+  }
+
+  // V(SB): a different person on each of the two V nights, so never the same person two days running.
+  for (const { staffId, date } of cells) {
+    for (const next of [addDays(date, -1), addDays(date, 1)]) {
+      const adjacent = inBatch.has(`${staffId}|${next}`) || (await db.dutyOverride.findFirst({ where: { staffId, date: next, duty: "VSB" } }));
+      if (adjacent) {
+        const [first, second] = [date, next].sort();
+        return `${byId.get(staffId)!.name} would be V(SB) on both ${formatDate(first)} and ${formatDate(second)}. Each V night needs a different standby.`;
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Assigns V, V(SB) or Off(V). AM and PM are never set by hand: they come from the cycle.
  * duty "CYCLE" removes the override, so cancelling a V duty also restores the PM block that the
  * app had turned into Off(V).
@@ -366,6 +417,8 @@ export async function assignDuty(input: { cells: CellRef[]; duty: string }): Pro
     const onLeave = await firstCellOnLeave(input.cells);
     if (onLeave) return fail(onLeave);
   }
+  const vRule = input.duty === "V" || input.duty === "VSB" ? await vRuleMessage(input.cells, input.duty) : null;
+  if (vRule) return fail(vRule);
   const swapped = await firstCellSwapped(input.cells);
   if (swapped) return fail(swapped);
   // A V next to a swapped date can change that date's duty (PM block <-> Off(V)).
@@ -409,10 +462,16 @@ export async function assignExtraDuty(input: { cells: CellRef[]; kind: string | 
   const onLeave = await firstCellOnLeave(input.cells);
   if (onLeave) return fail(onLeave);
 
+  // A cell that already holds a DOS/FDO duty only changes its name: same duty, same 0.5 OIL (and
+  // whichever half the supervisor set it to), so it needs none of the checks below.
+  const existing = await db.extraDuty.findMany({ where: { OR: input.cells.map(({ staffId, date }) => ({ staffId, date })) } });
+  const existingKey = new Set(existing.map((e) => `${e.staffId}|${e.date}`));
+  const newCells = input.cells.filter(({ staffId, date }) => !existingKey.has(`${staffId}|${date}`));
+
   // It must fall on an AM day, and the next day must be free for the 0.5 OIL.
   const staff = await db.staff.findMany({ where: { id: { in: input.cells.map((c) => c.staffId) } }, include: { shift: true } });
   const byId = new Map(staff.map((s) => [s.id, s]));
-  for (const { staffId, date } of input.cells) {
+  for (const { staffId, date } of newCells) {
     const person = byId.get(staffId)!;
     const roster = await buildRoster(person.shiftId!, date, date, viewer);
     const duty = roster.cells[staffId]?.[date]?.duty;
@@ -426,25 +485,26 @@ export async function assignExtraDuty(input: { cells: CellRef[]; kind: string | 
     }
   }
 
+  if (existing.length) {
+    await db.extraDuty.updateMany({ where: { id: { in: existing.map((e) => e.id) } }, data: { kind: input.kind } });
+    for (const e of existing) {
+      await db.leave.updateMany({ where: { autoFor: e.id }, data: { remarks: `Automatic after ${input.kind} duty on ${formatDate(e.date)}.` } });
+    }
+  }
   let withOil = 0;
-  for (const { staffId, date } of input.cells) {
-    const existing = await db.extraDuty.findUnique({ where: { staffId_date: { staffId, date } } });
-    if (existing) await db.leave.deleteMany({ where: { autoFor: existing.id } });
-    const duty = await db.extraDuty.upsert({
-      where: { staffId_date: { staffId, date } },
-      create: { staffId, date, kind: input.kind },
-      update: { kind: input.kind },
-    });
+  for (const { staffId, date } of newCells) {
+    const duty = await db.extraDuty.create({ data: { staffId, date, kind: input.kind } });
     if (!dosEarnsOil(byId.get(staffId)!.shift!.cycleAnchor, date)) continue;
     withOil++;
     await createDosOil(duty, viewer.id);
   }
+  if (newCells.length === 0) return done(`Changed to ${input.kind}. Its ${DOS_OIL_CODE}, if any, is unchanged.`);
   return done(
-    withOil === input.cells.length
+    withOil === newCells.length
       ? `${input.kind} assigned, with ${DOS_OIL_CODE} the next day.`
       : withOil === 0
         ? `${input.kind} assigned. No ${DOS_OIL_CODE}: a 2nd AM duty is followed by an Off day.`
-        : `${input.kind} assigned. ${withOil} of ${input.cells.length} earned the ${DOS_OIL_CODE} (only a 1st AM duty does).`,
+        : `${input.kind} assigned. ${withOil} of ${newCells.length} earned the ${DOS_OIL_CODE} (only a 1st AM duty does).`,
   );
 }
 
@@ -512,7 +572,7 @@ export async function unlockDate(input: { shiftId: string; date: string; allShif
   return done("Date unlocked. Leave already approved is unaffected.");
 }
 
-/** A whole shift reports at a different time. Does not change MFL or slots. */
+/** A note on a date for the whole shift (no reporting time). Does not change MFL or slots. */
 export async function setSpecialEvent(input: { shiftId: string; date: string; note?: string; announce?: AnnounceInput }): Promise<ActionResult> {
   const viewer = await requireViewer();
   if (!isValidDate(input.date)) return fail("Invalid date.");
@@ -590,11 +650,18 @@ function cleanTaskName(name: unknown): string | null {
   return t.length > 0 && t.length <= NAME_MAX ? t : null;
 }
 
+/** Task names are unique (ignoring case), so the roster tags and the Task report stay unambiguous. */
+async function taskNameTaken(name: string, exceptId?: string): Promise<boolean> {
+  const tasks = await db.task.findMany({ select: { id: true, name: true } });
+  return tasks.some((t) => t.id !== exceptId && t.name.toLowerCase() === name.toLowerCase());
+}
+
 export async function createTask(name: string): Promise<ActionResult> {
   const viewer = await requireViewer();
   if (!canManageTasks(viewer)) return fail("Only Management can manage Tasks.");
   const clean = cleanTaskName(name);
   if (!clean) return fail(`Name must be 1-${NAME_MAX} characters, spaces included.`);
+  if (await taskNameTaken(clean)) return fail(`There is already a Task called ${clean}.`);
   await db.task.create({ data: { name: clean } });
   return done(`${clean} added.`);
 }
@@ -604,6 +671,8 @@ export async function renameTask(id: string, name: string): Promise<ActionResult
   if (!canManageTasks(viewer)) return fail("Only Management can manage Tasks.");
   const clean = cleanTaskName(name);
   if (!clean) return fail(`Name must be 1-${NAME_MAX} characters, spaces included.`);
+  if (!(await db.task.findUnique({ where: { id } }))) return fail("Task not found. It may have been deleted: refresh the page.");
+  if (await taskNameTaken(clean, id)) return fail(`There is already a Task called ${clean}.`);
   await db.task.update({ where: { id }, data: { name: clean } });
   return done("Task renamed.");
 }

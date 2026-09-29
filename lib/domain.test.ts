@@ -103,6 +103,19 @@ test("one leave type per day: BD-IL skips working days that already have leave",
   ]);
 });
 
+test("BD-IL never lands on a V night (no leave on a V day)", () => {
+  // Birthday 5 Jan is Shift A's 1st Off; a single V on the 2nd Off (6 Jan) is skipped, so BD-IL
+  // goes past it. The PM block after that V becomes Off(V), so the first free day is 9 Jan (AM).
+  const overrides = new Map<string, AssignableDuty>([["2026-01-06", "V"]]);
+  const dutyOn = (d: string) => effectiveDuty(ANCHORS.A, d, overrides).duty;
+  assert.deepEqual(birthdayEvents("1990-01-05", 2026, dutyOn), [
+    { date: "2026-01-05", code: "BD", counts: false },
+    { date: "2026-01-09", code: "BD-IL", counts: true },
+  ]);
+  // A birthday on a V night is treated like one on an Off day.
+  assert.deepEqual(birthdayEvents("1990-01-06", 2026, dutyOn)[0], { date: "2026-01-06", code: "BD", counts: false });
+});
+
 test("date helpers", () => {
   assert.equal(addDays("2026-02-28", 1), "2026-03-01");
   assert.equal(formatDateList(["2026-10-03", "2026-10-04", "2026-10-05", "2026-10-09"]), "3-5 Oct, 9 Oct");

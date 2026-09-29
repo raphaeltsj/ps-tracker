@@ -88,7 +88,7 @@ Each staff member should be able to see their position in the cycle. Days in a b
 
 ## 5. V duty (night shift)
 
-The night shift is written as **V**. V duty is a **temporary overlay on the normal cycle**, not a separate team. **Exactly 1 person** covers V each night (see section 7).
+The night shift is written as **V**. V duty is a **temporary overlay on the normal cycle**, not a separate team. **Exactly 1 person** covers V each night (see section 7): the app refuses a second person on V for a night that already has one, and refuses V on a day that is not one of the shift's Off days.
 
 A person assigned to V duty follows this rule:
 
@@ -118,7 +118,7 @@ The duty picker offers **V, V(SB), and Off(V)**, plus "reset to cycle". A superv
 V duty runs for **2 days**, and each of those days has a **standby person** on **V(SB)**. Standby people come from **within the same shift** as the person on V duty.
 
 - **One person** is on V(SB) for the **first** V day.
-- A **different person** is on V(SB) for the **second** V day.
+- A **different person** is on V(SB) for the **second** V day. The app refuses the same person on V(SB) two days running.
 - On the roster, a standby person's cell for that day reads "V(SB)", so it is clearly different from a person actually working V.
 - V(SB) does **not** affect Total Strength, Not in Strength, Working Strength, MFL, or leave slots.
 - Supervisors (own shift) and Management (any shift) assign V, V(SB) and Off(V) from the duty picker.
@@ -173,7 +173,7 @@ On some dates an entire shift has something on that the roster should flag. This
 
 - The UI must show a clear "Special Event" indicator, with the note, on the day header, the day view, the mobile day card, and the affected staff cells.
 - Special events **do not change MFL or leave slots** for that day. They are a note for the whole shift.
-- Supervisors can set a special-event time for their own shift.
+- Supervisors can set a special event for their own shift; Management for any shift.
 - Like a locked date, setting a special event offers the option to **also announce it**: see section 13.1.
 
 **Public holidays** do not affect MFL or duty. The team works as usual, so they need no special handling in the roster.
@@ -236,7 +236,7 @@ Rest day (Off day) example, shift total 26, with 3 people on leave and MFL blank
 Besides their daily duty (AM, PM, V, V(SB), or Off), staff can be given a **specific duty** that shows what they are doing during that duty. To avoid confusion with the duty types, this document calls them **Tasks**.
 
 - Tasks are named **Task 1, Task 2, Task 3**, and so on. There is a variety of them. Only the **name** is stored: a Task has **no description** and no other details.
-- A Task name is limited to **6 characters maximum, spaces included**, with a live counter (for example "6/6"). "Task 1" to "Task 9" fit exactly. From the tenth Task, "Task 10" is 7 characters, so Management renames it (for example "T10").
+- A Task name is limited to **6 characters maximum, spaces included**, with a live counter (for example "6/6"). "Task 1" to "Task 9" fit exactly. From the tenth Task, "Task 10" is 7 characters, so Management renames it (for example "T10"). Names are **unique** (ignoring upper/lower case), so two Tasks can never share a name.
 - **Only Management** can **add**, **rename**, and **delete** Tasks.
 - **Task assignment is optional.** Supervisors can assign Tasks to people in their own shift, but nobody is required to have a Task.
 - **People on V duty can be given a Task** for their V days, in the same way as people on AM or PM. A **DOS/FDO duty also keeps its Task** (section 5.2).
@@ -304,7 +304,7 @@ There are three user roles. **Everyone can view the roster of every shift.** The
 | **Request a duty swap (partner accepts)** | Yes               | Yes                     | Not needed                 |
 | **Approve / reject / cancel duty swaps**  | No                | Own shift's side only   | All shifts, both sides     |
 | **Record a duty swap directly**           | No                | For own shift's staff   | All shifts                 |
-| **Manage staff records**                  | No                | No                      | Yes                        |
+| **Manage staff records**                  | No                | Own shift only          | All shifts                 |
 | **Set special events**               | No                | Own shift only          | All shifts                 |
 | **Add custom leave type**                 | No                | Yes                     | Yes                        |
 | **Add / rename / delete Tasks**           | No                | No                      | Yes                        |
@@ -316,7 +316,7 @@ There are three user roles. **Everyone can view the roster of every shift.** The
 
 - **Regular Staff** can view every shift roster and request leave. They have no edit controls and cannot request leave on locked dates.
 - **Supervisors** have the regular staff view plus an edit view for **their own shift only**. Other shifts appear in clearly marked read-only mode. They do not have the staff restrictions.
-- **Management** can do everything a supervisor can do across all three shifts, and is the **only** role that can add, rename, and delete Tasks and manage staff records. Management does **not** request or take leave of any sort. Their role is the bigger picture of roster and duty management.
+- **Management** can do everything a supervisor can do across all three shifts, and is the **only** role that can add, rename, and delete Tasks, and manage staff records for every shift (supervisors manage their own shift's; section 11.6). Management does **not** request or take leave of any sort. Their role is the bigger picture of roster and duty management.
 
 ## 11. Role views and functions
 
@@ -460,7 +460,7 @@ Common leave types and their full names:
 - If a staff member's birthday falls on a **working day**, they take **BD** (birthday leave) on that day.
 - If the birthday falls on an **Off day**, the leave becomes **BD-IL**, an off in lieu for the birthday.
 - **BD is still shown** on the roster and calendar on the birthday, even when it falls on an Off day.
-- The **BD-IL** is placed on the **next closest working day** the staff member has after the birthday **that does not already have leave** (one type of leave per day, section 12.3).
+- The **BD-IL** is placed on the **next closest working day** the staff member has after the birthday **that does not already have leave** (one type of leave per day, section 12.3). A V night or a DOS/FDO day never counts as free (no leave on those days, section 5.1), and a birthday that falls on a V night is treated like one on an Off day.
 - While BD or BD-IL is on a day, no other leave can be requested or given for that day.
 - A BD shown on an Off day is a marker only and does not count in Not in Strength; the BD-IL day counts like other leave [to confirm].
 - Birthdays come from the staff record, which Management maintains (section 11.3).
@@ -519,7 +519,7 @@ Some types are tracked together against a combined **annual limit**, shown as a 
 | OML         | OML        | 3         |
 | BD/BD-IL    | BD, BD-IL  | 1 (always, since there is one birthday a year) |
 
-Everything else (MWO, HL, FCL, CSE, OIL, custom types) has **no limit**: it just keeps a running total, as before. A limit is always checked against the **whole year**, whichever period (month or year) the list is currently showing, so switching to "This month" changes the counts shown but never the "left" figure. Colour the remaining figure the same way as Available Slot(s) (section 6): green above 2 left, amber at 1-2, red at 0 or below (over the limit, for example leave given beyond it).
+Everything else (MWO, HL, FCL, CSE, OIL, custom types) has **no limit**: it just keeps a running total, as before. A limit is always checked against the **whole year**, whichever period (month or year) the list is currently showing, so switching to "This month" changes the counts shown but never the "left" figure. Colour the remaining figure the same way as Available Slot(s) (section 8): green above 2 left, amber at 1-2, red at 0 or below (over the limit, for example leave given beyond it).
 
 ## 13. Notifications
 

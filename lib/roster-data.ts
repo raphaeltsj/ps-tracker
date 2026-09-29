@@ -110,7 +110,8 @@ export async function buildRoster(
     }),
     db.lockedDate.findMany({ where: { shiftId, date: { gte: from, lte: to } } }),
     db.specialEvent.findMany({ where: { shiftId, date: { gte: from, lte: to } } }),
-    db.extraDuty.findMany({ where: { staffId: { in: staffIds }, date: { gte: from, lte: to } } }),
+    // Loaded as widely as leave: a DOS/FDO day is never free for BD-IL (no leave on a DOS day).
+    db.extraDuty.findMany({ where: { staffId: { in: staffIds }, date: { gte: loadFrom, lte: loadTo } } }),
     // Bottom rows: dayworkers clocking Ops duty, and people from other shifts serving Extra (visible to everyone).
     db.opsDuty.findMany({ where: { shiftId, date: { gte: from, lte: to } }, include: { dayworker: true } }),
     db.extraShiftDuty.findMany({ where: { hostShiftId: shiftId, date: { gte: from, lte: to } }, include: { staff: true } }),
@@ -141,6 +142,7 @@ export async function buildRoster(
     // All approved/pending leave days (visible or not), so BD / BD-IL land the same for every viewer.
     // A swapped day is never free for BD-IL either: no leave on a swapped day (spec 11.4).
     const leaveDates = new Set(leaves.filter((l) => l.staffId === person.id).flatMap((l) => l.days.map((d) => d.date)));
+    const dosDates = new Set(extraDuties.filter((e) => e.staffId === person.id).map((e) => e.date));
     const row: Record<string, RosterCell> = {};
     for (const date of dates) {
       const { duty, source, swap } = dutyOn(date);
@@ -175,7 +177,7 @@ export async function buildRoster(
     if (person.birthday) {
       const years = new Set([Number(from.slice(0, 4)) - 1, Number(from.slice(0, 4)), Number(to.slice(0, 4))]);
       for (const year of years) {
-        for (const ev of birthdayEvents(person.birthday, year, (d) => dutyOn(d).duty, (d) => leaveDates.has(d) || dutyOn(d).swap !== null)) {
+        for (const ev of birthdayEvents(person.birthday, year, (d) => dutyOn(d).duty, (d) => leaveDates.has(d) || dosDates.has(d) || dutyOn(d).swap !== null)) {
           if (!dateSet.has(ev.date)) continue;
           row[ev.date].absences.push({
             leaveId: null,
