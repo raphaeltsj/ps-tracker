@@ -117,10 +117,10 @@ The duty picker offers **V, V(SB), and Off(V)**, plus "reset to cycle". A superv
 - **Duty on a leave day is pending.** A supervisor may assign V, V(SB), Off(V) or a DOS/FDO duty on a day the person has leave (approved or pending, including BD / BD-IL), except **medical leave (MC, OML, HL)**, which the app refuses and names. The leave stays and still counts in the strength figures. The person gets a bell notification, and their cell turns **amber (`warning`, the reserved "pending" colour) with a dashed outline and a "Pending" tag** (legend: "Duty on leave (pending)") so they can plan: they may **swap the duty away** (section 11.4), or the supervisor removes the duty, or the leave is cancelled. The Pending flag clears by itself once any of those happens. A DOS/FDO stays with its holder through a swap, so only removing it clears that day. The flag shows only where the leave itself is visible to the viewer. Extra shift duty is still refused on any leave day (section 5.4).
 - **No leave on a day the person already has V duty or a DOS/FDO duty**, the other way around (section 12.3). Remove the duty first if leave is genuinely needed that day.
 
-V duty runs for **2 days**, and each of those days has a **standby person** on **V(SB)**. Standby people come from **within the same shift** as the person on V duty.
+V duty runs for **2 days**, and the block has a **standby person** on **V(SB)**, who comes from **within the same shift** as the person on V duty.
 
-- **One person** is on V(SB) for the **first** V day.
-- A **different person** is on V(SB) for the **second** V day. The app refuses the same person on V(SB) two days running.
+- **The same person** is on V(SB) for **both** V nights of the block. Picking V(SB) on either Off day assigns that person to both nights, and resetting either night to the cycle clears both.
+- **One standby per block:** if someone else is already V(SB) on either night, the app refuses and names them (reset them to the cycle first). Like V, V(SB) goes only on the shift's 2 Off days after AM.
 - On the roster, a standby person's cell for that day reads "V(SB)", so it is clearly different from a person actually working V.
 - V(SB) does **not** affect Total Strength, Not in Strength, Working Strength, MFL, or leave slots.
 - Supervisors (own shift) and Management (any shift) assign V, V(SB) and Off(V) from the duty picker.
@@ -858,7 +858,7 @@ Design polished **hero screens** for a responsive web app (desktop and mobile) c
 
 **Duties and timings:** The daily duties are AM (0745-1445), PM (1445-2130), V (the night shift, 2130-0745, crossing midnight), V(SB) (standby for V), and Off. A supervisor assigns V, V(SB) and Off(V) from one duty picker, and can reset a day to the cycle; AM and PM always come from the cycle. A separate DOS/FDO duty (named DOS, DOS2IC or FDO) sits on top of an AM day: 24 hours reporting at 0800, the Task is kept, and a 0.5 OIL (first half) follows automatically the next day.
 
-**V duty and standby:** Normally 1 person covers V; specific dates can require more. The person works 2 days of V on what would be their 2 Off days after AM, then their next 2-day PM block becomes 2 Off, then they continue normally. Example: PM PM AM AM V V OFF OFF AM AM OFF OFF PM PM. Label the converted Off days "Off (post-V)". For the 2-day V block, one person from the same shift is on V(SB) for the first V day and a different person from the same shift is on V(SB) for the second V day. V(SB) does not affect strength, MFL, or leave slots.
+**V duty and standby:** Normally 1 person covers V; specific dates can require more. The person works 2 days of V on what would be their 2 Off days after AM, then their next 2-day PM block becomes 2 Off, then they continue normally. Example: PM PM AM AM V V OFF OFF AM AM OFF OFF PM PM. Label the converted Off days "Off (post-V)". For the 2-day V block, one person from the same shift is on V(SB) for both V nights. V(SB) does not affect strength, MFL, or leave slots.
 
 **Special events:** Some dates carry a note for the whole shift. Show a clear "Special Event" indicator with its note on the day header, day view, mobile day card, and affected cells. There is no reporting time, and special events do not change MFL or leave slots. Public holidays do not affect MFL or duty.
 

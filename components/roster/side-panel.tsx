@@ -977,7 +977,7 @@ function EditTools(props: PanelProps) {
           <div className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">Shift duty</p>
             <p className="text-xs text-muted-foreground">
-              AM and PM come from the shift cycle and are not set by hand. Assigning a 2-day V turns the next PM block into Off(V) by itself; resetting the V duty puts that PM block back.
+              AM and PM come from the shift cycle and are not set by hand. Assigning a 2-day V turns the next PM block into Off(V) by itself; resetting the V duty puts that PM block back. V(SB) covers both V nights: picking either Off day assigns the same person to both.
             </p>
             <div className="flex flex-wrap items-stretch gap-1.5">
               {ASSIGNABLE_DUTIES.map((d) => {

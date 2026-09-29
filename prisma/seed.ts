@@ -114,17 +114,16 @@ async function main() {
     const offDay = monthDays.find((d) => d.slice(8) >= "05" && shiftDutyOn(s.cycleAnchor, d) === "OFF" && cyclePosition(s.cycleAnchor, d) === 4)!;
     await db.staff.update({ where: { id: members[3].id }, data: { birthday: `1991${offDay.slice(4)}` } });
 
-    // V duty: on every Off block one person works V on both days, with a different V(SB) each day.
+    // V duty: on every Off block one person works V on both days, with one V(SB) standing by for both.
     const overrides: { staffId: string; date: string; duty: string }[] = [];
     let vTurn = 2;
     for (const date of range) {
       if (cyclePosition(s.cycleAnchor, date) !== 4) continue;
       const next = addDays(date, 1);
       const v = members[vTurn % s.size];
-      const sb1 = members[(vTurn + 5) % s.size];
-      const sb2 = members[(vTurn + 9) % s.size];
+      const sb = members[(vTurn + 5) % s.size];
       overrides.push({ staffId: v.id, date, duty: "V" }, { staffId: v.id, date: next, duty: "V" });
-      overrides.push({ staffId: sb1.id, date, duty: "VSB" }, { staffId: sb2.id, date: next, duty: "VSB" });
+      overrides.push({ staffId: sb.id, date, duty: "VSB" }, { staffId: sb.id, date: next, duty: "VSB" });
       vTurn += 3;
     }
     // An activated V(SB) gets an Off(V) on a day the supervisor picks (an assigned Off is an Off(V)).

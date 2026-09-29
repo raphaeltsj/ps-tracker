@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { endSession, requireViewer, startSession } from "@/lib/auth";
-import { dosEarnsOil, shiftDutyOn } from "@/lib/cycle";
+import { cyclePosition, dosEarnsOil, shiftDutyOn } from "@/lib/cycle";
 import { addDays, formatDate, formatDateList, isValidDate } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { normalizeDayworkerName, normalizeUsername } from "@/lib/dayworkers";
@@ -401,8 +401,9 @@ async function checkCells(viewer: Viewer, cells: CellRef[]): Promise<string | nu
 
 /**
  * The V overlay rules (spec 5, 5.1), checked against the roster as it will be after this change:
- * V is worked on the shift's Off days (the 2 days after AM), exactly 1 person covers V each night,
- * and the two V nights of a block have a different V(SB) each.
+ * V and V(SB) are worked on the shift's Off days (the 2 days after AM), exactly 1 person covers V
+ * each night, and one person is V(SB) for both V nights of a block (`cells` already holds both
+ * nights for V(SB): see vsbBlockCells).
  */
 async function vRuleMessage(cells: CellRef[], duty: "V" | "VSB"): Promise<string | null> {
   const staff = await db.staff.findMany({ where: { id: { in: [...new Set(cells.map((c) => c.staffId))] } }, include: { shift: true } });
@@ -437,17 +438,45 @@ async function vRuleMessage(cells: CellRef[], duty: "V" | "VSB"): Promise<string
     return null;
   }
 
-  // V(SB): a different person on each of the two V nights, so never the same person two days running.
+  // V(SB): one standby per night per shift, so one person covers the whole block.
+  const nights = new Map<string, Set<string>>();
   for (const { staffId, date } of cells) {
-    for (const next of [addDays(date, -1), addDays(date, 1)]) {
-      const adjacent = inBatch.has(`${staffId}|${next}`) || (await db.dutyOverride.findFirst({ where: { staffId, date: next, duty: "VSB" } }));
-      if (adjacent) {
-        const [first, second] = [date, next].sort();
-        return `${byId.get(staffId)!.name} would be V(SB) on both ${formatDate(first)} and ${formatDate(second)}. Each V night needs a different standby.`;
-      }
+    const key = `${byId.get(staffId)!.shiftId}|${date}`;
+    nights.set(key, (nights.get(key) ?? new Set()).add(staffId));
+  }
+  for (const [key, people] of nights) {
+    const [shiftId, date] = key.split("|");
+    if (people.size > 1) {
+      const names = [...people].map((id) => byId.get(id)!.name).join(" and ");
+      return `${names} would both be V(SB) on ${formatDate(date)}. One person is V(SB) for both nights of a V block: pick one.`;
     }
+    const other = await db.dutyOverride.findFirst({
+      where: { date, duty: "VSB", staffId: { notIn: [...people] }, staff: { shiftId, active: true } },
+      include: { staff: true },
+    });
+    if (other) return `${other.staff.name} is already V(SB) on ${formatDate(date)}. One person is V(SB) for both nights of a V block: reset them to the cycle first.`;
   }
   return null;
+}
+
+/**
+ * V(SB) covers a whole V block: picking either Off day assigns the same person to both nights
+ * (spec 5.1). Returns the cells with each block's other night added, or an error for a day that
+ * is not one of the shift's Off days.
+ */
+async function vsbBlockCells(cells: CellRef[]): Promise<{ cells: CellRef[] } | { error: string }> {
+  const staff = await db.staff.findMany({ where: { id: { in: [...new Set(cells.map((c) => c.staffId))] } }, include: { shift: true } });
+  const byId = new Map(staff.map((s) => [s.id, s]));
+  const out = new Map<string, CellRef>();
+  for (const { staffId, date } of cells) {
+    const shift = byId.get(staffId)!.shift;
+    if (!shift) continue;
+    const pos = cyclePosition(shift.cycleAnchor, date);
+    if (pos !== 4 && pos !== 5) return { error: `${formatDate(date)} is not an Off day for ${shift.name}. V(SB) stands by for the V nights, on the 2 Off days after AM.` };
+    const first = pos === 4 ? date : addDays(date, -1);
+    for (const d of [first, addDays(first, 1)]) out.set(`${staffId}|${d}`, { staffId, date: d });
+  }
+  return { cells: [...out.values()] };
 }
 
 /**
@@ -463,21 +492,42 @@ export async function assignDuty(input: { cells: CellRef[]; duty: string }): Pro
   if (!isCycle && !(ASSIGNABLE_DUTIES as readonly string[]).includes(input.duty)) {
     return fail("Pick V, V(SB) or Off(V). AM and PM follow the shift cycle.");
   }
+  // V(SB) always covers both nights of the V block, whichever of the two was picked.
+  let cells = input.cells;
+  if (input.duty === "VSB") {
+    const block = await vsbBlockCells(cells);
+    if ("error" in block) return fail(block.error);
+    cells = block.cells;
+  } else if (isCycle) {
+    // Resetting a V(SB) night resets the whole block, so no block is left with half a standby.
+    const standby = await db.dutyOverride.findMany({ where: { duty: "VSB", OR: cells.map(({ staffId, date }) => ({ staffId, date })) } });
+    if (standby.length) {
+      const block = await vsbBlockCells(standby.map(({ staffId, date }) => ({ staffId, date })));
+      if (!("error" in block)) {
+        const keys = new Set(cells.map((c) => `${c.staffId}|${c.date}`));
+        const extra = block.cells.filter((c) => !keys.has(`${c.staffId}|${c.date}`));
+        const alsoStandby = extra.length
+          ? await db.dutyOverride.findMany({ where: { duty: "VSB", OR: extra.map(({ staffId, date }) => ({ staffId, date })) } })
+          : [];
+        cells = [...cells, ...alsoStandby.map(({ staffId, date }) => ({ staffId, date }))];
+      }
+    }
+  }
 
   if (!isCycle) {
-    const onLeave = await firstCellOnMedicalLeave(input.cells);
+    const onLeave = await firstCellOnMedicalLeave(cells);
     if (onLeave) return fail(onLeave);
   }
-  const vRule = input.duty === "V" || input.duty === "VSB" ? await vRuleMessage(input.cells, input.duty) : null;
+  const vRule = input.duty === "V" || input.duty === "VSB" ? await vRuleMessage(cells, input.duty) : null;
   if (vRule) return fail(vRule);
-  const swapped = await firstCellSwapped(input.cells);
+  const swapped = await firstCellSwapped(cells);
   if (swapped) return fail(swapped);
   // A V next to a swapped date can change that date's duty (PM block <-> Off(V)).
-  const knockOn = await swapAffectedByDutyChange(input.cells.map(({ staffId, date }) => ({ staffId, date, duty: isCycle ? null : (input.duty as AssignableDuty) })));
+  const knockOn = await swapAffectedByDutyChange(cells.map(({ staffId, date }) => ({ staffId, date, duty: isCycle ? null : (input.duty as AssignableDuty) })));
   if (knockOn) return fail(knockOn);
 
   await db.$transaction(
-    input.cells.map(({ staffId, date }) =>
+    cells.map(({ staffId, date }) =>
       isCycle
         ? db.dutyOverride.deleteMany({ where: { staffId, date } })
         : db.dutyOverride.upsert({
@@ -488,8 +538,8 @@ export async function assignDuty(input: { cells: CellRef[]; duty: string }): Pro
     ),
   );
   if (isCycle) return done("Reset to the normal cycle.");
-  await notifyDutyOnLeave(viewer, input.cells, DUTY_LABEL[input.duty === "OFF" ? "OFF_V" : (input.duty as AssignableDuty)]);
-  return done("Duty assigned.");
+  await notifyDutyOnLeave(viewer, cells, DUTY_LABEL[input.duty === "OFF" ? "OFF_V" : (input.duty as AssignableDuty)]);
+  return done(cells.length > input.cells.length ? "V(SB) assigned for both nights of the V block." : "Duty assigned.");
 }
 
 /**
