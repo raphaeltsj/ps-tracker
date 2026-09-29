@@ -32,7 +32,7 @@ export function AnnouncementBanner({ announcements }: { announcements: Announcem
       <Megaphone className="size-4 shrink-0" aria-hidden />
       <div className="relative h-5 flex-1 overflow-hidden">
         <span
-          className="absolute top-0 left-0 flex items-center whitespace-nowrap font-medium [animation-name:banner-slide] [animation-timing-function:linear] [animation-iteration-count:infinite]"
+          className="absolute top-0 left-0 flex items-center whitespace-nowrap font-medium [animation-name:banner-slide] [animation-timing-function:linear] [animation-iteration-count:infinite] motion-reduce:static motion-reduce:block motion-reduce:truncate motion-reduce:[animation-name:none]"
           style={{ animationDuration: `${duration}s` }}
         >
           {text}

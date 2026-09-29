@@ -105,6 +105,17 @@ export function baseLeaveCode(code: string): string {
 }
 
 /**
+ * Medical leave: someone on it cannot be asked to work, so no duty is ever assigned over it. Any other
+ * leave can have a duty (V, V(SB), Off(V), DOS/FDO) assigned over it, which flags the day as pending
+ * until the person swaps the duty away or the duty or leave is removed (spec 5.1).
+ */
+export const MEDICAL_LEAVE_CODES = ["MC", "OML", "HL"] as const;
+
+export function isMedicalLeave(code: string): boolean {
+  return (MEDICAL_LEAVE_CODES as readonly string[]).includes(code);
+}
+
+/**
  * Colour groups for leave chips (spec 14.2): leave of the same kind shares a colour so a supervisor
  * can read a column at a glance; the code on the chip still names the exact type. Custom types
  * (spec 12.2) can't be classified, so they get their own neutral group.

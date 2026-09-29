@@ -1,7 +1,8 @@
 import "server-only";
+import { cyclePosition } from "@/lib/cycle";
 import { addDays, dateRange, formatDate, todayLocal } from "@/lib/dates";
 import { db } from "@/lib/db";
-import type { AssignableDuty, Duty } from "@/lib/domain";
+import { isMedicalLeave, type AssignableDuty, type Duty } from "@/lib/domain";
 import { findLeaveConflict } from "@/lib/leave-rules";
 import { buildRoster } from "@/lib/roster-data";
 import { canEditShift, type Viewer } from "@/lib/permissions";
@@ -245,9 +246,12 @@ function evaluateSwap(f: SwapFacts, { a: aId, b: bId, dates, excludeSwapId }: Pr
     return fail(`${who} is already in a duty swap on ${formatDate(clash.date)}. One swap per person per day.`);
   }
 
-  // No swap on a day either person has leave (pending or approved, including BD / BD-IL).
+  // No swap on a day either person has leave (pending or approved, including BD / BD-IL), except to
+  // swap away a duty a supervisor assigned over non-medical leave (spec 5.1): that is how the person
+  // clears the clash and keeps their leave.
+  const dutyOverLeave = (id: string, l: { date: string; code: string }) => !isMedicalLeave(l.code) && Boolean(f.ctx.people.get(id)?.overrides.get(l.date));
   for (const p of [a, b]) {
-    const onLeave = (f.leave.get(p.id) ?? []).find((l) => dates.includes(l.date));
+    const onLeave = (f.leave.get(p.id) ?? []).find((l) => dates.includes(l.date) && !dutyOverLeave(p.id, l));
     if (onLeave) return fail(`${p.name} has ${onLeave.status === "PENDING" ? "pending " : ""}${onLeave.code} on ${formatDate(onLeave.date)}. Duties cannot be swapped on a leave day.`);
   }
 
@@ -277,10 +281,38 @@ function evaluateSwap(f: SwapFacts, { a: aId, b: bId, dates, excludeSwapId }: Pr
     }
   }
 
+  // V and V(SB) are worked in 2-night blocks, so they are swapped 2 for 2: both nights of the block,
+  // with the same partner. A single night would split the V (or its standby) between two people.
+  const vRows = rows.filter((r) => isVDuty(r.aBefore) || isVDuty(r.bBefore));
+  if (vRows.length > 0) {
+    const anchor = f.ctx.people.get(aId)?.anchor;
+    if (anchor !== undefined) {
+      const firstNight = (d: string) => (cyclePosition(anchor, d) === 5 ? addDays(d, -1) : d);
+      const n1 = firstNight(vRows[0].date);
+      const n2 = addDays(n1, 1);
+      const wholeBlock = vRows.length === 2 && dates.length === 2 && dates[0] === n1 && dates[1] === n2 && cyclePosition(anchor, n1) === 4;
+      if (!wholeBlock) {
+        return fail(`V and V(SB) are swapped 2 for 2: both nights of the block (${formatDate(n1)} and ${formatDate(n2)}) with the same partner. Pick both dates.`);
+      }
+    }
+  }
+
+  // Swapping away a duty assigned over leave must not hand the person on leave another V or V(SB).
+  for (const r of rows) {
+    for (const [p, takes] of [[a, r.bBefore], [b, r.aBefore]] as const) {
+      const l = (f.leave.get(p.id) ?? []).find((x) => x.date === r.date);
+      if (l && isVDuty(takes)) return fail(`${p.name} has ${l.code} on ${formatDate(r.date)}, so cannot take over ${dutyWord(takes)} that day. Pick a partner who is not on V or V(SB).`);
+    }
+  }
+
   // A V swap takes the PM block after it with it (the taker gets the Off(V), the giver works PM):
   // those follow-on days are part of the swap, so they must be free the same way as the swap dates.
   const linked = linkedDates(ripples);
   for (const p of [a, b]) {
+    // Someone swapping away a V assigned over their leave gets their PM block back, and leave that
+    // runs over it simply becomes leave on those PM days again.
+    const clearing = (f.leave.get(p.id) ?? []).some((l) => dates.includes(l.date) && dutyOverLeave(p.id, l));
+    if (clearing) continue;
     const onLeave = (f.leave.get(p.id) ?? []).find((l) => linked.includes(l.date));
     if (onLeave) return fail(`${p.name} has ${onLeave.status === "PENDING" ? "pending " : ""}${onLeave.code} on ${formatDate(onLeave.date)}, a follow-on day of this V swap (the Off(V) moves with the V). Sort out that leave first.`);
   }
@@ -536,6 +568,10 @@ export async function swapCandidates(aId: string, dates: string[]): Promise<{ aD
   const onLeave = new Set(leaveDays.map((d) => d.leave.staffId));
   const inSwap = new Set(swapDays.flatMap((d) => [d.swap.requesterId, d.swap.partnerId]));
   const aDuties = sorted.map((d) => ctx.resolve(aId, d).duty);
+  // V and V(SB) swap 2 for 2: the dates must be exactly the two nights of the block.
+  const aAnchor = ctx.people.get(aId)?.anchor;
+  const isVBlock =
+    aAnchor !== undefined && sorted.length === 2 && sorted[1] === addDays(sorted[0], 1) && cyclePosition(aAnchor, sorted[0]) === 4;
 
   // Supervisors swap only with supervisors, and staff with staff: the other role never appears.
   const people = staff
@@ -549,6 +585,7 @@ export async function swapCandidates(aId: string, dates: string[]): Promise<{ aD
       else if (duties.some((d, i) => !dutiesDiffer(d, aDuties[i]))) blocked = "Same duty";
       else if (s.shiftId === a.shiftId && !duties.every((d, i) => isVDuty(d) || isVDuty(aDuties[i]))) blocked = "Same shift: V or V(SB) days only";
       else if (s.shiftId !== a.shiftId && [...duties, ...aDuties].some(isVDuty)) blocked = "V / V(SB): same shift only";
+      else if ([...duties, ...aDuties].some(isVDuty) && !(isVBlock && duties.every((d, i) => isVDuty(d) || isVDuty(aDuties[i])))) blocked = "V / V(SB): pick both nights of the block";
       return { id: s.id, name: s.name, shiftId: s.shiftId!, duties, blocked, birthday: s.birthday };
     });
 

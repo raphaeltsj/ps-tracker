@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { tallyLeaveTaken } from "./leave-report";
 import type { RosterCell } from "./roster-types";
 
-const cell = (absences: RosterCell["absences"]): RosterCell => ({ duty: "AM", dutySource: "cycle", dos: null, task: null, absences, swap: null });
+const cell = (absences: RosterCell["absences"]): RosterCell => ({ duty: "AM", dutySource: "cycle", dos: null, task: null, absences, swap: null, dutyOnLeave: false });
 
 test("tallyLeaveTaken counts only approved leave, half-day at 0.5", () => {
   const cells: Record<string, RosterCell> = {

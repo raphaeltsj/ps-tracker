@@ -117,6 +117,13 @@ export function RosterWorkspace(props: WorkspaceProps) {
       localStorage.setItem("ps-compact", v ? "1" : "0");
     } catch {}
   };
+  /** Clicking a person's cell reopens a collapsed panel, so its details and tools are never hidden. */
+  const expandPanel = useCallback(() => {
+    setPanelCollapsed(false);
+    try {
+      localStorage.setItem("ps-panel-collapsed", "0");
+    } catch {}
+  }, []);
   const togglePanel = () => {
     setPanelCollapsed((prev) => {
       const next = !prev;
@@ -226,6 +233,7 @@ export function RosterWorkspace(props: WorkspaceProps) {
    */
   const clickCell = useCallback(
     (staffId: string, date: string, shiftKey: boolean) => {
+      expandPanel();
       if (mode !== "edit") {
         if (staffId === viewerId || isPseudoRow(staffId)) return clickDate(date, shiftKey);
         return showPerson(staffId, date);
@@ -252,16 +260,17 @@ export function RosterWorkspace(props: WorkspaceProps) {
       });
       setAnchor({ staffId, date });
     },
-    [anchor, canEdit, clickDate, mode, showPerson, viewerId],
+    [anchor, canEdit, clickDate, expandPanel, mode, showPerson, viewerId],
   );
 
   const clickLeave = useCallback((leaveId: string | null, date: string) => {
+    expandPanel();
     setFocusDate(date);
     setDateSettingsOpen(false);
     setFocusLeaveId(leaveId);
     setFocusStaffId(null);
     setSheetOpen(true);
-  }, []);
+  }, [expandPanel]);
 
   const clearSelection = useCallback(() => {
     setDates(new Set());
