@@ -77,6 +77,8 @@ export function SidePanel(props: PanelProps) {
   // so it isn't buried under the request form.
   const other = selection.focusStaffId && selection.focusStaffId !== viewer.id ? roster.staff.find((s) => s.id === selection.focusStaffId) : undefined;
   const otherCell = other && selection.focusDate ? roster.cells[other.id]?.[selection.focusDate] : undefined;
+  // Requests are only for the viewer's own dates: someone else's cell shows just their details.
+  const showRequestTools = mode === "staff" && canRequest && !(other && otherCell);
 
   return (
     <div className="text-sm">
@@ -90,7 +92,7 @@ export function SidePanel(props: PanelProps) {
         <DateSettingsPanel roster={roster} date={selection.focusDate!} today={props.today} isManagement={viewer.role === "MANAGEMENT"} onClose={onCloseDateSettings} />
       )}
       {!focusLeave && !showDateSettings && mode === "edit" && canEdit && (rowKind ? <RowEditor key={rowKind} {...props} kind={rowKind} /> : <EditTools {...props} />)}
-      {mode === "staff" && canRequest && (
+      {showRequestTools && (
         <div className="grid grid-cols-2 gap-0.5 border-b p-2" role="tablist" aria-label="Request leave or a swap">
           <button
             role="tab"
@@ -110,12 +112,12 @@ export function SidePanel(props: PanelProps) {
           </button>
         </div>
       )}
-      {mode === "staff" && canRequest && staffTool === "swap" && (
+      {showRequestTools && staffTool === "swap" && (
         <Section title="Request a swap">
           <SwapForm mode="request" viewerId={viewer.id} firstPeople={[]} today={props.today} prefillDates={[...selection.dates]} />
         </Section>
       )}
-      {mode === "staff" && canRequest && staffTool === "leave" && <RequestForm {...props} />}
+      {showRequestTools && staffTool === "leave" && <RequestForm {...props} />}
       {selection.focusDate && <DateDetails {...props} date={selection.focusDate} />}
     </div>
   );
