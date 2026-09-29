@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { MonthPicker } from "@/components/month-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Period } from "@/lib/report-period";
@@ -72,10 +73,10 @@ export function DayworkerFilters(props: Props) {
         </label>
       )}
       {period === "month" && (
-        <label className="space-y-1">
+        <div className="space-y-1">
           <span className={cn(label, "block")}>Month</span>
-          <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} required className="w-44" />
-        </label>
+          <MonthPicker value={month} onChange={setMonth} years={props.years} />
+        </div>
       )}
       {period === "range" && (
         <>

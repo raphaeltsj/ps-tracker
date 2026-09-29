@@ -32,6 +32,27 @@ export async function notifyLeaveDecision(staffId: string, decidedById: string, 
   await db.notification.create({ data: { staffId, message, href: "/requests" } });
 }
 
+/**
+ * A supervisor or Management cancelled someone's leave, all of it or some of its days: tell the staff
+ * member what went and (for a partial cancel) what is left, unless they cancelled it themselves.
+ */
+export async function notifyLeaveCancelled(input: {
+  staffId: string;
+  byId: string;
+  byName: string;
+  typeCode: string;
+  cancelled: string;
+  remaining: string | null;
+  wasPending: boolean;
+}): Promise<void> {
+  if (input.staffId === input.byId) return;
+  const what = input.wasPending ? `${input.typeCode} request` : `${input.typeCode} leave`;
+  const message = input.remaining
+    ? `${input.byName} cancelled ${input.cancelled} from your ${what}. It now covers ${input.remaining}.`
+    : `Your ${what} on ${input.cancelled} was cancelled by ${input.byName}.`;
+  await db.notification.create({ data: { staffId: input.staffId, message, href: "/requests" } });
+}
+
 /** A supervisor locked dates or set a special event: tell everyone active on the affected shift(s), except who did it. */
 export async function notifyShiftEvent(shiftIds: string[], byId: string, message: string): Promise<void> {
   const staff = await db.staff.findMany({ where: { shiftId: { in: shiftIds }, active: true, id: { not: byId } }, select: { id: true } });

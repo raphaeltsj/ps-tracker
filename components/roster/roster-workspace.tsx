@@ -71,6 +71,13 @@ export type Selection = {
   focusStaffId: string | null;
 };
 
+// One look for every toolbar switch (shift, Calendar/Roster, phone Day/Grid): a 32px bordered box
+// with rounded segments, the selected one in the accent.
+const SEGMENTED = "flex h-8 items-center gap-0.5 rounded-lg border p-0.5 text-sm";
+function segment(selected: boolean): string {
+  return cn("h-full rounded-md px-2", selected ? "bg-primary font-medium text-primary-foreground" : "text-muted-foreground hover:bg-accent");
+}
+
 export function RosterWorkspace(props: WorkspaceProps) {
   const { roster, month, view, mode, canEdit, canRequest, canRequestLocked, today } = props;
   const viewerId = props.viewer.id;
@@ -315,50 +322,37 @@ export function RosterWorkspace(props: WorkspaceProps) {
             <SwapWaitingBanner count={props.swapsWaiting} href={props.hasEditView ? "/manage-requests" : "/requests"} />
           </div>
         )}
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2.5">
-          <div className="flex rounded-lg border p-0.5" role="tablist" aria-label="Shift">
+        {/* Toolbar: every control is one 32px-high box with the same shape, so they sit on one line
+            (supervisors included) from about 1280px wide with the panel open. */}
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 border-b px-4 py-2.5">
+          <div className={SEGMENTED} role="tablist" aria-label="Shift">
             {["A", "B", "C"].map((id) => (
-              <button
-                key={id}
-                role="tab"
-                aria-selected={roster.shiftId === id}
-                onClick={() => navigate({ shift: id })}
-                className={cn(
-                  "rounded-md px-3 py-1 text-sm",
-                  roster.shiftId === id ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-accent",
-                )}
-              >
+              <button key={id} role="tab" aria-selected={roster.shiftId === id} onClick={() => navigate({ shift: id })} className={segment(roster.shiftId === id)}>
                 Shift {id}
                 {props.viewer.shiftId === id && <span className="sr-only"> (your shift)</span>}
               </button>
             ))}
           </div>
 
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" aria-label="Previous month" onClick={() => navigate({ month: shiftMonth(month, -1) })}>
+          <div className="flex h-8 items-center gap-1">
+            <Button variant="ghost" size="icon" className="size-8" aria-label="Previous month" onClick={() => navigate({ month: shiftMonth(month, -1) })}>
               <ChevronLeft className="size-4" />
             </Button>
             <span className="min-w-20 text-center text-sm font-medium">{formatMonth(month)}</span>
-            <Button variant="ghost" size="icon" aria-label="Next month" onClick={() => navigate({ month: shiftMonth(month, 1) })}>
+            <Button variant="ghost" size="icon" className="size-8" aria-label="Next month" onClick={() => navigate({ month: shiftMonth(month, 1) })}>
               <ChevronRight className="size-4" />
             </Button>
             {month !== today.slice(0, 7) && (
-              <Button variant="outline" size="sm" onClick={() => navigate({ month: today.slice(0, 7) })}>
+              <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => navigate({ month: today.slice(0, 7) })}>
                 Today
               </Button>
             )}
           </div>
 
           {/* Calendar / Roster switch: every role */}
-          <div className="flex rounded-full border p-0.5 text-sm" role="group" aria-label="View">
+          <div className={SEGMENTED} role="group" aria-label="View">
             {(["calendar", "roster"] as const).map((v) => (
-              <button
-                key={v}
-                aria-pressed={view === v}
-                onClick={() => navigate({ view: v })}
-                className={cn("rounded-full px-3 py-1 capitalize", view === v ? "bg-foreground text-background font-medium" : "text-muted-foreground hover:bg-accent")}
-              >
+              <button key={v} aria-pressed={view === v} onClick={() => navigate({ view: v })} className={cn(segment(view === v), "capitalize")}>
                 {v}
               </button>
             ))}
@@ -366,24 +360,19 @@ export function RosterWorkspace(props: WorkspaceProps) {
 
           {/* Phones only: one day at a time, or the full month grid scrolled sideways */}
           {!isDesktop && view === "roster" && (
-            <div className="flex rounded-full border p-0.5 text-sm" role="group" aria-label="Phone layout">
+            <div className={SEGMENTED} role="group" aria-label="Phone layout">
               {([
                 [false, "Day"],
                 [true, "Grid"],
               ] as const).map(([grid, label]) => (
-                <button
-                  key={label}
-                  aria-pressed={phoneGrid === grid}
-                  onClick={() => togglePhoneGrid(grid)}
-                  className={cn("rounded-full px-3 py-1", phoneGrid === grid ? "bg-foreground text-background font-medium" : "text-muted-foreground hover:bg-accent")}
-                >
+                <button key={label} aria-pressed={phoneGrid === grid} onClick={() => togglePhoneGrid(grid)} className={segment(phoneGrid === grid)}>
                   {label}
                 </button>
               ))}
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <label className="flex h-8 items-center gap-2 text-sm text-muted-foreground">
             <Switch checked={compact} onCheckedChange={toggleCompact} aria-label="Compact strength rows" />
             Compact
           </label>
@@ -391,38 +380,42 @@ export function RosterWorkspace(props: WorkspaceProps) {
           {/* Right-aligned together, so they wrap as one unit on narrower screens. */}
           {(props.hasEditView || isDesktop) && (
             <div className="ml-auto flex items-center gap-2">
-              {/* Edit / Staff switch: supervisors and Management, deliberately styled differently */}
+              {/* Edit / Staff switch: supervisors and Management. The dashed border marks it as the mode switch. */}
               {props.hasEditView && (
-                <div className="flex items-center rounded-lg border-2 border-dashed p-0.5 text-sm" role="group" aria-label="Edit or Staff view">
+                <div className="flex h-8 items-center gap-0.5 rounded-lg border-2 border-dashed p-0.5 text-sm" role="group" aria-label="Edit or Staff view">
                   <button
                     aria-pressed={mode === "staff"}
+                    aria-label="Staff view"
+                    title="Staff view"
                     onClick={() => navigate({ mode: "staff" })}
-                    className={cn("flex items-center gap-1.5 rounded-md px-3 py-1", mode === "staff" ? "bg-secondary font-semibold" : "text-muted-foreground")}
+                    className={cn("flex h-full items-center gap-1.5 rounded-md px-2", mode === "staff" ? "bg-secondary font-semibold" : "text-muted-foreground hover:bg-accent")}
                   >
-                    <Eye className="size-3.5" /> Staff view
+                    <Eye className="size-3.5" aria-hidden /> Staff
                   </button>
                   <button
                     aria-pressed={mode === "edit"}
+                    aria-label="Edit view"
+                    title="Edit view"
                     onClick={() => navigate({ mode: "edit" })}
-                    className={cn("flex items-center gap-1.5 rounded-md px-3 py-1", mode === "edit" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground")}
+                    className={cn("flex h-full items-center gap-1.5 rounded-md px-2", mode === "edit" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:bg-accent")}
                   >
-                    <Pencil className="size-3.5" /> Edit view
+                    <Pencil className="size-3.5" aria-hidden /> Edit
                   </button>
                 </div>
               )}
 
-              {/* In the toolbar (not on the panel edge) so it never covers the panel's own tabs, and sized
-                  like the switches beside it. */}
+              {/* In the toolbar (not on the panel edge) so it never covers the panel's own tabs; a square the
+                  same height as the other controls. */}
               {isDesktop && (
                 <button
                   type="button"
                   onClick={togglePanel}
                   aria-expanded={!panelCollapsed}
                   aria-label={panelCollapsed ? "Show the side panel" : "Hide the side panel"}
-                  className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-foreground/80 hover:bg-accent hover:text-foreground"
+                  title={panelCollapsed ? "Show panel" : "Hide panel"}
+                  className="flex size-8 items-center justify-center rounded-lg border text-foreground/80 hover:bg-accent hover:text-foreground"
                 >
-                  {panelCollapsed ? <PanelRightOpen className="size-4" /> : <PanelRightClose className="size-4" />}
-                  {panelCollapsed ? "Show panel" : "Hide panel"}
+                  {panelCollapsed ? <PanelRightOpen className="size-[18px]" aria-hidden /> : <PanelRightClose className="size-[18px]" aria-hidden />}
                 </button>
               )}
             </div>
