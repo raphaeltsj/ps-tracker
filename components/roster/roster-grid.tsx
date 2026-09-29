@@ -19,16 +19,39 @@ type GridProps = WorkspaceProps & {
 
 const SHIFT_DUTY_LABEL = { AM: "AM", PM: "PM", OFF: "Rest day" } as const;
 
+// Remembers where the grid was scrolled horizontally, so switching shift or month (which reloads
+// this component) doesn't force a supervisor working near month-end to scroll right again.
+const SCROLL_KEY = "ps-roster-scroll-x";
+
 /** Desktop month grid: sticky name column, sticky date header with strength rows directly below. */
 export function RosterGrid({ roster, selection, compact, today, viewer, mode, canEdit, onDate, onCell, onLeave }: GridProps) {
   const { dates, days } = roster;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Land on today's column (not the 1st of the month) so picking a date for a swap or leave request
-  // doesn't start by showing only past, unselectable days.
+  // doesn't start by showing only past, unselectable days. But if the viewer already scrolled
+  // somewhere this session (e.g. near month-end) and then switched shift or month, which remounts
+  // this grid, restore that instead of snapping back to today every time.
   const todayRef = useRef<HTMLTableCellElement>(null);
   useEffect(() => {
-    todayRef.current?.scrollIntoView({ inline: "start", block: "nearest" });
+    let saved: string | null = null;
+    try {
+      saved = sessionStorage.getItem(SCROLL_KEY);
+    } catch {}
+    if (saved && scrollRef.current) scrollRef.current.scrollLeft = Number(saved);
+    else todayRef.current?.scrollIntoView({ inline: "start", block: "nearest" });
   }, [roster.shiftId, roster.dates]);
+
+  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const left = e.currentTarget.scrollLeft;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try {
+        sessionStorage.setItem(SCROLL_KEY, String(left));
+      } catch {}
+    }, 150);
+  };
 
   const strengthRows: { label: string; value: (d: RosterDay) => React.ReactNode; cls?: (d: RosterDay) => string }[] = [
     { label: "Total Strength", value: (d) => d.strength.total },
@@ -40,7 +63,7 @@ export function RosterGrid({ roster, selection, compact, today, viewer, mode, ca
   return (
     <div className="flex h-full flex-col">
       <DutyLegend className="border-b px-4 py-1.5" />
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto">
         <table className="border-separate border-spacing-0 text-xs">
           <thead className="sticky top-0 z-20 bg-background">
             <tr>
