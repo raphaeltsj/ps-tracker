@@ -47,6 +47,12 @@ export function canViewTaskReport(viewer: Viewer): boolean {
   return viewer.role === "SUPERVISOR" || viewer.role === "MANAGEMENT";
 }
 
+/** Leave report (leave taken against limits, and OIL). Supervisors see their own shift; Management any.
+ * Awarding OIL follows canEditShift. */
+export function canViewLeaveReport(viewer: Viewer): boolean {
+  return viewer.role === "SUPERVISOR" || viewer.role === "MANAGEMENT";
+}
+
 /** Dayworkers are added and edited by supervisors and Management (spec 5.3). */
 export function canManageDayworkers(viewer: Viewer): boolean {
   return viewer.role === "SUPERVISOR" || viewer.role === "MANAGEMENT";

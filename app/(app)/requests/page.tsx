@@ -7,6 +7,7 @@ import { monthDates, todayLocal } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { baseLeaveCode } from "@/lib/domain";
 import { leaveTakenRows, tallyLeaveTaken } from "@/lib/leave-report";
+import { getOilBalances } from "@/lib/oil";
 import { canDecideLeave, canRequestLeave } from "@/lib/permissions";
 import { buildRoster, getMyLeaves } from "@/lib/roster-data";
 import { firstDateWithoutSlot } from "@/lib/slots";
@@ -45,7 +46,7 @@ export default async function RequestsPage({ searchParams }: PageProps<"/request
   const yearFrom = `${year}-01-01`;
   const yearTo = `${year}-12-31`;
 
-  const [leaves, swaps, roster, annualRoster, leaveTypes] = await Promise.all([
+  const [leaves, swaps, roster, annualRoster, leaveTypes, oilBalances] = await Promise.all([
     getMyLeaves(viewer.id),
     getSwapsFor(viewer),
     buildRoster(viewer.shiftId!, from, to, viewer),
@@ -53,6 +54,7 @@ export default async function RequestsPage({ searchParams }: PageProps<"/request
     // roster instead of a second query when that's already the selected period.
     period === "year" ? Promise.resolve(null) : buildRoster(viewer.shiftId!, yearFrom, yearTo, viewer, { staffIds: [viewer.id] }),
     db.leaveType.findMany({ orderBy: [{ custom: "asc" }, { sortOrder: "asc" }] }),
+    getOilBalances([viewer.id]),
   ]);
   for (const l of leaves) {
     if (l.status === "PENDING" && canDecideLeave(viewer, l.staffId, l.shiftId)) l.noSlotOn = await firstDateWithoutSlot(l);
@@ -60,10 +62,10 @@ export default async function RequestsPage({ searchParams }: PageProps<"/request
   const { total, byType } = tallyLeaveTaken(roster.cells[viewer.id], roster.dates);
   const { byType: annualByType } = annualRoster ? tallyLeaveTaken(annualRoster.cells[viewer.id], annualRoster.dates) : { byType };
   // Every leave type shows, even at zero, not just the ones actually taken. Half/full-day variants of
-  // the same type combine (0.5 AL + AL = AL), and AL/OL, MC, OML and BD/BD-IL each get a combined
-  // annual limit; everything else keeps tracking as before, with no limit.
+  // the same type combine (0.5 AL + AL = AL), and AL/OL, MC, OML, BD/BD-IL and GRW each get a combined
+  // annual limit; OIL shows what supervisors have allowed; everything else has no limit.
   const baseCodes = [...new Set(leaveTypes.map((t) => baseLeaveCode(t.code)))];
-  const leaveRows = leaveTakenRows(byType, annualByType, baseCodes);
+  const leaveRows = leaveTakenRows(byType, annualByType, baseCodes, oilBalances[viewer.id]);
 
   // Full history, every status (Pending, Approved, Rejected, Declined/Cancelled/Expired), not only pending.
   const mySwaps = swaps.filter((s) => s.requester.id === viewer.id || s.partner.id === viewer.id);

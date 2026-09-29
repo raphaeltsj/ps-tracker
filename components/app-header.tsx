@@ -3,6 +3,7 @@ import { LogOut } from "lucide-react";
 import { logout } from "@/app/actions";
 import { DevClearRoster } from "@/components/dev-clear-roster";
 import { Logo } from "@/components/logo";
+import { navItems } from "@/components/nav-items";
 import { NavLinks } from "@/components/nav-links";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -15,6 +16,7 @@ export function AppHeader({
   viewer,
   showTasks,
   showTaskReport,
+  showLeaveReport,
   showDayworkers,
   showManageRequests,
   showStaff,
@@ -26,6 +28,7 @@ export function AppHeader({
   viewer: Viewer;
   showTasks: boolean;
   showTaskReport: boolean;
+  showLeaveReport: boolean;
   showDayworkers: boolean;
   showManageRequests: boolean;
   showStaff: boolean;
@@ -34,15 +37,27 @@ export function AppHeader({
   notifications: NotificationSummary[];
   unreadCount: number;
 }) {
-  const links = [
+  // Grouped so the header stays short; a group left with one link (e.g. Management has no My Requests)
+  // shows as that plain link.
+  const links = navItems([
     { href: "/roster", label: "Roster" },
-    ...(viewer.role !== "MANAGEMENT" ? [{ href: "/requests", label: "My Requests" }] : []),
-    ...(showManageRequests ? [{ href: "/manage-requests", label: "Manage requests" }] : []),
-    ...(showTaskReport ? [{ href: "/task-report", label: "Task report" }] : []),
-    ...(showDayworkers ? [{ href: "/dayworkers", label: "Dayworkers" }] : []),
-    ...(showStaff ? [{ href: "/staff", label: "Staff" }] : []),
+    {
+      label: "Requests",
+      items: [
+        ...(viewer.role !== "MANAGEMENT" ? [{ href: "/requests", label: "My Requests" }] : []),
+        ...(showManageRequests ? [{ href: "/manage-requests", label: "Manage requests" }] : []),
+      ],
+    },
+    {
+      label: "Reports",
+      items: [...(showTaskReport ? [{ href: "/task-report", label: "Task report" }] : []), ...(showLeaveReport ? [{ href: "/leave-report", label: "Leave report" }] : [])],
+    },
+    {
+      label: "Manage Staff",
+      items: [...(showDayworkers ? [{ href: "/dayworkers", label: "Dayworkers" }] : []), ...(showStaff ? [{ href: "/staff", label: "Staff" }] : [])],
+    },
     ...(showTasks ? [{ href: "/tasks", label: "Tasks" }] : []),
-  ];
+  ]);
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
       <div className="flex h-14 items-center gap-4 px-4">
@@ -50,7 +65,7 @@ export function AppHeader({
           <Logo />
         </Link>
         <nav className="hidden items-center gap-1 lg:flex">
-          <NavLinks links={links} />
+          <NavLinks items={links} />
         </nav>
         <div className="ml-auto flex items-center gap-1">
           {/* TEMPORARY developer tool: clears the whole roster. Never shown in production. */}

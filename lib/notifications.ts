@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { formatFigure } from "@/lib/strength";
 
 export type NotificationSummary = {
   id: string;
@@ -51,6 +52,23 @@ export async function notifyLeaveCancelled(input: {
     ? `${input.byName} cancelled ${input.cancelled} from your ${what}. It now covers ${input.remaining}.`
     : `Your ${what} on ${input.cancelled} was cancelled by ${input.byName}.`;
   await db.notification.create({ data: { staffId: input.staffId, message, href: "/requests" } });
+}
+
+/** OIL was awarded to (or taken off) these people: tell each how much, and how much they can now take. */
+export async function notifyOilChange(changes: { staffId: string; left: number }[], byId: string, byName: string, amount: number): Promise<void> {
+  const rows = changes.filter((c) => c.staffId !== byId);
+  if (rows.length === 0) return;
+  const days = formatFigure(Math.abs(amount));
+  await db.notification.createMany({
+    data: rows.map((c) => ({
+      staffId: c.staffId,
+      message:
+        amount > 0
+          ? `${byName} awarded you ${days} OIL. You can now take ${formatFigure(c.left)} OIL.`
+          : `${byName} reduced your OIL by ${days}. You can now take ${formatFigure(c.left)} OIL.`,
+      href: "/requests",
+    })),
+  });
 }
 
 /** A supervisor locked dates or set a special event: tell everyone active on the affected shift(s), except who did it. */

@@ -1,6 +1,6 @@
 # PS Tracker: System Context Document
 
-*Duty roster management for a shift-based team | Version 1.23 | Draft for editing*
+*Duty roster management for a shift-based team | Version 1.24 | Draft for editing*
 
 ## 1. Purpose of this document
 
@@ -12,6 +12,8 @@ It has two parts:
 - **Part B: Build framework** (section 17): the tech stack, project structure, and build conventions. Read both before implementing any feature.
 
 > **How to edit:** items in [square brackets] are still undecided. Section 16 lists assumptions and open questions. Update this document whenever a rule changes so it stays the single source of truth.
+
+**Changes in 1.24:** the desktop menu is grouped into Requests, Reports and Manage Staff dropdowns (14.3.1); a new **Leave report** shows each person's leave, every type (against its limit where it has one), with a leave-type filter, and lets supervisors award OIL, one person at a time (−0.5 / +0.5 / +1) or everyone on the shift (+1 / +0.5), with a notification to each person (12.7); OIL is now measured against what each person is allowed, stored as awards, and shown on My Requests (12.6); GRW (Growth Day) has an annual limit of 7 (12.6).
 
 **Changes in 1.23:** a supervisor can cancel the whole of a multi-day leave or only the clicked / selected day(s), and the staff member is notified either way (12.4); the legend names the leave groups by their codes (AL/OL, MC/OML/MWO/HL/FCL, GRW/CSE, BD/BD-IL/OIL) (14.2); the roster toolbar is a single row of same-height controls, with the panel button a square at its end (14.3); the Task report no longer lists each person's dates (9.2); browser support is defined and checked in Firefox and WebKit, with month filters now month and year selects (17.4).
 
@@ -534,8 +536,20 @@ Some types are tracked together against a combined **annual limit**, shown as a 
 | MC          | MC, OML    | 14 (includes any OML taken) |
 | OML         | OML        | 3 (also counts toward MC's 14, so 3 OML leaves 11 MC days) |
 | BD/BD-IL    | BD, BD-IL  | 1 (always, since there is one birthday a year) |
+| GRW         | GRW, 0.5 GRW | 7 (Growth Days; half days count 0.5) |
 
-Everything else (MWO, HL, FCL, CSE, OIL, custom types) has **no limit**: it just keeps a running total, as before. A limit is always checked against the **whole year**, whichever period (month or year) the list is currently showing, so switching to "This month" changes the counts shown but never the "left" figure. Colour the remaining figure the same way as Available Slot(s) (section 8): green above 2 left, amber at 1-2, red at 0 or below (over the limit, for example leave given beyond it).
+**OIL** is measured against what each person is **allowed**, not a fixed limit: supervisors (own shift) and Management award OIL on the Leave report (section 12.7), so it differs from person to person. The OIL row shows OIL used against OIL allowed and how many are left. It is a **running balance**, not reset each year. The 0.5 OIL that comes with a DOS/FDO duty (section 5.2) is earned and taken at once, so it counts on neither side.
+
+Everything else (MWO, HL, FCL, CSE, custom types) has **no limit**: it just keeps a running total, as before. Limits and the OIL allowance are **shown, not enforced**: a request beyond them can still be made and decided (open item, section 16). A limit is always checked against the **whole year**, whichever period (month or year) the list is currently showing, so switching to "This month" changes the counts shown but never the "left" figure. Colour the remaining figure the same way as Available Slot(s) (section 8): green above 2 left, amber at 1-2, red at 0 or below (over the limit, for example leave given beyond it).
+
+### 12.7 Leave report and OIL awards
+
+Supervisors (their own shift) and Management (any shift, picked with Shift A / B / C tabs) have a **Leave report** (`/leave-report`, under **Reports** in the menu) for a chosen year (the past two, this one and next):
+
+- One row per person and **one column per leave type**, every type tracked even at zero: the limited ones (AL/OL, MC, OML, BD/BD-IL, GRW) as days taken and days left in the same colours as section 12.6; OIL as what they can take ("used X of Y allowed"); and every type with no limit (MWO, HL, FCL, CSE, custom types) as days taken. Counts are approved leave only and come from the roster, so they match each person's My Requests. The Staff column stays pinned while the table scrolls sideways.
+- **Leave types filter:** a chip per type (with its legend colour) turns its column on or off, with shortcuts **All**, **With a limit**, **No limit** and **Clear**. All are shown to start with; the filter changes the view instantly (no reload).
+- **Awarding OIL:** each row has **−0.5**, **+0.5** and **+1** buttons, and the page has **+1 OIL to everyone** and **+0.5 OIL to everyone** (every active person on the shift, after a confirmation), for example after a public holiday on an Off day. OIL allowed can't go below zero. Only people who can edit the shift (section 10) see these buttons, and the server checks the same.
+- Every award or reduction sends the person a **bell notification** ("Alpha awarded you 1 OIL. You can now take 3 OIL."), except to whoever made it. Each award is stored (who, when, how much), and the allowance is their sum.
 
 ## 13. Notifications
 
@@ -603,6 +617,7 @@ Other screens (Calendar view, side panel, Home, forms) keep text labels for duti
 ### 14.3.1 Navigation, loading and error states
 
 - The requests page is called **My Requests** everywhere (desktop menu, mobile tab, page heading); the review page for supervisors and Management is **Manage requests**.
+- The desktop menu is grouped so it stays short: **Roster**, **Requests** (My Requests, Manage requests), **Reports** (Task report, Leave report), **Manage Staff** (Dayworkers, Staff), and Tasks for Management. A group opens as a dropdown; a group with only one page for that role (for example Requests for Management, who have no My Requests) is a plain link to it, and a group with none is left out.
 - The desktop Roster view opens **scrolled to today's column**, not the 1st of the month, so the dates a leave request or duty swap can actually use (today onwards) are visible without scrolling first. The mobile week strip already opens on the week containing today.
 - On phones and tablets (where the top menu is hidden), Profile links to every page the role can open.
 - Changing month, shift or view shows a thin progress bar and dims the roster until the new data arrives; moving between pages shows a loading indicator.
@@ -696,6 +711,8 @@ For now, use placeholder staff names that are each a **single 5-character word**
 - V(SB): how a standby person's own cycle looks around their standby day (for example, which days they are normally on, and whether their following block changes).
 - Whether the "extra slot needed" rule for approval also applies to leave a supervisor gives directly, to a supervisor's own leave, and to edits of existing leave.
 - Where leave entitlements come from, so "leave taken" (section 12.6) could one day also show how many of each type remain.
+- Whether leave limits and the OIL allowance should **block** a request or approval that goes over them (currently shown only, like the other limits), and whether unused OIL **expires** (currently a running balance that carries over).
+- BD/BD-IL shows "0 left" in red once the birthday leave is taken, the same band as any limit reached; confirm whether a used-up once-a-year entitlement should look neutral instead.
 - Branding: final app name, logo, and accent colour.
 - Notification design and rules (future).
 - Tasks on non-working days: whether a Task may be assigned on an Off day or on a V(SB) standby day (currently allowed; only full-day leave blocks a Task).
@@ -754,15 +771,17 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
   /(app)/manage-requests    Manage requests: leave inbox, swap approvals (view / review only;
                             supervisor / management; mobile Manage tab; section 11.5)
   /(app)/task-report        Task report (supervisor / management), section 9.2
+  /(app)/leave-report       Leave report and OIL awards (supervisor / management), section 12.7
   /(app)/dayworkers         dayworkers and their Ops duty counts (supervisor / management), section 5.3
   /(app)/tasks              Task management (management only)
   /(app)/staff              Staff records and Task proficiency (supervisor / management), section 11.6
-  /(app)/profile            profile, theme, links to Tasks, the Task report, and Staff on mobile
+  /(app)/profile            profile, theme, links to Tasks, the Task and Leave reports, and Staff on mobile
   actions.ts                all Server Actions: requestLeave, approveLeave, giveLeave, assignDuty, assignTask,
                             lockDates, setSpecialEvent (with the optional announce banner), ...
   swap-actions.ts           duty swap Server Actions
   staff-actions.ts          staff record Server Actions (create / update / deactivate, Task proficiency)
   announcement-actions.ts   closing the announcement banner (per viewer)
+  oil-actions.ts            awarding OIL: one person (+/-) or everyone on a shift, with notifications
 /components/ui              shadcn/ui components
 /components/roster          RosterGrid, CalendarView, MobileRoster, SidePanel (incl. the roster's
                             Request swap / Swap tabs, and the lock/event date-settings panel with its
@@ -774,10 +793,14 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
                             roster, the list from My Requests and Manage requests
 /components/staff           StaffManager: add / edit / deactivate staff, and the Task proficiency matrix
 /components/announcements   AnnouncementBanner: the combined, sliding, per-viewer-dismissible banner
+/components/reports         LeaveReportTable: leave against limits, OIL with award buttons
+nav-items.ts / nav-links.tsx  the grouped desktop menu (model, and the dropdown renderer)
 /lib
   cycle.ts                  duty cycle, cycle position, V overlay and Off (post-V)
   swaps.ts                  duty swap exchange and preview (pure); swap-data.ts loads and checks swaps
   dos-oil.ts                the automatic 0.5 OIL after a DOS/FDO duty
+  oil.ts                    OIL allowed / used / left per person (OilGrant awards minus approved OIL leave)
+  leave-report.ts           leave taken, limit groups (AL/OL, MC, OML, BD/BD-IL, GRW) and the OIL row
   strength.ts               Total / Not in / Working / MFL / Available Slot(s)
   birthday.ts                BD / BD-IL placement
   leave-rules.ts            one type of leave per person per day
