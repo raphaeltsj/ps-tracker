@@ -14,14 +14,14 @@ import { SWAP_STATUS_LABEL, type SwapStatus } from "@/lib/swaps";
 import { cn } from "@/lib/utils";
 
 const STATUS_STYLE: Record<SwapStatus, string> = {
-  PENDING_PARTNER: "bg-amber-100 text-amber-900 dark:bg-amber-400/20 dark:text-amber-200",
-  PENDING_APPROVAL: "bg-amber-100 text-amber-900 dark:bg-amber-400/20 dark:text-amber-200",
-  APPROVED: "bg-emerald-100 text-emerald-900 dark:bg-emerald-400/20 dark:text-emerald-200",
-  DECLINED: "bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200",
-  REJECTED: "bg-red-100 text-red-900 dark:bg-red-400/20 dark:text-red-200",
-  WITHDRAWN: "bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200",
-  CANCELLED: "bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200",
-  EXPIRED: "bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200",
+  PENDING_PARTNER: "bg-warning-soft text-warning-ink",
+  PENDING_APPROVAL: "bg-warning-soft text-warning-ink",
+  APPROVED: "bg-success-soft text-success-ink",
+  DECLINED: "bg-muted text-muted-foreground",
+  REJECTED: "bg-danger-soft text-danger-ink",
+  WITHDRAWN: "bg-muted text-muted-foreground",
+  CANCELLED: "bg-muted text-muted-foreground",
+  EXPIRED: "bg-muted text-muted-foreground",
 };
 
 export function SwapStatusBadge({ status }: { status: SwapStatus }) {
@@ -39,7 +39,7 @@ export function SwapFeedbackProvider({ children }: { children: React.ReactNode }
   return (
     <Feedback.Provider value={setMessage}>
       {message && (
-        <div role="status" className="sticky top-16 z-30 flex items-start gap-2 rounded-lg border border-emerald-600/40 bg-emerald-50 p-3 text-sm text-emerald-900 shadow-sm dark:bg-emerald-500/15 dark:text-emerald-100">
+        <div role="status" className="sticky top-16 z-30 flex items-start gap-2 rounded-lg border border-success/40 bg-success-soft p-3 text-sm text-success-ink shadow-sm">
           <Check className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span className="flex-1">{message}</span>
           <button type="button" className="text-xs underline underline-offset-2" onClick={() => setMessage(null)}>
@@ -167,15 +167,15 @@ function SwapCard({ swap: s, viewerId, proficiencyByStaff }: { swap: SwapSummary
         )}
       </div>
       {s.notes && <p className="text-xs">Notes: {s.notes}</p>}
-      {s.rejectReason && <p className="text-xs text-red-700 dark:text-red-300">Reject reason: {s.rejectReason}</p>}
+      {s.rejectReason && <p className="text-xs text-danger-ink">Reject reason: {s.rejectReason}</p>}
       {s.status === "APPROVED" && s.started && <p className="text-xs text-muted-foreground">Started on {formatDateShort(s.dates[0])}, so it stays as worked and can no longer be cancelled.</p>}
       {pendingState &&
         s.warnings.map((w) => (
-          <p key={w} className="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
+          <p key={w} className="rounded-md bg-warning-soft p-2 text-xs text-warning-ink">
             {w}
           </p>
         ))}
-      {s.problem && pendingState && <p className="rounded-md bg-red-50 p-2 text-xs font-medium text-red-800 dark:bg-red-500/10 dark:text-red-200">Cannot go through as things stand: {s.problem}</p>}
+      {s.problem && pendingState && <p className="rounded-md bg-danger-soft p-2 text-xs font-medium text-danger-ink">Cannot go through as things stand: {s.problem}</p>}
 
       {!rejecting && !confirmCancel && (s.can.respond || s.can.withdraw || s.can.approve || s.can.reject || s.can.cancel) && (
         <div className="flex flex-wrap gap-2">
@@ -205,7 +205,7 @@ function SwapCard({ swap: s, viewerId, proficiencyByStaff }: { swap: SwapSummary
             </Button>
           )}
           {s.can.cancel && (
-            <Button size="sm" variant="outline" className="text-red-700 dark:text-red-300" disabled={pending} onClick={() => setConfirmCancel(true)}>
+            <Button size="sm" variant="outline" className="text-danger-ink" disabled={pending} onClick={() => setConfirmCancel(true)}>
               Cancel swap
             </Button>
           )}
@@ -225,7 +225,7 @@ function SwapCard({ swap: s, viewerId, proficiencyByStaff }: { swap: SwapSummary
         </div>
       )}
       {confirmCancel && (
-        <div className="space-y-2 rounded-md border border-red-300 p-2 dark:border-red-500/40">
+        <div className="space-y-2 rounded-md border border-danger/40 p-2">
           <p className="text-xs">Cancel this approved swap? Both people go back to their own duties on these dates.</p>
           <div className="flex gap-2">
             <Button size="sm" variant="destructive" disabled={pending} onClick={() => run(() => cancelSwap(s.id), () => setConfirmCancel(false))}>
@@ -276,7 +276,7 @@ function ProficiencyCompare({ a, b, proficiencyByStaff }: { a: { id: string; nam
                         key={t.taskName}
                         className={cn(
                           "rounded px-1.5 py-0.5 text-[10px] font-semibold",
-                          t.understudy ? "bg-amber-100 text-amber-900 dark:bg-amber-400/20 dark:text-amber-200" : "bg-emerald-100 text-emerald-900 dark:bg-emerald-400/20 dark:text-emerald-200",
+                          t.understudy ? "bg-warning-soft text-warning-ink" : "bg-success-soft text-success-ink",
                         )}
                       >
                         {t.taskName}
@@ -296,7 +296,7 @@ function ProficiencyCompare({ a, b, proficiencyByStaff }: { a: { id: string; nam
 
 function SideState({ label, by }: { label: string; by: string | null }) {
   return by ? (
-    <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
+    <span className="inline-flex items-center gap-1 text-success-ink">
       <Check className="size-3" /> {label} approved by {by}
     </span>
   ) : (

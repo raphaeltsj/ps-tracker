@@ -15,8 +15,8 @@ function UsernameInput({ value, onChange, label, id }: { value: string; onChange
   const over = value.trim().length > DAYWORKER_USERNAME_MAX;
   return (
     <div className="flex items-center gap-2">
-      <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} className={cn("w-32 uppercase", over && "border-red-500")} />
-      <span className={cn("w-10 text-xs tabular-nums", over ? "font-semibold text-red-600" : "text-muted-foreground")} aria-live="polite">
+      <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} className={cn("w-32 uppercase", over && "border-danger")} />
+      <span className={cn("w-10 text-xs tabular-nums", over ? "font-semibold text-danger-ink" : "text-muted-foreground")} aria-live="polite">
         {value.trim().length}/{DAYWORKER_USERNAME_MAX}
       </span>
     </div>

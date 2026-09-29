@@ -1,6 +1,6 @@
 # PS Tracker: System Context Document
 
-*Duty roster management for a shift-based team | Version 1.20 | Draft for editing*
+*Duty roster management for a shift-based team | Version 1.21 | Draft for editing*
 
 ## 1. Purpose of this document
 
@@ -12,6 +12,8 @@ It has two parts:
 - **Part B: Build framework** (section 17): the tech stack, project structure, and build conventions. Read both before implementing any feature.
 
 > **How to edit:** items in [square brackets] are still undecided. Section 16 lists assumptions and open questions. Update this document whenever a rule changes so it stays the single source of truth.
+
+**Changes in 1.21:** a new colour scheme across the app (14.2): a cool slate neutral base with a deep ink-navy accent (dark mode is deep navy rather than black); duties follow the time of day, AM a warm apricot, PM a deeper dusk blue, V a night indigo; leave chips are no longer all teal but coloured by group, Annual (AL, OL: teal), Health & care (MC, OML, MWO, HL, FCL: rose), Training & growth (CSE, GRW: green), Birthday & in lieu (BD, BD-IL, OIL: plum), and custom types neutral slate (12.1); the legend names the leave groups; DOS/FDO tags are solid ink and duty-swap tags azure, so neither is mistaken for leave; the Edit view switch uses the accent instead of magenta, which stays reserved for special events; the colour legend moves below the roster grid; section 17 gains a colour-token guide for building new UI.
 
 **Changes in 1.20:** the Staff records page's Task proficiency editor is redesigned from a per-person expanding picker into a single matrix (people down, Tasks across, one click-to-cycle button per cell), which stays usable as Management adds more Tasks; Management can filter the matrix by shift (9.3, 11.6, 14).
 
@@ -112,7 +114,7 @@ The duty picker offers **V, V(SB), and Off(V)**, plus "reset to cycle". A superv
 - **AM and PM are never assigned by hand.** They come from the shift cycle. Supervisors change the cycle only through V duty and its Off(V) days.
 - **Off(V)** is an Off awarded because of V duty. It covers both the 2 days the app creates after a V block, and an Off a supervisor gives by hand, for example to a V(SB) who was activated and did the V duty. The app does not track activation: the supervisor simply picks the Off day.
 - **Reset to cycle** removes whatever was assigned, so the person follows the normal rotation again.
-- **Duty on a leave day is pending.** A supervisor may assign V, V(SB), Off(V) or a DOS/FDO duty on a day the person has leave (approved or pending, including BD / BD-IL), except **medical leave (MC, OML, HL)**, which the app refuses and names. The leave stays and still counts in the strength figures. The person gets a bell notification, and their cell turns **orange with a "Pending" tag** (legend: "Duty on leave (pending)") so they can plan: they may **swap the duty away** (section 11.4), or the supervisor removes the duty, or the leave is cancelled. The Pending flag clears by itself once any of those happens. A DOS/FDO stays with its holder through a swap, so only removing it clears that day. The flag shows only where the leave itself is visible to the viewer. Extra shift duty is still refused on any leave day (section 5.4).
+- **Duty on a leave day is pending.** A supervisor may assign V, V(SB), Off(V) or a DOS/FDO duty on a day the person has leave (approved or pending, including BD / BD-IL), except **medical leave (MC, OML, HL)**, which the app refuses and names. The leave stays and still counts in the strength figures. The person gets a bell notification, and their cell turns **amber (`warning`, the reserved "pending" colour) with a dashed outline and a "Pending" tag** (legend: "Duty on leave (pending)") so they can plan: they may **swap the duty away** (section 11.4), or the supervisor removes the duty, or the leave is cancelled. The Pending flag clears by itself once any of those happens. A DOS/FDO stays with its holder through a swap, so only removing it clears that day. The flag shows only where the leave itself is visible to the viewer. Extra shift duty is still refused on any leave day (section 5.4).
 - **No leave on a day the person already has V duty or a DOS/FDO duty**, the other way around (section 12.3). Remove the duty first if leave is genuinely needed that day.
 
 V duty runs for **2 days**, and each of those days has a **standby person** on **V(SB)**. Standby people come from **within the same shift** as the person on V duty.
@@ -453,7 +455,16 @@ Common leave types and their full names:
 | **GRW**     | Growth Day                |                                                                                                                              |
 | **0.5 GRW** | Half-day growth day       | Requester chooses the first half or second half of the duty timing; the UI shows the actual hours. Counts as 0.5.            |
 
-- Each type appears as a short-code chip on the roster. Half-day types (0.5 AL and 0.5 OIL) look visually different (for example half-filled) from full-day leave.
+- Each type appears as a short-code chip on the roster. Half-day types (0.5 AL, 0.5 OIL and 0.5 GRW) look half-filled, and pending leave has a dashed outline and a "?".
+- Chips are coloured by **group**, so leave of the same kind looks the same at a glance (the code still names the exact type); every group has the same visual weight:
+
+| **Group**              | **Types**                    | **Colour**   |
+|------------------------|------------------------------|--------------|
+| **Annual**             | AL, 0.5 AL, OL               | Teal         |
+| **Health & care**      | MC, OML, MWO, HL, FCL        | Rose         |
+| **Training & growth**  | CSE, GRW, 0.5 GRW            | Green        |
+| **Birthday & in lieu** | BD, BD-IL, 0.5 OIL, 1 OIL    | Plum         |
+| **Custom** (12.2)      | Any supervisor-added type    | Neutral slate |
 
 **Birthday leave rules (BD and BD-IL):**
 
@@ -546,24 +557,30 @@ When locking dates or setting a special event (sections 6, 12.5), a supervisor o
 
 - Simple, calm, easy on the eyes, and highly readable for dense data. No decorative clutter.
 - **Light and dark mode toggle** in the header, with sufficient contrast in both modes.
-- Neutral base with one restrained accent colour. No brand identity yet, so use a neutral placeholder logo with the name "PS Tracker".
-- Suggested colours, always paired with a text label, an icon, or a legend for accessibility (see "Roster view colour coding" below):
+- Neutral base with one restrained accent colour: a cool slate neutral (deep navy, not black, in dark mode) with an ink-navy accent for primary buttons, the selected shift, today's date and the Edit view switch. No brand identity yet, so use a neutral placeholder logo with the name "PS Tracker".
+- Duty colours follow the time of day, lightest in the morning to darkest at night, in both light and dark mode. Every colour is a named token in `app/globals.css`, so the palette is changed in one place.
+- Colours, always paired with a text label, an icon, or a legend for accessibility (see "Roster view colour coding" below):
 
-| **Item**          | **Suggested colour**                      |
+| **Item**          | **Colour**                                |
 |-------------------|-------------------------------------------|
-| **AM**            | Yellow (solid in dark mode too: a see-through yellow on a dark background reads as brown) |
-| **PM**            | Blue                                      |
-| **V (night)**     | Purple                                    |
-| **Off**           | Soft grey                                 |
-| **Leave**         | Teal                                      |
-| **Special event** | Magenta accent                            |
+| **AM**            | Warm apricot (solid in dark mode too: a see-through warm tone on a dark background reads as brown) |
+| **PM**            | Deeper dusk blue                          |
+| **V (night)**     | Night indigo                              |
+| **Off**           | Soft slate grey                           |
+| **Off(V)**        | Light lavender tint with the "Off(V)" label |
+| **Leave**         | By group (section 12.1): Annual teal, Health & care rose, Training & growth green, Birthday & in lieu plum, custom neutral slate |
+| **DOS/FDO**       | Solid ink tag                             |
+| **Duty swap**     | Azure tag with the ⇄ icon                 |
+| **Special event** | Magenta accent (used for nothing else)    |
 | **V(SB) standby** | Neutral grey dashed outline: standby only, so not the V colour |
 | **Locked date**   | Neutral hatch pattern with a lock icon    |
+| **Duty on leave (pending)** | Amber (`warning`) tint with a dashed amber outline and a "Pending" tag (section 5.1) |
 | **Announcement banner** | Cyan accent, with a megaphone icon  |
+| **Status**        | Green = fine / approved, amber = low / pending, red = none left / rejected / error |
 
-**Roster view colour coding.** On the Roster view (desktop grid and mobile day list), **AM, PM, and Off are not written as text**. Each cell is filled with its duty colour instead: AM yellow, PM blue, Off grey. The date header shows the shift's duty as a small colour bar. **V, V(SB) and Off(V) keep a text label** on top of their colour, because they are exceptions to the cycle (Off(V) is a light violet tint with the "Off(V)" chip, not a border). DOS/FDO duties show their name as a small tag. To stay accessible without text:
+**Roster view colour coding.** On the Roster view (desktop grid and mobile day list), **AM, PM, and Off are not written as text**. Each cell is filled with its duty colour instead: AM apricot, PM dusk blue, Off grey. The date header shows the shift's duty as a small colour bar. **V, V(SB) and Off(V) keep a text label** on top of their colour, because they are exceptions to the cycle (Off(V) is a light violet tint with the "Off(V)" chip, not a border). DOS/FDO duties show their name as a small tag. To stay accessible without text:
 
-- A **colour legend** sits above the roster grid (and on the mobile day card) naming every colour **by name only**: AM, PM, V and DOS/FDO are written as just "AM", "PM", "V" and "DOS/FDO", with no timings and no report time. Times stay in the cell tooltips.
+- A **colour legend** sits **below** the roster grid, pinned so it stays in view while the grid scrolls (on the phone Day list, at the end of the day), naming every colour, including the leave groups, **by name only**: AM, PM, V and DOS/FDO are written as just "AM", "PM", "V" and "DOS/FDO", with no timings and no report time. Times stay in the cell tooltips.
 - Each cell has a hover tooltip and a screen-reader label with the duty name and times.
 - Leave chips, Task tags, lock icons, and special-event markers still appear on top of the colour. Task and DOS/FDO tags have a near-solid background so they stay readable on every duty colour.
 
@@ -787,7 +804,45 @@ Do not introduce Postgres, Vercel-specific features, Firebase, or a separate Exp
 - **Seed realistic-shaped data:** the seed creates 3 shifts, staff with placeholder 5-character names, and enough duties, V blocks, leave, and Tasks that the app looks populated on first run.
 - **Flag, don't guess:** if behaviour is not fully specified (see section 16), implement the most reasonable interpretation and leave a `// TODO(open item):` comment rather than silently deciding.
 
-### 17.5 Build priority
+### 17.5 Colour tokens (read before designing any new UI)
+
+The product rules for colour are in section 14.2; this is how they are built, so new screens and components fit the existing scheme.
+
+**Where colours live.** Every colour is a CSS variable in `app/globals.css`, defined twice: under `:root` (light) and `.dark` (dark). Each is registered in the `@theme inline` block, which makes it a Tailwind utility: `--am` becomes `bg-am`, `text-am`, `border-am`, and opacity modifiers work (`border-danger/40`). Because the variable itself switches with the theme, **components never need `dark:` colour variants**.
+
+**Rules.**
+
+- **Use tokens, never raw Tailwind palette colours** (`bg-red-100`, `text-emerald-700`, `bg-yellow-300` ...). If no token fits, add one (below) rather than hard-coding.
+- **Reuse the shared pieces** in `components/roster/chips.tsx` instead of restyling: `DUTY_CELL` / `DutyChip` for duties, `LeaveChip` for leave, `StatusBadge` / `SlotBadge` / `SLOT_STYLE` / `SLOT_BG` for statuses, `DosTag`, `SwapTag`, `TaskTag`, `LockBadge`, `EventBadge`, `OpsChip`, `ExtraChip`.
+- **Colour is never the only signal:** pair it with text, an icon, or the legend (`DutyLegend`, shown below the roster grid). Anything new with its own colour on the roster goes in the legend.
+- **Text contrast at least 4.5:1 in both themes.** Anything drawn on top of a roster cell (a tag or chip) needs a near-solid background, because it can land on any duty colour.
+- **Reserved meanings: don't reuse these for anything else.** Magenta (`event`) = special events only. Red (`danger`, `destructive`) = errors, no slots or below MFL, rejected, and destructive actions; never a category. Amber (`warning`) = low slots, pending, cautions. Green (`success`) = fine, approved, done. Ink navy (`primary`) = the one accent: primary buttons, the selected tab, today, the Edit view switch, DOS/FDO tags.
+
+**Token families.** Most families come as a set: the base (solid fill, borders, bars, dots), `-soft` (a pale panel or badge background), and `-ink` (text on the soft fill).
+
+| **Family** | **Tokens** | **Use** |
+|---|---|---|
+| Neutral base | `background`, `foreground`, `card`, `muted`, `muted-foreground`, `secondary`, `accent`, `border`, `input`, `ring` | Page, surfaces, quiet text, dividers (shadcn/ui names). Cool slate, not pure grey. |
+| Accent | `primary`, `primary-foreground` | The one accent, ink navy (light periwinkle in dark mode). |
+| Duties | `am`, `am-edge`, `am-ink` · `pm`, `pm-edge`, `pm-ink` · `night`, `night-strong`, `night-ink` · `offv`, `offv-ink` · `off`, `off-edge`, `off-ink` · `standby`, `standby-edge`, `standby-ink` | Time of day, light to dark: AM warm apricot, PM dusk blue, V night indigo. Off slate, Off(V) lavender, V(SB) neutral dashed. |
+| Leave groups | `leave-annual`, `leave-medical`, `leave-growth`, `leave-inlieu`, `leave-custom` (each with `-soft`, `-ink`), and `leave-on` (text on a solid chip) | Picked by `leaveGroup(code)` in `lib/domain.ts`. A chip sets `data-leave={group}`, which sets `--chip`, `--chip-soft` and `--chip-ink`; style it with `bg-(--chip)` and so on, and use `.leave-half` for half-day. A new leave type goes in `LEAVE_GROUP_BY_BASE_CODE`, not a new colour. |
+| Status | `success`, `warning`, `danger` (+ `-soft`, `-ink`) | Messages, badges, slot figures, limit bars. |
+| Markers | `info` (announcements, dayworker Ops chips), `event` (special events), `swap` (duty swaps), `extra` (Extra duty) (+ `-soft`, `-ink`) | One meaning each. |
+| Other | `--hatch` via `.bg-hatch` | Locked dates. |
+
+**Recipes.**
+
+- Message or panel: `rounded-md bg-danger-soft p-2 text-xs text-danger-ink` (swap `danger` for `warning`, `success`, `info`).
+- Outlined box: `border border-success/40`.
+- Badge: `bg-warning-soft text-warning-ink` (see `StatusBadge`).
+- Solid fill with text: `bg-success text-white dark:text-background` (the solid gets lighter in dark mode, so its text flips dark).
+- Tag on a roster cell: soft or solid background plus a border, never transparent (see `SwapTag`, `TaskTag`).
+
+**Hue map** (OKLCH hue, to avoid a new colour looking like an existing one): danger 27 · extra 50 · AM 74 / warning 75 to 85 · growth 145 · success 160 · annual 195 · info 215 · swap 240 · PM 255 · accent and neutrals 255 to 262 (low chroma) · V / Off(V) 285 to 292 · in lieu 305 · event 340 · medical 5. Siblings share a lightness: the leave groups are all about L 0.53 in light mode and L 0.74 in dark mode, so no chip is louder than another.
+
+**Adding a colour.** Add the variable to both `:root` and `.dark` in `app/globals.css`, register it in `@theme inline` (`--color-name: var(--name);`), give it a hue that is free on the map above, check contrast in both themes, and add a row to this section (and to section 14.2 if it carries product meaning).
+
+### 17.6 Build priority
 
 Done: Roster view and same-page leave request (staff), Calendar view, Edit view roster grid (supervisor), give / edit / cancel leave, approve / reject from the leave detail panel, assign duties (V, V(SB), Off(V), DOS/FDO) and Tasks, lock dates and special events (with the optional announcement banner), Task management (management), Task proficiency, the Task report, dayworkers with Ops duty and their count, Extra shift duty, the Support and Recall placeholder rows, duty swaps (including picking one directly from the roster, and comparing proficiency when reviewing one), the My Requests / Manage requests pages, staff records, and notifications for leave decisions and shift announcements.
 

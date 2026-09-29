@@ -115,6 +115,40 @@ export function isMedicalLeave(code: string): boolean {
   return (MEDICAL_LEAVE_CODES as readonly string[]).includes(code);
 }
 
+/**
+ * Colour groups for leave chips (spec 14.2): leave of the same kind shares a colour so a supervisor
+ * can read a column at a glance; the code on the chip still names the exact type. Custom types
+ * (spec 12.2) can't be classified, so they get their own neutral group.
+ */
+export type LeaveGroup = "annual" | "health" | "growth" | "inlieu" | "custom";
+
+export const LEAVE_GROUP_LABEL: Record<LeaveGroup, string> = {
+  annual: "Annual",
+  health: "Health & care",
+  growth: "Training & growth",
+  inlieu: "Birthday & in lieu",
+  custom: "Custom",
+};
+
+const LEAVE_GROUP_BY_BASE_CODE: Record<string, LeaveGroup> = {
+  AL: "annual",
+  OL: "annual",
+  MC: "health",
+  OML: "health",
+  MWO: "health",
+  HL: "health",
+  FCL: "health",
+  CSE: "growth",
+  GRW: "growth",
+  BD: "inlieu",
+  "BD-IL": "inlieu",
+  OIL: "inlieu",
+};
+
+export function leaveGroup(code: string): LeaveGroup {
+  return LEAVE_GROUP_BY_BASE_CODE[baseLeaveCode(code)] ?? "custom";
+}
+
 export const NAME_MAX = 6; // Task names and custom leave type codes
 
 export const MFL: Record<"weekday" | "weekend", { AM: number; PM: number; V: number }> = {

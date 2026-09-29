@@ -1,19 +1,19 @@
 import { ArrowLeftRight, CalendarClock, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { DOS_LABEL, DOS_REPORT_TIME, DUTY_LABEL, DUTY_TIMES, STATUS_LABEL, type DosKind, type Duty, type LeaveStatus } from "@/lib/domain";
+import { DOS_LABEL, DOS_REPORT_TIME, DUTY_LABEL, DUTY_TIMES, LEAVE_GROUP_LABEL, leaveGroup, STATUS_LABEL, type DosKind, type Duty, type LeaveGroup, type LeaveStatus } from "@/lib/domain";
 import type { CellAbsence, CellSwap, ExtraEntry, OpsEntry } from "@/lib/roster-types";
 import { formatFigure, slotLabel, type Strength } from "@/lib/strength";
 
-// Colours always come with a text label (spec 14.2).
+// Colours always come with a text label (spec 14.2). Palette tokens live in app/globals.css.
 const DUTY_STYLE: Record<Duty, string> = {
-  AM: "bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-400 dark:text-yellow-950 dark:border-yellow-400",
-  PM: "bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-400/20 dark:text-blue-200 dark:border-blue-400/40",
-  V: "bg-purple-900 text-purple-50 border-purple-900 dark:bg-purple-500/40 dark:text-purple-50 dark:border-purple-400/60",
-  // Standby only, not on duty: a neutral dashed outline rather than V's purple.
-  VSB: "bg-transparent text-slate-700 border-slate-400 border-dashed dark:text-slate-300 dark:border-slate-500",
-  OFF: "bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:border-neutral-700",
-  OFF_V: "bg-neutral-100 text-violet-700 border-violet-400 border-dashed dark:bg-neutral-800 dark:text-violet-300 dark:border-violet-500/60",
+  AM: "bg-am text-am-ink border-am-edge",
+  PM: "bg-pm text-pm-ink border-pm-edge",
+  V: "bg-night-strong text-night-ink border-night-strong",
+  // Standby only, not on duty: a neutral dashed outline rather than V's indigo.
+  VSB: "bg-standby text-standby-ink border-standby-edge border-dashed",
+  OFF: "bg-off text-off-ink border-off-edge",
+  OFF_V: "bg-offv text-offv-ink border-offv-ink/50 border-dashed",
 };
 
 const DUTY_SHORT: Record<Duty, string> = { ...DUTY_LABEL };
@@ -23,26 +23,25 @@ const DUTY_SHORT: Record<Duty, string> = { ...DUTY_LABEL };
  * their text chip. The legend and cell tooltips / screen-reader labels carry the names.
  */
 export const DUTY_CELL: Record<Duty, string> = {
-  // Solid in dark mode too: a translucent yellow over the dark background reads as olive/brown.
-  AM: "bg-yellow-300 dark:bg-yellow-400",
-  PM: "bg-blue-200/80 dark:bg-blue-500/35",
-  V: "bg-purple-300/70 dark:bg-purple-600/40",
-  VSB: "bg-slate-100 dark:bg-slate-500/15",
-  OFF: "bg-neutral-100 dark:bg-neutral-800/70",
+  AM: "bg-am",
+  PM: "bg-pm",
+  V: "bg-night",
+  VSB: "bg-standby",
+  OFF: "bg-off",
   // A light tint plus the "Off(V)" text chip (LABELLED_DUTIES below); no border overlay needed.
-  OFF_V: "bg-violet-50 dark:bg-violet-500/10",
+  OFF_V: "bg-offv",
 };
 
 /**
- * A duty assigned over leave (spec 5.1): orange, pending until the person swaps it away or the duty
+ * A duty assigned over leave (spec 5.1): amber (`warning`, the reserved "pending" colour), pending until the person swaps it away or the duty
  * or leave is removed. Always paired with the "Pending" tag below.
  */
-export const DUTY_ON_LEAVE_CELL = "bg-orange-100 outline-2 outline-dashed -outline-offset-2 outline-orange-500 dark:bg-orange-500/20";
+export const DUTY_ON_LEAVE_CELL = "bg-warning-soft outline-2 outline-dashed -outline-offset-2 outline-warning";
 export const DUTY_ON_LEAVE_TITLE = "Duty assigned on a leave day: pending until it is swapped away, or the duty or leave is removed";
 
 export function PendingTag() {
   return (
-    <span className="rounded border border-orange-500 bg-orange-50 px-1 text-[10px] font-semibold leading-4 text-orange-800 dark:bg-orange-950 dark:text-orange-200" title={DUTY_ON_LEAVE_TITLE}>
+    <span className="rounded border border-warning bg-warning-soft px-1 text-[10px] font-semibold leading-4 text-warning-ink" title={DUTY_ON_LEAVE_TITLE}>
       Pending
     </span>
   );
@@ -76,13 +75,13 @@ export function DutyLegend({ className }: { className?: string }) {
         </li>
       ))}
       <li className="flex items-center gap-1.5">
-        <span className="grid h-3.5 w-5 place-items-center rounded-sm border border-rose-500 bg-rose-500/15 text-[7px] font-bold text-rose-800 dark:text-rose-200" aria-hidden>
+        <span className="grid h-3.5 w-5 place-items-center rounded-sm border border-primary bg-primary text-[7px] font-bold text-primary-foreground" aria-hidden>
           DOS
         </span>
         {DOS_LABEL}
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="grid h-3.5 w-5 place-items-center rounded-sm border border-emerald-600 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200" aria-hidden>
+        <span className="grid h-3.5 w-5 place-items-center rounded-sm border border-swap bg-swap-soft text-swap-ink" aria-hidden>
           <ArrowLeftRight className="size-2.5" />
         </span>
         Duty swap
@@ -96,12 +95,20 @@ export function DutyLegend({ className }: { className?: string }) {
         Locked date
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="size-2 rounded-full bg-fuchsia-500" aria-hidden />
+        <span className="size-2 rounded-full bg-event" aria-hidden />
         Special event
       </li>
+      {LEGEND_LEAVE_GROUPS.map((g) => (
+        <li key={g} className="flex items-center gap-1.5">
+          <span data-leave={g} className="h-3.5 w-5 rounded-sm bg-(--chip)" aria-hidden />
+          {LEAVE_GROUP_LABEL[g]}
+        </li>
+      ))}
     </ul>
   );
 }
+
+const LEGEND_LEAVE_GROUPS: LeaveGroup[] = ["annual", "health", "growth", "inlieu"];
 
 export function DutyChip({ duty, className, long }: { duty: Duty; className?: string; long?: boolean }) {
   const title = DUTY_TIMES[duty] ? `${DUTY_LABEL[duty]} ${DUTY_TIMES[duty]}` : DUTY_LABEL[duty];
@@ -130,16 +137,19 @@ export function LeaveChip({ absence, className }: { absence: Pick<CellAbsence, "
   ]
     .filter(Boolean)
     .join(", ");
+  const group = leaveGroup(absence.code);
   return (
     <span
-      title={title}
+      title={`${title} (${LEAVE_GROUP_LABEL[group]})`}
+      data-leave={group}
       className={cn(
-        "inline-flex h-5 items-center justify-center rounded border px-1 text-[10px] font-semibold leading-none whitespace-nowrap",
+        // The thin page-coloured ring separates the chip from whatever duty colour it sits on.
+        "inline-flex h-5 items-center justify-center rounded border px-1 text-[10px] font-semibold leading-none whitespace-nowrap ring-1 ring-background/70",
         pending || marker
-          ? "border-dashed border-teal-500 text-teal-800 dark:text-teal-200"
+          ? "border-dashed border-(--chip) bg-(--chip-soft) text-(--chip-ink)"
           : half
-            ? "border-teal-600 text-teal-900 dark:text-teal-50 bg-[linear-gradient(135deg,var(--color-teal-300)_50%,transparent_50%)] dark:bg-[linear-gradient(135deg,var(--color-teal-700)_50%,transparent_50%)]"
-            : "border-teal-700 bg-teal-700 text-white dark:bg-teal-500 dark:border-teal-500 dark:text-teal-950",
+            ? "leave-half border-(--chip) text-(--chip-ink)"
+            : "border-(--chip) bg-(--chip) text-leave-on",
         className,
       )}
     >
@@ -155,7 +165,8 @@ export function DosTag({ kind, className }: { kind: DosKind; className?: string 
     <span
       title={`${kind}: 24-hour duty, report at ${DOS_REPORT_TIME}. The shift duty and any Task still apply.`}
       className={cn(
-        "inline-flex h-4 items-center rounded-sm border border-rose-500 bg-rose-500/15 px-1 text-[10px] font-bold leading-none text-rose-800 whitespace-nowrap dark:bg-rose-950/90 dark:text-rose-200",
+        // Solid ink: an official duty, so it reads apart from every leave colour and on every duty colour.
+        "inline-flex h-4 items-center rounded-sm border border-primary bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground whitespace-nowrap",
         className,
       )}
     >
@@ -174,7 +185,7 @@ export function OpsChip({ entry, className }: { entry: OpsEntry; className?: str
       <TooltipTrigger asChild>
         <span
           className={cn(
-            "inline-flex max-w-full cursor-default items-center truncate rounded border border-sky-500/70 bg-sky-500/10 px-0.5 text-[9px] font-bold leading-4 tracking-tight text-sky-900 dark:text-sky-100",
+            "inline-flex max-w-full cursor-default items-center truncate rounded border border-info/70 bg-info-soft px-0.5 text-[9px] font-bold leading-4 tracking-tight text-info-ink",
             !entry.active && "border-dashed bg-transparent",
             className,
           )}
@@ -196,7 +207,7 @@ export function ExtraChip({ entry, className }: { entry: ExtraEntry; className?:
       <TooltipTrigger asChild>
         <span
           className={cn(
-            "inline-flex max-w-full cursor-default items-center truncate rounded border border-orange-500/70 bg-orange-500/10 px-0.5 text-[9px] font-bold leading-4 tracking-tight text-orange-900 dark:text-orange-100",
+            "inline-flex max-w-full cursor-default items-center truncate rounded border border-extra/70 bg-extra-soft px-0.5 text-[9px] font-bold leading-4 tracking-tight text-extra-ink",
             className,
           )}
         >
@@ -228,7 +239,7 @@ export function SwapTag({ swap, duty, className }: { swap: CellSwap; duty: Duty;
     <span
       title={swapTitle(swap, duty)}
       className={cn(
-        "inline-flex h-4 max-w-full items-center gap-0.5 truncate rounded-sm border border-emerald-600 bg-emerald-100 px-0.5 text-[10px] font-bold leading-none tracking-tight text-emerald-900 dark:bg-emerald-500/25 dark:text-emerald-50",
+        "inline-flex h-4 max-w-full items-center gap-0.5 truncate rounded-sm border border-swap bg-swap-soft px-0.5 text-[10px] font-bold leading-none tracking-tight text-swap-ink",
         className,
       )}
     >
@@ -257,7 +268,7 @@ export function TaskTag({ name, className }: { name: string; className?: string 
 
 export function LockBadge({ className }: { className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded bg-neutral-200 px-1.5 py-0.5 text-[11px] font-semibold text-neutral-800 dark:bg-neutral-700 dark:text-neutral-100", className)}>
+    <span className={cn("inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[11px] font-semibold text-secondary-foreground ring-1 ring-border", className)}>
       <Lock className="size-3" aria-hidden /> Locked date
     </span>
   );
@@ -265,7 +276,7 @@ export function LockBadge({ className }: { className?: string }) {
 
 export function EventBadge({ note, className }: { note?: string | null; className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded bg-fuchsia-100 px-1.5 py-0.5 text-[11px] font-semibold text-fuchsia-900 dark:bg-fuchsia-500/20 dark:text-fuchsia-200", className)}>
+    <span className={cn("inline-flex items-center gap-1 rounded bg-event-soft px-1.5 py-0.5 text-[11px] font-semibold text-event-ink", className)}>
       <CalendarClock className="size-3" aria-hidden /> Special Event{note ? `: ${note}` : ""}
     </span>
   );
@@ -273,17 +284,17 @@ export function EventBadge({ note, className }: { note?: string | null; classNam
 
 // Green above 2 slots, yellow at 1-2, red at none or below MFL (spec 8).
 export const SLOT_STYLE: Record<Strength["status"], string> = {
-  healthy: "text-emerald-700 dark:text-emerald-300",
-  low: "text-amber-800 dark:text-amber-300 font-semibold",
-  zero: "text-red-700 dark:text-red-300 font-bold",
-  below: "text-red-700 dark:text-red-300 font-bold",
+  healthy: "text-success-ink",
+  low: "text-warning-ink font-semibold",
+  zero: "text-danger-ink font-bold",
+  below: "text-danger-ink font-bold",
 };
 
 export const SLOT_BG: Record<Strength["status"], string> = {
-  healthy: "bg-emerald-50 dark:bg-emerald-500/10",
-  low: "bg-amber-100 dark:bg-amber-500/15",
-  zero: "bg-red-100 dark:bg-red-500/20",
-  below: "bg-red-200 dark:bg-red-500/30",
+  healthy: "bg-success-soft",
+  low: "bg-warning-soft",
+  zero: "bg-danger-soft",
+  below: "bg-danger/25",
 };
 
 export function SlotBadge({ strength, className }: { strength: Strength; className?: string }) {
@@ -296,11 +307,11 @@ export function SlotBadge({ strength, className }: { strength: Strength; classNa
 
 export function StatusBadge({ status }: { status: LeaveStatus }) {
   const style: Record<LeaveStatus, string> = {
-    PENDING: "bg-amber-100 text-amber-900 dark:bg-amber-400/20 dark:text-amber-200",
-    APPROVED: "bg-teal-100 text-teal-900 dark:bg-teal-400/20 dark:text-teal-200",
-    REJECTED: "bg-red-100 text-red-900 dark:bg-red-400/20 dark:text-red-200",
-    WITHDRAWN: "bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200",
-    CANCELLED: "bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200",
+    PENDING: "bg-warning-soft text-warning-ink",
+    APPROVED: "bg-success-soft text-success-ink",
+    REJECTED: "bg-danger-soft text-danger-ink",
+    WITHDRAWN: "bg-muted text-muted-foreground",
+    CANCELLED: "bg-muted text-muted-foreground",
   };
   return <span className={cn("rounded px-1.5 py-0.5 text-[11px] font-semibold", style[status])}>{STATUS_LABEL[status]}</span>;
 }

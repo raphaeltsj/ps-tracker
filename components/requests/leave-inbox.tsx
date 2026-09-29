@@ -49,7 +49,7 @@ function LeaveInboxRow({ leave }: { leave: LeaveSummary }) {
           <Button size="sm" variant="outline" disabled={pending} onClick={() => setRejecting(true)}>
             Reject
           </Button>
-          {leave.noSlotOn && <span className="text-xs font-medium text-red-700 dark:text-red-300">No slot available on {formatDate(leave.noSlotOn)}</span>}
+          {leave.noSlotOn && <span className="text-xs font-medium text-danger-ink">No slot available on {formatDate(leave.noSlotOn)}</span>}
         </div>
       ) : (
         <div className="space-y-2">

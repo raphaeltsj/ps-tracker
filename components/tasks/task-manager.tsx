@@ -24,8 +24,8 @@ function NameInput({ value, onChange, label }: { value: string; onChange: (v: st
   const over = value.length > NAME_MAX;
   return (
     <div className="flex items-center gap-2">
-      <Input value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} className={cn("w-32", over && "border-red-500")} />
-      <span className={cn("w-10 text-xs tabular-nums", over ? "font-semibold text-red-600" : "text-muted-foreground")} aria-live="polite">
+      <Input value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} className={cn("w-32", over && "border-danger")} />
+      <span className={cn("w-10 text-xs tabular-nums", over ? "font-semibold text-danger-ink" : "text-muted-foreground")} aria-live="polite">
         {value.length}/{NAME_MAX}
       </span>
     </div>
@@ -49,7 +49,7 @@ export function TaskManager({ tasks }: { tasks: TaskRow[] }) {
         <Button disabled={pending || !validName(newName)} onClick={() => run(() => createTask(newName), () => setNewName(""))}>
           Add Task
         </Button>
-        {newName.length > NAME_MAX && <span className="text-xs text-red-600">Too long. Try a shorter name such as &quot;T10&quot;.</span>}
+        {newName.length > NAME_MAX && <span className="text-xs text-danger-ink">Too long. Try a shorter name such as &quot;T10&quot;.</span>}
       </div>
       <ResultMessage result={result} />
 
@@ -83,7 +83,7 @@ export function TaskManager({ tasks }: { tasks: TaskRow[] }) {
                   >
                     Rename
                   </Button>
-                  <Button size="sm" variant="outline" className="text-red-700 dark:text-red-300" onClick={() => setToDelete(t)}>
+                  <Button size="sm" variant="outline" className="text-danger-ink" onClick={() => setToDelete(t)}>
                     Delete
                   </Button>
                 </span>
@@ -106,7 +106,7 @@ export function TaskManager({ tasks }: { tasks: TaskRow[] }) {
           <AlertDialogFooter>
             <AlertDialogCancel>Keep Task</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 text-white hover:bg-red-700"
+              className="bg-destructive text-white hover:bg-destructive/90"
               onClick={() => {
                 const t = toDelete!;
                 run(() => deleteTask(t.id));

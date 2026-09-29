@@ -60,7 +60,7 @@ export function CalendarView({
               <div className="flex items-center justify-between">
                 <span className={cn("text-sm font-semibold", date === today && "rounded-full bg-primary px-1.5 text-primary-foreground")}>{Number(date.slice(8))}</span>
                 <span className="flex items-center gap-0.5">
-                  {day.event && <CalendarClock className="size-3.5 text-fuchsia-600 dark:text-fuchsia-400" aria-label="Special event" />}
+                  {day.event && <CalendarClock className="size-3.5 text-event" aria-label="Special event" />}
                   {day.locked && <Lock className="size-3.5" aria-label="Locked date" />}
                   {hasRemarks && <span className="size-1.5 rounded-full bg-foreground/60" aria-label="Has remarks" />}
                 </span>

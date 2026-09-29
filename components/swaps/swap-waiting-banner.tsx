@@ -7,7 +7,7 @@ export function SwapWaitingBanner({ count, href }: { count: number; href: string
   return (
     <Link
       href={href}
-      className="flex items-center gap-2 rounded-xl border border-amber-400/60 bg-amber-50 p-3 text-sm font-medium text-amber-950 hover:bg-amber-100 dark:bg-amber-400/10 dark:text-amber-100 dark:hover:bg-amber-400/20"
+      className="flex items-center gap-2 rounded-xl border border-warning/60 bg-warning-soft p-3 text-sm font-medium text-warning-ink hover:bg-warning/20"
     >
       <ArrowLeftRight className="size-4 shrink-0" aria-hidden />
       <span className="flex-1">

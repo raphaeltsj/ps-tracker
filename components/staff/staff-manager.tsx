@@ -242,8 +242,9 @@ function ProficiencyCell({ staffId, taskId, level }: { staffId: string; taskId: 
       onClick={() => run(() => setStaffProficiency({ staffId, taskId, level: NEXT_LEVEL[level] }))}
       className={cn(
         "flex h-7 w-7 items-center justify-center rounded-md border text-[10px] font-bold transition-colors disabled:opacity-60",
-        level === "PROFICIENT" && "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700",
-        level === "UNDERSTUDY" && "border-amber-500 bg-amber-500 text-white hover:bg-amber-600",
+        level === "PROFICIENT" && "border-success bg-success text-white hover:bg-success/90 dark:text-background",
+        // Softer than proficient: training is still in progress.
+        level === "UNDERSTUDY" && "border-warning bg-warning-soft text-warning-ink hover:bg-warning/25",
         level === "NONE" && "border-muted-foreground/30 bg-muted/40 text-muted-foreground hover:bg-muted",
       )}
     >
@@ -344,13 +345,13 @@ function ProficiencyMatrix({
 
       <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1">
-          <span className="inline-flex h-4 w-4 items-center justify-center rounded border border-emerald-600 bg-emerald-600 text-white">
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded border border-success bg-success text-white dark:text-background">
             <Check className="size-2.5" />
           </span>
           Proficient
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-flex h-4 w-4 items-center justify-center rounded border border-amber-500 bg-amber-500 text-[8px] font-bold text-white">U/S</span>
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded border border-warning bg-warning-soft text-[8px] font-bold text-warning-ink">U/S</span>
           Understudy (training)
         </span>
         <span className="flex items-center gap-1">

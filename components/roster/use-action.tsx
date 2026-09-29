@@ -25,7 +25,7 @@ export function useAction() {
 export function ResultMessage({ result }: { result: ActionResult | null }) {
   if (!result) return null;
   return (
-    <p role="status" className={result.ok ? "text-sm text-teal-700 dark:text-teal-300" : "text-sm font-medium text-red-700 dark:text-red-300"}>
+    <p role="status" className={result.ok ? "text-sm text-success-ink" : "text-sm font-medium text-danger-ink"}>
       {result.ok ? result.message : result.error}
     </p>
   );

@@ -5,15 +5,15 @@ import { cn } from "@/lib/utils";
 /** Same colour bands as the roster's Available Slot(s): green above 2 left, amber at 1-2, red at or
  * below 0 (over the limit, e.g. leave given beyond it). */
 function remainingClass(remaining: number): string {
-  if (remaining <= 0) return "text-red-700 dark:text-red-300";
-  if (remaining <= 2) return "text-amber-700 dark:text-amber-300";
-  return "text-emerald-700 dark:text-emerald-300";
+  if (remaining <= 0) return "text-danger-ink";
+  if (remaining <= 2) return "text-warning-ink";
+  return "text-success-ink";
 }
 
 function barClass(remaining: number): string {
-  if (remaining <= 0) return "bg-red-600";
-  if (remaining <= 2) return "bg-amber-500";
-  return "bg-emerald-600";
+  if (remaining <= 0) return "bg-danger";
+  if (remaining <= 2) return "bg-warning";
+  return "bg-success";
 }
 
 /** Leave taken as a list: a combined-limit row shows a progress bar and how many are left this year

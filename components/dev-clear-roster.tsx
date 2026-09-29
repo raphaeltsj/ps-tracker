@@ -25,7 +25,7 @@ export function DevClearRoster() {
       <Button
         variant="outline"
         size="sm"
-        className="border-dashed border-red-500/60 text-red-700 dark:text-red-300"
+        className="border-dashed border-danger/60 text-danger-ink"
         disabled={pending}
         onClick={() => setOpen(true)}
         title="Developer tool: clears every duty, leave, Task assignment, lock, event, Ops duty and Extra"
@@ -34,7 +34,7 @@ export function DevClearRoster() {
         <span className="hidden md:inline">{pending ? "Clearing..." : "Clear roster (dev)"}</span>
       </Button>
       {result && (
-        <span role="status" className={result.ok ? "sr-only" : "text-xs font-medium text-red-700 dark:text-red-300"}>
+        <span role="status" className={result.ok ? "sr-only" : "text-xs font-medium text-danger-ink"}>
           {result.ok ? result.message : result.error}
         </span>
       )}
@@ -49,7 +49,7 @@ export function DevClearRoster() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 text-white hover:bg-red-700" onClick={() => run(() => devClearRoster())}>
+            <AlertDialogAction className="bg-destructive text-white hover:bg-destructive/90" onClick={() => run(() => devClearRoster())}>
               Clear everything
             </AlertDialogAction>
           </AlertDialogFooter>

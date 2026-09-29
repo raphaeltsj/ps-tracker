@@ -133,7 +133,6 @@ export function MobileRoster({
           </div>
         )}
         <StrengthSummary day={info} compact={compact} />
-        <DutyLegend />
       </div>
 
       <ul className="divide-y">
@@ -218,6 +217,7 @@ export function MobileRoster({
           );
         })}
       </ul>
+      <DutyLegend className="border-t px-4 py-3" />
     </div>
   );
 }
