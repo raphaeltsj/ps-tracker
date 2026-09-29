@@ -95,19 +95,29 @@ async function firstCellOnMedicalLeave(cells: CellRef[]): Promise<string | null>
  * pending until then (spec 5.1).
  */
 async function notifyDutyOnLeave(viewer: Viewer, cells: CellRef[], dutyLabel: string) {
-  for (const { staffId, date } of cells) {
-    if (staffId === viewer.id) continue;
-    const leave = await findLeaveConflict(staffId, [date]);
-    if (!leave) continue;
+  // One notification per person, covering all their dates in this change (a 2-night V is one message).
+  const byStaff = new Map<string, string[]>();
+  for (const { staffId, date } of cells) if (staffId !== viewer.id) byStaff.set(staffId, [...(byStaff.get(staffId) ?? []), date]);
+  for (const [staffId, allDates] of byStaff) {
+    const hits: { date: string; label: string }[] = [];
+    for (const date of [...new Set(allDates)].sort()) {
+      const leave = await findLeaveConflict(staffId, [date]);
+      if (leave) hits.push({ date, label: `${leave.status === "PENDING" ? "pending " : ""}${leave.code}` });
+    }
+    if (hits.length === 0) continue;
+    const one = hits.length === 1;
+    const sameYear = hits.every((h) => h.date.slice(0, 4) === hits[0].date.slice(0, 4));
+    const when = one ? formatDate(hits[0].date) : `${formatDateList(hits.map((h) => h.date))}${sameYear ? ` ${hits[0].date.slice(0, 4)}` : ""}`;
+    const leave = [...new Set(hits.map((h) => h.label))].join(" / ");
     const next =
       dutyLabel === DUTY_LABEL.OFF_V
-        ? "Your leave that day may no longer be needed: check with your supervisor."
-        : "Swap the duty with someone, or check with your supervisor.";
+        ? `Your leave ${one ? "that day" : "on those days"} may no longer be needed: check with your supervisor.`
+        : `Swap the duty with someone, or check with your supervisor.`;
     await db.notification.create({
       data: {
         staffId,
-        message: `${viewer.name} assigned you ${dutyLabel} on ${formatDate(date)}, a day you have ${leave.status === "PENDING" ? "pending " : ""}${leave.code}. ${next}`,
-        href: `/roster?month=${date.slice(0, 7)}`,
+        message: `${viewer.name} assigned you ${dutyLabel} on ${when}, ${one ? "a day" : "days"} you have ${leave}. ${next}`,
+        href: `/roster?month=${hits[0].date.slice(0, 7)}`,
       },
     });
   }
